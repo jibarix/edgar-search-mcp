@@ -11,10 +11,10 @@ import re
 
 from jsonschema import validate, ValidationError
 
-from config.constants import SUBMISSIONS_URL, XBRL_INSTANCE_URL
-from utils.cache import Cache
-from utils.helpers import iso_date
-from utils.sec_client import SecError, get_json
+from edgar_mcp.config.constants import SUBMISSIONS_URL, XBRL_INSTANCE_URL
+from edgar_mcp.utils.cache import Cache
+from edgar_mcp.utils.helpers import iso_date
+from edgar_mcp.utils.sec_client import SecError, get_json
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ class FilingRetrieval:
         return data, meta
 
     def get_filing_metadata(self, cik, filing_type="10-K", end_date=None, limit=10,
-                            include_amendments=False):
+                            include_amendments=False, strict=False):
         """
         Get metadata for company filings, newest first.
 
@@ -84,6 +84,8 @@ class FilingRetrieval:
             end_date (str): YYYY-MM-DD; filings made after it are left out
             limit (int): Maximum number of filings to return
             include_amendments (bool): also return amendments ("10-K/A" with "10-K")
+            strict (bool): raise the SecError of an older filings file that
+                cannot be read, instead of warning and going on without it
 
         Returns:
             (list, list, dict): filings, warnings and the retrieval record. A
@@ -100,17 +102,25 @@ class FilingRetrieval:
         sources = [meta]
         filings = self._process_filings_data(
             submissions["filings"]["recent"], filing_type, end_date, formatted_cik, include_amendments, warnings)
-        # Older filings sit in separate files, read only if the recent ones run out.
-        for name in (f.get("name", "") for f in submissions["filings"]["files"]):
+        # Older filings sit in separate files, read only if the recent ones run
+        # out, newest first so the first filings found are the latest ones.
+        files = [f if isinstance(f, dict) else {"name": repr(f)} for f in submissions["filings"]["files"]]
+        files.sort(key=lambda f: str(f.get("filingTo") or ""), reverse=True)
+        for name in (str(f.get("name", "")) for f in files):
             if len(filings) >= limit:
                 break
             if not _HISTORY_FILE.fullmatch(name):
+                if strict:
+                    raise SecError(f"older filings file {name!r} has an unexpected name; "
+                                   f"the filings of CIK {formatted_cik} cannot all be read")
                 warnings.append(f"older filings file {name!r} has an unexpected name and was not read")
                 continue
             try:
                 data, older = get_json(f"https://data.sec.gov/submissions/{name}", filing_cache, f"historical_{name}")
                 sources.append(older)
             except SecError as e:
+                if strict:
+                    raise
                 warnings.append(f"older filings file {name} could not be read ({e.code}); "
                                 "filings from that period are missing")
                 continue

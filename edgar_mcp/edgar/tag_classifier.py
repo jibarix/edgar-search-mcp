@@ -126,14 +126,19 @@ _BUILTIN_TAGS = {
     "OperatingExpenses":                                     {"statement": "IS", "category": "Income", "display_name": "Total operating expenses",     "order": 25, "indent": 1, "is_subtotal": True},
     "OperatingIncomeLoss":                                   {"statement": "IS", "category": "Income", "display_name": "Operating income",             "order": 30, "indent": 0, "is_subtotal": True},
 
-    "InterestExpense":                                       {"statement": "IS", "category": "Revenue", "display_name": "Total interest expense",       "order": 8,  "indent": 0},
+    # An expense, so not in "Revenue"; order 8 keeps a bank's interest income, interest expense, net interest income.
+    "InterestExpense":                                       {"statement": "IS", "category": "Income",  "display_name": "Interest expense",             "order": 8,  "indent": 0},
     "InterestIncome":                                        {"statement": "IS", "category": "Revenue", "display_name": "Interest income",              "order": 6,  "indent": 0},
     "InterestIncomeExpenseNet":                               {"statement": "IS", "category": "Income",  "display_name": "Net interest income",          "order": 12, "indent": 0, "is_subtotal": True},
+    # The SEC mapping called it "Interest income"; the tag also holds other income.
+    "InterestAndOtherIncome":                                {"statement": "IS", "category": "Income", "display_name": "Interest and other income",    "order": 37, "indent": 1},
     "OtherNonoperatingIncomeExpense":                        {"statement": "IS", "category": "Income", "display_name": "Other non-operating income/(expense)", "order": 38, "indent": 1},
     "NonoperatingIncomeExpense":                             {"statement": "IS", "category": "Income", "display_name": "Other income/(expense), net",  "order": 39, "indent": 0},
 
     "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest": {"statement": "IS", "category": "Income", "display_name": "Income before provision for income taxes", "order": 40, "indent": 0, "is_subtotal": True},
     "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments": {"statement": "IS", "category": "Income", "display_name": "Income before provision for income taxes", "order": 40, "indent": 0, "is_subtotal": True},
+    # The taxonomy's own label; the SEC mapping called it "Income before income taxes", which drops "attributable to parent".
+    "IncomeLossAttributableToParent":                        {"statement": "IS", "category": "Income", "display_name": "Income (loss) attributable to parent, before tax", "order": 40, "indent": 0},
     "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic":              {"statement": "IS", "category": "Income", "display_name": "Domestic pre-tax income",   "order": 41, "indent": 1, "section": "Pre-tax income by jurisdiction:"},
     "IncomeLossFromContinuingOperationsBeforeIncomeTaxesForeign":               {"statement": "IS", "category": "Income", "display_name": "Foreign pre-tax income",    "order": 42, "indent": 1},
 
@@ -183,6 +188,11 @@ _BUILTIN_TAGS = {
 
     "ComprehensiveIncomeNetOfTaxIncludingPortionAttributableToNoncontrollingInterest": {"statement": "CI", "category": "OCI", "display_name": "Comprehensive income (incl. non-controlling interest)", "order": 89, "indent": 0, "is_subtotal": True},
 
+    # ── Statement of equity: changes in the period ──
+    # The SEC mapping files these under the income statement; they are movements in equity.
+    "DividendsCommonStockCash":                              {"statement": "EQ", "category": "Equity", "display_name": "Cash dividends declared on common stock", "order": 460, "indent": 1},
+    "StockIssuedDuringPeriodValueRestrictedStockAwardGross": {"statement": "EQ", "category": "Equity", "display_name": "Issuance of restricted stock",            "order": 461, "indent": 1},
+
     # ── Cash Flow: Operating ──
     "NetCashProvidedByUsedInOperatingActivities":            {"statement": "CF", "category": "OperatingCashFlow",  "display_name": "Net Cash from Operations",             "order": 0},
     "DepreciationDepletionAndAmortization":                  {"statement": "CF", "category": "OperatingCashFlow",  "display_name": "Depreciation & Amortization",          "order": 10},
@@ -212,8 +222,14 @@ _BUILTIN_TAGS = {
 
 # Tags that should never be classified. These are footnote / axis-member /
 # rate-reconciliation disclosures the auto-derived SEC mapping placed on a
-# statement, but they aren't real statement lines.
-_SKIP_TAGS = frozenset({
+# statement, but they aren't real statement lines. A tag with a reason of its
+# own is in _EXCLUDED; the rest give _FOOTNOTE as the reason.
+_FOOTNOTE = "a footnote disclosure, not a line of the statement"
+_EXCLUDED = {
+    "DebtSecuritiesUnrealizedGainLoss": "an investment footnote figure: it can belong in net income or in "
+                                        "other comprehensive income, and the tag does not say which",
+}
+_SKIP_TAGS = frozenset(_EXCLUDED) | frozenset({
     # Share-count of buybacks — lives in equity changes, not the IS.
     "StockRepurchasedAndRetiredDuringPeriodShares",
     "StockRepurchasedAndRetiredDuringPeriodValue",
@@ -269,28 +285,49 @@ class TagClassifier:
         Returns:
             dict mapping concept_name -> classification dict
         """
-        results = {}
-        skipped = 0
+        return self.classify_with_report(concept_names, statement_type)[0]
 
+    def classify_with_report(self, concept_names, statement_type=None):
+        """As classify_tags, and say what was left out and why.
+
+        Returns (classifications, report). The report has "unmapped" (tags in
+        neither source), "excluded" ({tag: reason}, left out by rule) and
+        "other_statements" (tags classified, but on another statement).
+        """
+        results, unmapped, excluded = {}, [], {}
         for name in concept_names:
             info = self._lookup(name)
             if info is not None:
                 results[name] = info
+            elif name in _SKIP_TAGS:
+                excluded[name] = _EXCLUDED.get(name, _FOOTNOTE)
             else:
-                skipped += 1
+                unmapped.append(name)
 
-        if skipped:
-            logger.debug(f"Skipped {skipped} unrecognized tags (not in SEC mapping or builtins)")
+        if unmapped:
+            logger.debug(f"Skipped {len(unmapped)} unrecognized tags (not in SEC mapping or builtins)")
 
         # Filter by statement type
+        other = []
         if statement_type and statement_type != "ALL":
             allowed_categories = set(_STATEMENT_CATEGORIES.get(statement_type, []))
-            results = {
-                k: v for k, v in results.items()
-                if v.get("category") in allowed_categories
-            }
+            # A tag excluded by rule is reported only where the mapping would have put it.
+            for name in list(excluded):
+                mapped = _BUILTIN_TAGS.get(name) or _SEC_MAPPING.get(name) or {}
+                if mapped.get("category") not in allowed_categories:
+                    del excluded[name]
+                    other.append(name)
+            kept = {}
+            for k, v in results.items():
+                # Movements in equity share the "Equity" category but are not balances.
+                if v.get("category") in allowed_categories and not (statement_type == "BS" and v.get("statement") == "EQ"):
+                    kept[k] = v
+                else:
+                    other.append(k)
+            results = kept
 
-        return results
+        return results, {"unmapped": sorted(unmapped), "excluded": dict(sorted(excluded.items())),
+                         "other_statements": sorted(other)}
 
     def _lookup(self, concept_name):
         """Check builtin overrides first, then SEC mapping. Tags source.

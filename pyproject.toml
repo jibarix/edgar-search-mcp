@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "edgar-search-mcp"
-version = "0.4.0"
+version = "0.5.0"
 description = "Retrieve SEC EDGAR filings and reported financial facts, as an MCP server"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,8 +24,10 @@ Repository = "https://github.com/jibarix/edgar-search-mcp"
 edgar-search-mcp = "edgar_mcp.__main__:main"
 
 [tool.setuptools.packages.find]
-include = ["edgar*", "edgar_mcp*", "config*", "utils*"]
+include = ["edgar_mcp*"]
 
-# The tag-to-statement mapping the classifier cannot work without.
+# The tag-to-statement mapping the classifier cannot work without, and the
+# company index snapshot that search_companies reads unless another is built.
 [tool.setuptools.package-data]
-edgar = ["data/*.json"]
+"edgar_mcp.edgar" = ["data/*.json"]
+edgar_mcp = ["data/*.json"]

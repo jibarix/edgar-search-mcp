@@ -1,6 +1,6 @@
 import sys
 
-from config.constants import USER_AGENT
+from edgar_mcp.config.constants import USER_AGENT
 from edgar_mcp.server import mcp
 
 

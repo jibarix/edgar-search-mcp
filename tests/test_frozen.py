@@ -21,7 +21,7 @@ URLS = {
 def child(mode):
     """Runs in a fresh process, so the settings read the environment set for it."""
     sys.path.insert(0, HERE)
-    from utils import sec_client
+    from edgar_mcp.utils import sec_client
     out = {}
     if mode == "frozen":
         def no_network(*a, **k):

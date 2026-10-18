@@ -18,8 +18,8 @@ import logging
 from collections import Counter, defaultdict
 from datetime import date, timedelta
 
-from edgar.tag_classifier import TagClassifier
-from utils.helpers import iso_date
+from edgar_mcp.edgar.tag_classifier import TagClassifier
+from edgar_mcp.utils.helpers import iso_date
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +158,7 @@ class XBRLParser:
         logger.info(f"Found {len(all_concept_names)} unique concepts in data")
 
         # Classify all concepts via the builtin + SEC tag mapping.
-        classifications = self.classifier.classify_tags(
+        classifications, report = self.classifier.classify_with_report(
             list(all_concept_names),
             statement_type=statement_type
         )
@@ -234,6 +234,12 @@ class XBRLParser:
         )
 
         metadata = normalized['metadata']
+        # What the company reports that is not here, and why: no mapping, a rule, or another statement.
+        metadata['unclassified'] = {
+            'unmapped': len(report['unmapped']),
+            'excluded': report['excluded'],
+            'other_statements': len(report['other_statements']),
+        }
         if skipped_units:
             metadata['skipped_units'] = skipped_units
             metadata['warnings'].append(

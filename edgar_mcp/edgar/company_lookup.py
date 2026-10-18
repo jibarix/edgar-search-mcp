@@ -4,9 +4,9 @@ from __future__ import annotations
 import re
 from difflib import get_close_matches
 
-from config.constants import COMPANY_TICKERS_URL
-from utils.cache import Cache
-from utils.sec_client import get_json
+from edgar_mcp.config.constants import COMPANY_TICKERS_URL
+from edgar_mcp.utils.cache import Cache
+from edgar_mcp.utils.sec_client import get_json
 
 # Initialize cache for company lookup
 company_cache = Cache("company_lookup")
@@ -36,14 +36,16 @@ def get_company_tickers():
             "shared":    normalized lowercase name -> entries, for a name
                          used by more than one CIK,
         }
-    Each entry has the shape {"cik", "ticker", "name"}.
+    Each entry has the shape {"cik", "ticker", "name"}. "source" says where
+    the feed came from and when it left the SEC; a cached index keeps the
+    time of the download it was built from.
     """
-    cached_data = company_cache.get("company_tickers_v4")
+    cached_data = company_cache.get("company_tickers_v5")
     if cached_data:
         return cached_data
 
     # A failed download raises SecError; it is never reported as "no match".
-    data, _ = get_json(COMPANY_TICKERS_URL)
+    data, meta = get_json(COMPANY_TICKERS_URL)
 
     by_name: dict[str, dict] = {}
     by_ticker: dict[str, dict] = {}
@@ -66,8 +68,10 @@ def get_company_tickers():
 
     # A name used by more than one CIK identifies none of them.
     shared = {name: list(entries.values()) for name, entries in by_cik.items() if len(entries) > 1}
-    result = {"by_name": by_name, "by_ticker": by_ticker, "shared": shared}
-    company_cache.set("company_tickers_v4", result)
+    source = {"source_url": COMPANY_TICKERS_URL, "retrieved_at": meta.get("retrieved_at"),
+              "frozen": meta.get("frozen", False)}
+    result = {"by_name": by_name, "by_ticker": by_ticker, "shared": shared, "source": source}
+    company_cache.set("company_tickers_v5", result)
     return result
 
 

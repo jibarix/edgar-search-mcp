@@ -1,0 +1,719 @@
+% edgar-search-mcp -- the architecture, in diagrams (version 0.5.0, the code as of 2026-10-17)
+% Build: latexmk -xelatex edgar_search_mcp_architecture.tex
+% Drawn from the code: edgar_mcp/server.py, edgar_mcp/utils/*.py, edgar_mcp/edgar/*.py, edgar_mcp/config/*.py.
+% The examples are real calls to the server on 2026-10-17 (Costco, CIK 0000909832), shortened.
+% Each frame's footer has two lines: CODE (where it lives) and CHECKED (the test that covers it).
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usepackage{fontspec}
+\usepackage{inter}
+\usepackage[scale=0.95]{plex-mono}
+\setsansfont{Inter}
+\usepackage{tikz}
+\usepackage{array}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric,matrix}
+
+% ---------- palette ----------
+\definecolor{bg}{HTML}{F4F4F2}
+\definecolor{ink}{HTML}{1F1F1E}
+\definecolor{muted}{HTML}{8A8A86}
+\definecolor{line}{HTML}{C4C4BF}
+\definecolor{panel}{HTML}{E9E9E5}
+\definecolor{svc}{HTML}{DCDCD7}
+\definecolor{accent}{HTML}{DD6B3D}
+\definecolor{accentfill}{HTML}{FBE4D8}
+
+% ---------- beamer theme ----------
+\setbeamercolor{background canvas}{bg=bg}
+\setbeamercolor{normal text}{fg=ink}
+\setbeamercolor{frametitle}{fg=ink}
+\setbeamertemplate{navigation symbols}{}
+\setbeamerfont{frametitle}{size=\large,series=\bfseries}
+\newcommand{\kicker}{}
+\setbeamertemplate{frametitle}{%
+  \vspace{3mm}%
+  {\ttfamily\fontsize{6}{7}\selectfont\color{muted}\MakeUppercase{\kicker}}\\[0.6mm]%
+  {\usebeamerfont{frametitle}\insertframetitle}%
+  \ifx\insertframesubtitle\empty\else\\[0.2mm]{\mdseries\fontsize{6.4}{7.8}\selectfont\color{ink!60}\insertframesubtitle}\fi
+}
+% each frame names where its subject lives and what checks it: \status{code}{checked}, set before the frame
+\newcommand{\stcode}{}\newcommand{\stcheck}{}
+\newcommand{\status}[2]{\renewcommand{\stcode}{#1}\renewcommand{\stcheck}{#2}}
+\newcommand{\stline}[2]{\makebox[9mm][l]{\ttfamily\fontsize{4.6}{5.6}\selectfont\color{accent}#1}{\fontsize{5}{6}\selectfont\color{ink!80}#2}}
+\setbeamertemplate{footline}{%
+  \ifx\stcode\empty
+    \hspace{5mm}{\ttfamily\fontsize{5}{6}\selectfont\color{muted}EDGAR-SEARCH-MCP · ARCHITECTURE IN DIAGRAMS · VERSION 0.5.0 · THE CODE AS OF 2026-10-17}%
+  \else
+    \hspace{5mm}\parbox[b]{150mm}{\raggedright\hyphenpenalty=10000
+      \stline{CODE}{\stcode}\\[0.2mm]\stline{CHECKED}{\stcheck}}%
+  \fi
+  \hfill{\ttfamily\fontsize{5}{6}\selectfont\color{muted}\insertframenumber}\hspace{5mm}\vspace{2.5mm}}
+\setbeamersize{text margin left=6mm,text margin right=6mm}
+
+% ---------- text vocabulary ----------
+\newcommand{\bt}[1]{{\fontsize{5.1}{6.15}\selectfont\hyphenpenalty=10000\exhyphenpenalty=10000 #1\par}}
+\newcommand{\cd}[1]{{\ttfamily\fontsize{4.6}{6.15}\selectfont #1}}
+\newcommand{\ra}{{\,$\rightarrow$\,}}
+\newcommand{\zlabel}[1]{{\ttfamily\fontsize{4.8}{5.6}\selectfont\color{muted}\MakeUppercase{#1}}}
+\newcommand{\elabel}[1]{{\ttfamily\fontsize{4.4}{5.2}\selectfont\color{ink!70}#1}}
+% card text: [step number]{tag}{title}{body}
+\newcommand{\K}[4][]{%
+  {\ttfamily\fontsize{4.3}{5.2}\selectfont\color{muted}%
+   \if\relax\detokenize{#1}\relax\else{\fontsize{5.4}{5.2}\selectfont\bfseries\color{accent}#1}\hspace{1mm}\fi#2\par}\vspace{0.4pt}%
+  {\fontsize{6.3}{7.3}\selectfont\bfseries\hyphenpenalty=10000 #3\par}\vspace{0.7pt}%
+  \bt{#4}}
+% an example: a call and what came back, in monospace
+\newcommand{\call}[1]{{\ttfamily\fontsize{4.7}{5.9}\selectfont\color{accent}#1\par}}
+\newcommand{\out}[1]{{\ttfamily\fontsize{4.5}{5.7}\selectfont\color{ink!85}#1\par}}
+\newcommand{\oc}[2]{\makebox[#1][l]{#2}}
+
+\tikzset{
+  x=1mm, y=1mm,
+  card/.style={draw=line, fill=white, rounded corners=1.2pt, line width=0.4pt, align=left, text width=#1,
+               inner sep=1.3mm, anchor=north},
+  card/.default=31mm,
+  plain/.style={},
+  client/.style={draw=accent, fill=accentfill},             % the MCP client and its model
+  gate/.style={draw=accent, fill=white, line width=0.8pt},  % a check that can stop the call
+  store/.style={fill=svc!70},                               % stored data
+  ext/.style={draw=ink!60, dash pattern=on 1.3pt off 1pt},  % the SEC
+  zone/.style={draw=line, fill=panel, rounded corners=2pt, line width=0.4pt},
+  arr/.style={-{Stealth[length=2.6pt,width=2.2pt]}, line width=0.45pt, draw=ink!65},
+  farr/.style={arr, draw=accent, line width=0.6pt},
+  darr/.style={arr, dashed},
+  back/.style={arr, draw=accent, dashed, line width=0.55pt},
+  note/.style={align=left, text width=#1, inner sep=0pt, anchor=north west, font=\fontsize{5.1}{6.15}\selectfont,
+              execute at begin node={\hyphenpenalty=10000 \exhyphenpenalty=10000 }},
+  note/.default=40mm,
+  ltr/.style={circle, fill=accent, text=white, inner sep=0pt, minimum size=2.9mm, font=\ttfamily\bfseries\fontsize{4.6}{5}\selectfont},
+  yes/.style={font=\ttfamily\fontsize{4.4}{5}\selectfont, text=accent, inner sep=0.6mm, fill=bg},
+  no/.style={font=\ttfamily\fontsize{4.4}{5}\selectfont, text=ink!70, inner sep=0.6mm, fill=bg},
+}
+\newcommand{\thead}[1]{{\ttfamily\color{muted}\fontsize{5}{6}\selectfont #1}}
+
+% ---------- tables ----------
+\newcommand{\tstart}{\hline\noalign{\vspace{0.8mm}}}
+\newcommand{\tmid}{\\[0.4mm]\hline\noalign{\vspace{0.8mm}}}
+\newcommand{\tend}{\\[0.4mm]\hline}
+\newcolumntype{B}[1]{>{\raggedright\arraybackslash\bfseries}p{#1}}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\raggedright\arraybackslash\ttfamily}p{#1}}
+\newenvironment{tbl}[1][5.4]{\centering\fontsize{#1}{\numexpr0\relax}\selectfont\fontsize{#1}{1.27\dimexpr#1pt\relax}\selectfont
+  \renewcommand{\arraystretch}{1.08}\setlength{\tabcolsep}{1.6mm}}{\par}
+
+% ---------- legend ----------
+\newcommand{\sw}[3][0.4pt]{\tikz[baseline=-0.55ex]\node[draw=#2, fill=#3, line width=#1, rounded corners=0.6pt, inner sep=0pt, minimum width=3.4mm, minimum height=1.9mm]{};}
+\newcommand{\lgi}[2]{#1\hspace{1.2mm}{\ttfamily\fontsize{4.6}{5.4}\selectfont\color{muted}#2}\hspace{4.5mm}}
+\newcommand{\legendrow}[1][]{\par\vspace{1.6mm}{\centering
+  \lgi{\sw{line}{white}}{CODE STEP}\lgi{\sw{accent}{accentfill}}{MCP CLIENT AND ITS MODEL}\lgi{\sw[0.8pt]{accent}{white}}{A CHECK THAT CAN STOP THE CALL}%
+  \lgi{\sw{line}{svc!70}}{STORED DATA}\lgi{{\ttfamily\fontsize{4.6}{5.4}\selectfont\color{ink!55}- - -}}{THE SEC}#1\par}}
+
+% ---------- a figure that never overflows the frame ----------
+\newsavebox{\figbox}
+\newlength{\figmax}\setlength{\figmax}{51mm}
+\newenvironment{fig}{\begin{lrbox}{\figbox}\begin{tikzpicture}}{\end{tikzpicture}\end{lrbox}%
+  \ifdim\wd\figbox>148mm \sbox{\figbox}{\resizebox{148mm}{!}{\usebox{\figbox}}}\fi
+  \ifdim\dimexpr\ht\figbox+\dp\figbox\relax>\figmax \resizebox{!}{\figmax}{\usebox{\figbox}}\else\usebox{\figbox}\fi}
+
+\begin{document}
+
+% =====================================================================
+\begin{frame}[plain]
+\begin{tikzpicture}[remember picture, overlay]
+  \node[anchor=north west, align=left] at ($(current page.north west)+(10,-18)$) {%
+    {\ttfamily\fontsize{7}{8}\selectfont\color{muted}EDGAR-SEARCH-MCP · SEC EDGAR AS A READ-ONLY MCP SERVER}\\[4mm]
+    {\fontsize{24}{28}\selectfont\bfseries The architecture}\\[1mm]
+    {\fontsize{24}{28}\selectfont\bfseries\color{accent} in diagrams}\\[6mm]
+    {\large\color{muted} Nine tools: companies, reported facts, filings, their text.}\\[1mm]
+    {\large\color{muted} Every figure carries the filing it came from.}\\[10mm]
+    {\ttfamily\fontsize{6}{7.6}\selectfont\color{muted}FRAMING · THE WHOLE SYSTEM · THE NINE TOOLS · HOW THEY CHAIN · ONE CALL · SEC ACCESS · STATEMENTS ·}\\
+    {\ttfamily\fontsize{6}{7.6}\selectfont\color{muted}FILING TEXT · SEGMENTS · BOUNDS · ERRORS · EXAMPLES · LIMITATIONS · SETUP · TESTS}\\[5mm]
+    {\ttfamily\fontsize{6}{7.6}\selectfont\color{muted}VERSION 0.5.0 · OCTOBER 17, 2026 · JIBARIX · GITHUB.COM/JIBARIX/EDGAR-SEARCH-MCP · MIT LICENCE}};
+\end{tikzpicture}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{01 · framing · what it is}
+\status{\cd{edgar\_mcp/server.py} (the nine tools), \cd{edgar\_mcp/edgar/} (lookup, filings, XBRL), \cd{edgar\_mcp/utils/sec\_client.py} (every request to the SEC).}{Five test scripts, all passing on 2026-10-17: two offline, frozen replay, periods against 22 companies, the server over stdio.}
+\begin{frame}{A small server that lets a model read the SEC}
+\framesubtitle{An MCP client (Claude Code, Claude Desktop, any agent) starts it as a subprocess and calls its tools. It reads; it never writes anything at the SEC.}
+\centering
+\begin{fig}
+  \matrix[column sep=3mm, row sep=3mm, ampersand replacement=\&] (m) {
+    \node[card=44mm] {\K{the problem}{Models recall figures; filings state them}{A model asked for Costco's revenue answers from memory, which is old or wrong. The answer is on file at the SEC: XBRL facts, filings, exhibits. They are free and public, but scattered over four hosts with their own formats, rate limit and identification rule.}}; \&
+    \node[card=44mm, client] {\K{the user}{An agent, or a person through one}{Any MCP client. The model picks a tool, passes plain arguments (a ticker, a form type, a URL it was given) and gets JSON back. Errors start with a fixed code, so the model can tell a typo from an outage.}}; \&
+    \node[card=44mm] {\K{what it returns}{Facts with their source}{Statements by period, single concepts, filing lists, a filing's documents, a document's text page by page, segment revenue, full-text search hits, candidate peers. Every statement value and concept row names its accession number, form and filing date.}}; \\
+    \node[card=44mm, gate] {\K{rule 1 · read-only}{Nothing is changed anywhere}{All nine tools are marked \cd{read\_only\_hint} and \cd{open\_world\_hint}. Only GET requests, only to sec.gov hosts, only to URLs the server builds or checks. Redirects are not followed.}}; \&
+    \node[card=44mm, gate] {\K{rule 2 · identify, then pace}{The SEC's access rules, enforced}{No request leaves without \cd{EDGAR\_USER\_AGENT} (a name and email). At most 8 requests a second per process, under the SEC's 10; \cd{Retry-After} is honoured; a 403, or a pause over 60 s, is read as rate limiting.}}; \&
+    \node[card=44mm, gate] {\K{rule 3 · as filed, or say so}{No figure is invented}{Values are the reported ones. A quarter the company did not report alone is derived from two filings and marked \cd{derived}. When nothing fits, the result says why (an empty reason) instead of guessing.}}; \\
+  };
+\end{fig}
+\legendrow
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{02 · the whole system · architecture}
+\status{\cd{edgar\_mcp/\_\_main\_\_.py} starts \cd{mcp.run(transport="stdio")}; \cd{\_tool} runs each tool in a worker thread; \cd{utils.sec\_client.fetch\_response} is the one way out.}{\cd{test\_mcp\_stdio.py} starts the server as a client would and calls every tool through the protocol.}
+\begin{frame}{The whole system on one page}
+\framesubtitle{One process on the user's machine, started by the MCP client. Four SEC hosts, one local index, three caches. Follow the letters.}
+\centering
+\begin{fig}
+  \node[card=30mm, client, anchor=north west] (cli) at (2,62)
+    {\K{claude code · claude desktop · an agent}{MCP client}{Starts the server as a subprocess, lists its tools, calls them on the model's behalf.}};
+  \node[card=30mm, below=2mm of cli] (env)
+    {\K{environment}{Configuration}{\cd{EDGAR\_USER\_AGENT} (required), \cd{EDGAR\_CACHE\_DIR}, \cd{EDGAR\_FROZEN\_DIR}, \cd{EDGAR\_RECORD\_DIR}.}};
+  % the server process
+  \node[card=34mm, anchor=north west] (srv) at (42,62)
+    {\K{edgar\_mcp/server.py · mcp 2.3.0 MCPServer}{Nine tools}{Check arguments and bounds, resolve the company, call the library, shape the JSON. \cd{\_tool} turns errors into coded messages.}};
+  \node[card=34mm, below=1.6mm of srv] (lib)
+    {\K{edgar\_mcp/edgar/}{The library}{\cd{company\_lookup} (tickers, names), \cd{filing\_retrieval} (submissions, facts, concepts), \cd{xbrl\_parser} (periods, vintage), \cd{tag\_classifier} (statement lines).}};
+  \node[card=34mm, gate, below=1.6mm of lib] (cl)
+    {\K{edgar\_mcp/utils/sec\_client.py}{SEC client}{User-Agent guard, frozen copies, rate limiter, retries, size caps, no redirects.}};
+  \node[card=30mm, store, anchor=north west] (idx) at (84,62)
+    {\K{company index · snapshot or built}{Company index}{CIK, name, SIC, country and state of incorporation; read by \cd{search\_companies}. \cd{EDGAR\_COMPANY\_INDEX}, else one built, else the packaged snapshot.}};
+  \node[card=30mm, store, below=1.6mm of idx] (map)
+    {\K{edgar\_mcp/edgar/data/sec\_tag\_mapping.json}{Tag mapping}{Which XBRL tag is which statement line, its order and label.}};
+  \node[card=30mm, store, below=1.6mm of map] (cache)
+    {\K{user cache folder · in memory}{Caches}{JSON on disk, outside the package: tickers 24 h, filing lists and facts 1 h. Text of the last 8 documents in memory.}};
+  % the SEC
+  \node[card=30mm, ext, anchor=north west] (sub) at (122,62)
+    {\K{data.sec.gov}{Submissions and XBRL APIs}{\cd{/submissions}, \cd{/api/xbrl/companyfacts}, \cd{/api/xbrl/companyconcept}.}};
+  \node[card=30mm, ext, below=1.6mm of sub] (arc)
+    {\K{www.sec.gov}{Archives and tickers}{Filing indexes, documents, exhibits, XBRL instances; \cd{company\_tickers.json}.}};
+  \node[card=30mm, ext, below=1.6mm of arc] (fts)
+    {\K{efts.sec.gov}{Full-text search}{Filings from 2001 whose text contains given words.}};
+  \begin{scope}[on background layer]
+    \node[zone, fit=(cli)(cache)(env), inner sep=2mm] (zl) {};
+    \node[zone, fit=(sub)(fts), inner sep=2mm] (zo) {};
+  \end{scope}
+  \node[anchor=south west] at (zl.north west) {\zlabel{the user's machine}};
+  \node[anchor=south west] at (zo.north west) {\zlabel{the sec · read only}};
+  % arrows
+  \draw[farr] ([yshift=-4.2mm]cli.north east) -- node[above, ltr]{A} ([yshift=-4.2mm]srv.north west);
+  \draw[darr] (env.east) -- ++(2,0) |- (cl.west);
+  \draw[arr] (srv.south) -- node[right, ltr, xshift=1mm]{B} (lib.north);
+  \draw[arr] (lib.south) -- node[right, ltr, xshift=1mm]{C} (cl.north);
+  \draw[arr] (srv.east) -- (idx.west |- srv.east);
+  \draw[arr] (lib.east) -- (map.west |- lib.east);
+  \draw[arr] (cl.east) -- (cache.west |- cl.east);
+  \draw[arr] (cache.east) -- ++(4,0) |- node[pos=0.25, ltr]{D} (arc.west);
+  \draw[arr] (cache.east) -- ++(4,0) |- (sub.west);
+  \draw[arr] (cache.east) -- ++(4,0) |- (fts.west);
+\end{fig}
+\par\vspace{0.8mm}
+{\centering\fontsize{5.2}{6.4}\selectfont\color{ink!70}\textbf{A} the client calls a tool over stdio (JSON-RPC) · \textbf{B} the tool resolves the company and calls the library · \textbf{C} every request goes through the one client\\\textbf{D} a cache miss goes to the SEC, paced and identified; a hit never leaves the machine. \cd{search\_companies} reads only the local index.\par}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{03 · the nine tools · purpose}
+\status{One function each in \cd{edgar\_mcp/server.py}, decorated \cd{@\_tool} and registered with \cd{ToolAnnotations(read\_only\_hint=True, open\_world\_hint=True)}.}{\cd{test\_mcp\_stdio.py} lists the tools and calls all nine; \cd{test\_cases.py} checks the arguments of each.}
+\begin{frame}{The nine tools and what each is for}
+\framesubtitle{A company is a CIK, an exact ticker, an exact name or a unique name without its suffix (Apple \ra{} Apple Inc.); anything else is an AMBIGUOUS\_COMPANY error that lists the candidates.}
+\begin{tbl}[4.9]
+\begin{tabular}{C{27mm}P{50mm}P{37mm}P{28mm}}
+\tstart
+\thead{TOOL} & \thead{PURPOSE} & \thead{KEY ARGUMENTS} & \thead{READS} \tmid
+lookup\_company & Turn a name or ticker into a CIK. Says how it matched: ticker, name, shared name, prefix or fuzzy (up to 5 candidates), none. & \cd{query} & company\_tickers.json \tmid
+get\_financial\_statement & One statement (BS, IS, CF, EQ, CI or ALL) by period, each value with its filing. Annual, single quarters or year to date. & \cd{statement\_type}, \cd{period\_type}, \cd{num\_periods}, \cd{as\_of} & companyfacts \tmid
+get\_concept & Every filed value of one XBRL concept, newest first: what the statement leaves out (cover share count, any company tag). & \cd{concept}, \cd{taxonomy}, \cd{unit}, period range, \cd{limit}, \cd{offset} & companyconcept \tmid
+list\_filings & A company's filings of one form, newest first, with the main document's URL and, for 8-Ks, the item numbers. & \cd{form}, \cd{as\_of}, \cd{limit}, \cd{include\_amendments} & submissions (and older pages) \tmid
+list\_filing\_documents & Every document of one filing: main document, exhibits, data files; which ones \cd{get\_filing\_text} can read. & \cd{url} of any document in the filing & the filing index \tmid
+get\_filing\_text & A document as plain text, a page at a time, or the places a phrase occurs, with offsets to read them. & \cd{url}, \cd{find}, \cd{start}, \cd{max\_chars} & the document \tmid
+get\_segment\_revenue & Revenue by business segment, product or service, and geography, from the latest 10-K (else 20-F). & \cd{as\_of} & the filing's XBRL instance \tmid
+search\_filings & Filings anywhere at the SEC whose text contains given words; phrase in quotes, OR for alternatives. & \cd{query}, \cd{forms}, \cd{filed\_from}, \cd{filed\_to}, \cd{offset}, \cd{limit} & efts full-text search \tmid
+search\_companies & Candidate peers by SIC code, industry, country or name; discovery only, not evidence. & \cd{sic}, \cd{industry}, \cd{country\_inc}, \cd{name\_substring} & local index (no request) \tend
+\end{tabular}
+\end{tbl}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{04 · how the tools chain · flow}
+\status{The outputs carry the inputs of the next tool: \cd{cik} from \cd{lookup\_company}, \cd{url} from \cd{list\_filings} and \cd{search\_filings}, \cd{next\_start} and \cd{next\_offset} for paging.}{\cd{test\_mcp\_stdio.py} runs the chain lookup \ra{} list\_filings \ra{} list\_filing\_documents \ra{} get\_filing\_text.}
+\begin{frame}{How the tools hand work to each other}
+\framesubtitle{Three paths: numbers, documents, discovery. A URL is never typed by the model; it comes from a tool that built it.}
+\centering
+\begin{fig}
+  % row 1: numbers
+  \node[card=26mm, anchor=north west] (lk) at (2,58) {\K[1]{name \ra{} cik}{lookup\_company}{Settle the company first; use the CIK from then on.}};
+  \node[card=28mm, anchor=north west] (fs) at (38,58) {\K[2a]{numbers}{get\_financial\_statement}{Reported lines by period; \cd{sources} per value.}};
+  \node[card=28mm, anchor=north west] (gc) at (74,58) {\K[2b]{one line in depth}{get\_concept}{Any concept the statement does not group.}};
+  \node[card=28mm, anchor=north west] (sg) at (110,58) {\K[2c]{splits}{get\_segment\_revenue}{Segments, products, geography from the 10-K.}};
+  % row 2: documents
+  \node[card=28mm, anchor=north west] (lf) at (38,36) {\K[3]{documents}{list\_filings}{Form, date, items, the main document's URL.}};
+  \node[card=28mm, anchor=north west] (ld) at (74,36) {\K[4]{exhibits}{list\_filing\_documents}{EX-99.1, EX-21, XBRL files; \cd{readable}.}};
+  \node[card=28mm, anchor=north west] (ft) at (110,36) {\K[5]{read}{get\_filing\_text}{\cd{find} a phrase, then read at its offset.}};
+  % row 3: discovery
+  \node[card=26mm, anchor=north west] (sc) at (2,14) {\K[0a]{peers}{search\_companies}{Candidates by SIC or country.}};
+  \node[card=28mm, anchor=north west] (sf) at (38,14) {\K[0b]{who says it}{search\_filings}{Filings containing a phrase, any filer.}};
+  \begin{scope}[on background layer]
+    \node[zone, fit=(fs)(sg), inner sep=1.6mm] (zn) {};
+    \node[zone, fit=(lf)(ft), inner sep=1.6mm] (zd) {};
+    \node[zone, fit=(sc)(sf), inner sep=1.6mm] (zs) {};
+  \end{scope}
+  \node[anchor=south east] at (zn.north east) {\zlabel{numbers · xbrl}};
+  \node[anchor=south east] at (zd.north east) {\zlabel{documents · archives}};
+  \node[anchor=south west] at (zs.north west) {\zlabel{discovery}};
+  \draw[farr] (lk.east) -- (fs.west |- lk.east);
+  \draw[arr] (lk.south) |- (lf.west);
+  \draw[arr] (fs.east) -- (gc.west |- fs.east);
+  \draw[arr] (lf.east) -- node[above]{\elabel{url}} (ld.west |- lf.east);
+  \draw[arr] (ld.east) -- node[above]{\elabel{url}} (ft.west |- ld.east);
+  \draw[arr] (lf.south) -- ++(0,-2.5) -| node[pos=0.25, below]{\elabel{url of the main document}} ([xshift=-4mm]ft.south);
+  \draw[arr] ([xshift=-6mm]sc.north) -- node[right]{\elabel{name}} ([xshift=-6mm]lk.south);
+  \draw[arr] (sf.east) -| node[pos=0.25, above]{\elabel{url of a hit}} ([xshift=4mm]ft.south);
+\end{fig}
+\par\vspace{0.8mm}
+{\centering\fontsize{5.2}{6.4}\selectfont\color{ink!70}Typical questions: \textbf{``What did Costco earn?''} 1 \ra{} 2a · \textbf{``What did the earnings release say?''} 1 \ra{} 3 (8-K) \ra{} 4 (EX-99.1) \ra{} 5\\\textbf{``Who are the peers?''} 0a, or 0b on a phrase such as ``membership fee'', then 1 and 2a for each candidate.\par}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{05 · one call · sequence}
+\status{\cd{\_tool} wraps each function: \cd{asyncio.to\_thread}, \cd{SecError} \ra{} \cd{ToolError("CODE: message")}, \cd{ValueError} \ra{} \cd{INVALID\_INPUT}.}{\cd{test\_cases.py} checks each error path offline; \cd{test\_mcp\_stdio.py} checks the codes arrive through the protocol, including NO\_USER\_AGENT.}
+\begin{frame}{One call, from the model's request to its answer}
+\framesubtitle{The tool runs in a worker thread, so a slow SEC response does not block the server. Every failure leaves as one line that starts with its code.}
+\centering
+\begin{fig}
+  \foreach \n/\x/\st/\tg/\ttl/\bd in {
+      a/2/client/{json-rpc · stdio}/Call/{\cd{tools/call} with a name and arguments; the SDK checks types and \cd{Literal} choices.},
+      b/30/gate/{\_bounded · iso\_date}/Check arguments/{Counts within bounds; dates real calendar dates; URLs on www.sec.gov.},
+      c/58/plain/{\_resolve}/Resolve the company/{CIK, exact ticker, exact name, or a unique name less its suffix; else AMBIGUOUS\_COMPANY.},
+      d/86/plain/{edgar/ · sec\_client}/Fetch and parse/{Cache or SEC; parse JSON, XBRL or HTML; choose periods.},
+      e/114/client/{result}/Answer/{JSON with \cd{source\_url}, \cd{retrieved\_at}, \cd{cache\_hit} and the data.}}{
+    \node[card=25mm, \st, anchor=north west] (\n) at (\x,40) {\K{\tg}{\ttl}{\bd}};
+  }
+  \draw[farr] ([yshift=-4.2mm]a.north east) -- ([yshift=-4.2mm]b.north west);
+  \draw[arr] ([yshift=-4.2mm]b.north east) -- ([yshift=-4.2mm]c.north west);
+  \draw[arr] ([yshift=-4.2mm]c.north east) -- ([yshift=-4.2mm]d.north west);
+  \draw[arr] ([yshift=-4.2mm]d.north east) -- ([yshift=-4.2mm]e.north west);
+  \node[card=137mm, gate, anchor=north west] (err) at (2,14) {\K{tool error · isError true}{One coded line instead of a result}{\cd{INVALID\_INPUT} · \cd{AMBIGUOUS\_COMPANY} · \cd{NOT\_FOUND} · \cd{RATE\_LIMITED} · \cd{UPSTREAM\_UNAVAILABLE} · \cd{UNSUPPORTED\_DOCUMENT} · \cd{NO\_USER\_AGENT} · \cd{NO\_FROZEN\_COPY}. The message says what to do next: which CIK to pass, which bound was broken, when to try again.}};
+  \draw[back] (b.south) -- node[right]{\elabel{bad argument}} (b.south |- err.north);
+  \draw[back] (c.south) -- node[right]{\elabel{not one company}} (c.south |- err.north);
+  \draw[back] (d.south) -- node[right]{\elabel{SEC said no, or nothing on file}} (d.south |- err.north);
+\end{fig}
+\legendrow
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{06 · sec access · the one way out}
+\status{\cd{utils/sec\_client.fetch\_response} and \cd{get\_json}; \cd{config/settings.py} (8 per second, 3 retries, 30 s timeout); \cd{utils/cache.py}.}{\cd{test\_cases.py}: pacing, Retry-After, 403, 5xx, size cap, no User-Agent; \cd{test\_tools\_offline.py}: a long pause on a 503, malformed frozen copies; \cd{test\_frozen.py}: record then replay with no network.}
+\begin{frame}{Every request to the SEC passes the same six steps}
+\framesubtitle{Nothing in the server opens a connection of its own. The order matters: a frozen copy is checked before the User-Agent, so replays work offline and anonymously.}
+\centering
+\begin{fig}
+  \foreach \n/\x/\st/\tg/\ttl/\bd in {
+      f1/2/gate/{EDGAR\_FROZEN\_DIR}/1 · Frozen copy?/{If set, read \cd{sha256(url).body}; never the network. Missing: NO\_FROZEN\_COPY.},
+      f2/26/gate/{EDGAR\_USER\_AGENT}/2 · Identified?/{No name and email: NO\_USER\_AGENT, and nothing is sent.},
+      f3/50/plain/{user cache · 1 h or 24 h}/3 · In the cache?/{JSON answers kept on disk; a hit returns \cd{cache\_hit: true} and its first \cd{retrieved\_at}.},
+      f4/74/gate/{8 per second}/4 · Pace/{One limiter for the process, under the SEC's 10 per second per user.},
+      f5/98/plain/{httpx · 30 s · no redirects}/5 · Send/{GET only; the body is capped (60 MB a document, 150 MB JSON).},
+      f6/122/gate/{3 retries}/6 · Retry or fail/{Wait (Retry-After, at most 60 s) and retry. A longer pause, or 429 or 403 \ra{} RATE\_LIMITED; 5xx or timeout \ra{} UPSTREAM\_ UNAVAILABLE; 404 \ra{} NOT\_FOUND.}}{
+    \node[card=21mm, \st, anchor=north west] (\n) at (\x,40) {\K{\tg}{\ttl}{\bd}};
+  }
+  \foreach \a/\b in {f1/f2, f2/f3, f3/f4, f4/f5, f5/f6} { \draw[arr] ([yshift=-4.2mm]\a.north east) -- ([yshift=-4.2mm]\b.north west); }
+  \node[card=21mm, ext, anchor=north west] (sec) at (122,8) {\K{four hosts}{SEC}{Answers 200, or a code the client maps.}};
+  \draw[farr] (f5.south) |- (sec.west);
+  \draw[back] (sec.north) -- (f6.south);
+  \node[card=45mm, store, anchor=north west] (rec) at (2,8) {\K{EDGAR\_RECORD\_DIR}{Record mode}{Each 200 answer (and each 404, as an empty record) is also written as \cd{sha256(url).body} and \cd{.json}. Replay that folder later with \cd{EDGAR\_FROZEN\_DIR}: same answers, no network. The disk cache is off in both modes; the text cache in memory is not.}};
+  \draw[darr] (f5.south) -- ++(0,-3) -| (rec.north);
+\end{fig}
+\legendrow
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{07 · statements · how a figure is chosen}
+\status{\cd{edgar/xbrl\_parser.parse\_company\_facts}; \cd{edgar/tag\_classifier.classify\_with\_report} with \cd{sec\_tag\_mapping.json}; empty reasons in \cd{server.\_EMPTY\_REASONS}.}{\cd{test\_periods.py}: 22 companies, 243 annual, 46 quarterly and 46 year-to-date figures against the raw 10-K facts; 0 problems on 2026-10-17.}
+\begin{frame}{From Company Facts to a statement by period}
+\framesubtitle{The SEC's Company Facts feed holds every value a company ever tagged, often filed three or four times. Five steps pick one value per line and period.}
+\centering
+\begin{fig}
+  \foreach \n/\x/\st/\tg/\ttl/\bd in {
+      p0/2/ext/{data.sec.gov}/Company Facts/{All tagged values: us-gaap, ifrs-full, dei; each with start, end, form, filed, accn.},
+      p1/27/plain/{units}/1 · Keep USD/{Per-share and share units kept; other currencies left out and named in \cd{skipped\_units}.},
+      p2/52/plain/{tag\_classifier}/2 · Classify/{Each tag to a statement, a category and an order; whole-company facts only.},
+      p3/77/plain/{fiscal calendar}/3 · Periods/{Fiscal year ends from the 10-Ks; quarters and year-to-date from the 10-Qs; 52/53-week years.},
+      p4/102/gate/{vintage}/4 · Latest filing wins/{A period filed more than once takes the value of the latest periodic report, before \cd{as\_of}.},
+      p5/127/plain/{derived quarters}/5 · Fill the quarter/{A Q4 no one filed alone: the year minus the 9-month year-to-date, marked \cd{derived}. USD amounts only.}}{
+    \node[card=22mm, \st, anchor=north west] (\n) at (\x,40) {\K{\tg}{\ttl}{\bd}};
+  }
+  \foreach \a/\b in {p0/p1, p1/p2, p2/p3, p3/p4, p4/p5} { \draw[arr] ([yshift=-4.2mm]\a.north east) -- ([yshift=-4.2mm]\b.north west); }
+  \node[card=70mm, anchor=north west] (outp) at (75,9) {\K{the result}{periods · metrics · metadata}{Each line: \cd{values} by period, \cd{sources} by period (accn, form, filed, start, end, derived), \cd{tag}, \cd{display\_name}, \cd{category}, \cd{order}. \cd{metadata.warnings} lists anything to check before use.}};
+  \node[card=68mm, gate, anchor=north west] (emp) at (2,9) {\K{nothing fits}{An empty reason, never a guess}{NO\_FACTS · NO\_SUPPORTED\_TAXONOMY · NO\_FACTS\_FOR\_STATEMENT · UNSUPPORTED\_UNITS · NOTHING\_ON\_FILE\_AT\_CUTOFF · INSUFFICIENT\_PERIOD\_EVIDENCE. Returned as NOT\_FOUND with the reason.}};
+  \draw[arr] (p5.south) -- (p5.south |- outp.north);
+  \draw[back] (p3.south) -- (p3.south |- emp.north east) -- ++(0,0);
+\end{fig}
+\legendrow
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{08 · filing text · reading safely}
+\status{\cd{server.\_document\_url}, \cd{document\_text} (extraction \cd{tags-stripped-v2}), \cd{\_document\_text} (in-memory cache), \cd{get\_filing\_text}, \cd{list\_filing\_documents}.}{\cd{test\_cases.py}: URL rejections, content types, extraction, \cd{find} paging; \cd{test\_mcp\_stdio.py}: reads a real 10-K and an exhibit.}
+\begin{frame}{Reading a filing document: checked address, plain text, pages}
+\framesubtitle{A 10-K runs to a million characters. The tool returns a page (12,000 characters by default) or the offsets where a phrase occurs, and the SHA-256 of the file it read.}
+\centering
+\begin{fig}
+  \foreach \n/\x/\st/\tg/\ttl/\bd in {
+      t1/2/gate/{\_document\_url}/1 · Address check/{https, host www.sec.gov, path \cd{/Archives/edgar/data/} \cd{<cik>/<18 digits>/<file>}, .htm .html .txt .xml; no query, no fragment.},
+      t2/30/plain/{memory · 8 documents}/2 · Held already?/{At most 8 documents and 60 million characters stay in memory, the first fetched dropped first; paging does not refetch.},
+      t3/58/gate/{content type · 60 MB}/3 · Fetch a text file/{\cd{text/*}, XHTML or XML only; PDFs and images are UNSUPPORTED\_DOCUMENT.},
+      t4/86/plain/{tags-stripped-v2}/4 · To plain text/{Scripts, styles and the inline-XBRL header dropped; rows to lines, cells to tabs; invisible characters removed.},
+      t5/114/client/{page or matches}/5 · Return/{\cd{max\_chars} from \cd{start} with \cd{next\_start}, or up to 40 \cd{find} matches with offsets and excerpts.}}{
+    \node[card=25mm, \st, anchor=north west] (\n) at (\x,40) {\K{\tg}{\ttl}{\bd}};
+  }
+  \foreach \a/\b in {t1/t2, t2/t3, t3/t4, t4/t5} { \draw[arr] ([yshift=-4.2mm]\a.north east) -- ([yshift=-4.2mm]\b.north west); }
+  \draw[back] (t5.south) -- ++(0,-3) -| node[pos=0.25, below]{\elabel{call again with next\_start}} (t2.south);
+  \node[card=60mm, anchor=north west] (ix) at (2,8) {\K{list\_filing\_documents}{The filing index, row by row}{Takes any document URL of the filing, reads the index page and lists every document: sequence, type (8-K, EX-99.1, GRAPHIC, XML), size, URL, and \cd{readable} (step 3 would accept it).}};
+  \node[card=60mm, anchor=north west] (pv) at (79,8) {\K{provenance}{What a reader can cite}{\cd{url}, \cd{sha256} of the file as sent, \cd{extraction} (the rules' version), \cd{retrieved\_at}, \cd{total\_chars}, \cd{start}. The same text, by the same rules, is open to programs through \cd{document\_text}.}};
+\end{fig}
+\legendrow
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{09 · segments, search, peers · three more paths}
+\status{\cd{get\_segment\_revenue} (XBRL instance, \cd{\_SEGMENT\_AXES}, \cd{\_REVENUE\_CONCEPTS}), \cd{search\_filings} (efts, 100 a page), \cd{search\_companies} (\cd{company\_classifier.load\_index\_with\_meta}).}{\cd{test\_tools\_offline.py} (currencies, units, periods, namespaces, malformed search answers, the 10,000 ceiling, index precedence) and \cd{test\_mcp\_stdio.py} (each tool on a live company).}
+\begin{frame}{Segment revenue, full-text search and candidate peers}
+\framesubtitle{Segment splits are not in Company Facts: the tool reads the 10-K's own XBRL instance. Search and peers are for finding candidates, which the other tools then confirm.}
+\centering
+\begin{fig}
+  \node[card=44mm, anchor=north west] (s1) at (2,58) {\K{get\_segment\_revenue}{Revenue by axis, from the filing itself}{1. \cd{list\_filings} finds the latest 10-K (else 20-F) before \cd{as\_of}. 2. Its index names the XBRL instance. 3. Annual figures of standard-taxonomy concepts on three axes are kept, in one currency (the total's) and one period; the rest go to \cd{skipped} with the reason. 4. Each member with its value, concept and share of the members listed; \cd{concepts} names the concepts read per axis.}};
+  \node[card=44mm, anchor=north west] (s2) at (52,58) {\K{search\_filings}{Who wrote these words, and where}{The SEC's full-text search over filings since 2001: all words required, a phrase in double quotes, OR between alternatives; filtered by form and filing dates. Each hit gives the filer, its SIC, the document URL and whether it is \cd{readable}. 100 hits a page; the SEC returns at most 10,000.}};
+  \node[card=44mm, anchor=north west] (s3) at (102,58) {\K{search\_companies}{Candidates from a local index}{No request leaves the machine. Filters are combined with AND: exact 4-digit SIC, industry, country or state of incorporation, part of the name. The index is the packaged snapshot (periods to 2025-10-31, build date not recorded) or one built from the SEC's Financial Statement Data Sets; \cd{index\_origin} says which. \cd{use: "candidate discovery only"}.}};
+  \node[card=44mm, gate, below=2mm of s1] (c1) {\K{caveat}{Members can overlap}{A company may tag a total member (\cd{ProductMember}) next to its parts; segment sales may include sales between segments. \cd{sum\_of\_members} shows it; shares are of the members listed, not of revenue.}};
+  \node[card=44mm, gate, below=2mm of s2] (c2) {\K{caveat}{Words, not meaning}{\cd{meaning: "the words are in the document; proximity and meaning are not checked"}. A hit is a place to read, not a finding.}};
+  \node[card=44mm, gate, below=2mm of s3] (c3) {\K{caveat}{Old and partial}{Companies that never filed financial statement data, or changed SIC since the index was built, are missing or stale. Confirm each with \cd{lookup\_company}.}};
+\end{fig}
+\legendrow
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{10 · parameters and bounds · table}
+\status{\cd{\_bounded(name, value, low, high)} and \cd{iso\_date} at the top of each tool; out of range is INVALID\_INPUT, never silently clipped.}{\cd{test\_cases.py} tries the edge of each bound.}
+\begin{frame}{Parameters, defaults and bounds}
+\framesubtitle{Dates are YYYY-MM-DD and must exist. \cd{as\_of} means ``as the record stood that day'': anything filed later is ignored.}
+\begin{tbl}[5.2]
+\begin{tabular}{C{30mm}C{26mm}P{24mm}P{62mm}}
+\tstart
+\thead{TOOL} & \thead{PARAMETER} & \thead{DEFAULT · BOUND} & \thead{NOTE} \tmid
+get\_financial\_statement & statement\_type & BS IS CF EQ CI ALL & ALL returns every statement in one call. \\
+ & period\_type & annual · quarterly · ytd & ytd: fiscal year to date at each quarter end; with annual, gives a trailing twelve months. \\
+ & num\_periods & 4 · 1--40 & Periods, newest first. \tmid
+get\_concept & taxonomy & us-gaap · ifrs-full · dei & dei holds cover-page items such as the share count. \\
+ & limit, offset & 100 · 1--500 & \cd{next\_offset} pages through \cd{total\_rows}. \\
+ & unit, period\_end\_from/to & none & \cd{units\_available} lists the choices. \tmid
+list\_filings & form, limit & 10-K · 10 · 1--100 & Older submission pages are read when needed; \cd{complete} says if all were. \\
+ & include\_amendments & false & 10-K/A and the like. \tmid
+get\_filing\_text & max\_chars & 12,000 · up to 40,000 & A page; \cd{next\_start} continues. \\
+ & find & up to 200 characters & Case-insensitive; 40 matches a call, then \cd{next\_start}. \tmid
+search\_filings & limit, offset & 25 · 1--100 · offset to 9,999 & The SEC returns at most 10,000 hits; \cd{next\_offset} is null at the end. \\
+ & forms & 10-K & One or several, comma-separated; amendments come with their form. \tmid
+search\_companies & limit & 25 · 1--200 & \cd{truncated} says more matched. \tmid
+\textsf{all company tools} & cik\_or\_ticker & --- & CIK (any zero padding), exact ticker, or exact name. \tend
+\end{tabular}
+\end{tbl}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{11 · errors · what the model reads}
+\status{\cd{SecError} subclasses in \cd{utils/sec\_client.py}; \cd{\_tool} in \cd{server.py} prefixes each message with its code.}{\cd{test\_cases.py} and \cd{test\_tools\_offline.py} (every code, RATE\_LIMITED offline), \cd{test\_mcp\_stdio.py} (codes over the protocol), \cd{test\_frozen.py} (NO\_FROZEN\_COPY).}
+\begin{frame}{Error codes, and what to do about each}
+\framesubtitle{A tool error is one line, \cd{CODE: message}. A result with nothing in it is not an error: an empty list, or a reason in \cd{metadata.empty\_reason}.}
+\begin{tbl}[5.2]
+\begin{tabular}{C{33mm}P{55mm}P{58mm}}
+\tstart
+\thead{CODE} & \thead{MEANS} & \thead{WHAT TO DO} \tmid
+INVALID\_INPUT & An argument out of bounds, a date that does not exist, a URL that is not an EDGAR document. & Fix the argument; the message names it and its bound. \tmid
+AMBIGUOUS\_COMPANY & The company text is not an exact ticker, name or CIK. & Call again with one of the CIKs listed in the message. \tmid
+NOT\_FOUND & The SEC has nothing at that address, or no figures fit (with the empty reason). & Check the concept, form or period; read the reason. \tmid
+RATE\_LIMITED & The SEC answered 429 or 403 after three retries, or asked for a pause over 60 s (a 503 with \cd{Retry-After}). & Wait; the message says how long is left. \tmid
+UPSTREAM\_UNAVAILABLE & 5xx, a timeout or a broken connection after three retries, or an answer of the wrong shape. & Try again later. \tmid
+UNSUPPORTED\_DOCUMENT & A PDF, an image, a file over 60 MB, a 10-K without inline XBRL, or revenue in two currencies with no total. & Pick another document; for segments, read the text. \tmid
+NO\_USER\_AGENT & \cd{EDGAR\_USER\_AGENT} is not set; nothing was sent. & Set it to a name and email, then restart the server. \tmid
+NO\_FROZEN\_COPY & Replay mode, and this URL was never recorded. & Record it with \cd{EDGAR\_RECORD\_DIR}, or leave replay mode. \tmid
+INDEX\_UNAVAILABLE & The company index named or built cannot be read. & Fix or remove \cd{EDGAR\_COMPANY\_INDEX}, or rebuild. \tend
+\end{tabular}
+\end{tbl}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{12 · example · company and statement}
+\status{Real calls on 2026-10-17, shortened: values in USD as returned, here written in millions.}{The same figures appear in Costco's 10-K for fiscal 2026 (accession 0000909832-26-000093).}
+\begin{frame}{Example 1: from a name to an income statement}
+\framesubtitle{``What did Costco earn last year?'' Two calls. Every value says which filing it came from.}
+\centering
+\begin{fig}
+  \node[card=58mm, anchor=north west] (q1) at (2,60) {%
+    \call{lookup\_company(query="Costco")}\vspace{0.6mm}
+    \out{match\_type: "prefix"}
+    \out{matches: [\{cik: "0000909832", ticker: "COST",}
+    \out{\ \ \ \ \ \ \ \ \ \ \ name: "COSTCO WHOLESALE CORP /NEW"\}]}\vspace{1mm}
+    \bt{``Prefix'' means a candidate, not a certainty: the model checks the name, then uses the CIK or ticker.}};
+  \node[card=58mm, anchor=north west, below=2mm of q1] (q2) {%
+    \call{get\_financial\_statement(cik\_or\_ticker="COST",}
+    \call{\ \ statement\_type="IS", period\_type="annual", num\_periods=2)}\vspace{0.6mm}
+    \out{periods: ["2026-08-30", "2025-08-31"]}
+    \out{source\_url: .../companyfacts/CIK0000909832.json}
+    \out{metrics.<line>.sources["2026-08-30"]:}
+    \out{\ \ \{accn: "0000909832-26-000093", form: "10-K",}
+    \out{\ \ \ filed: "2026-10-07", start: "2025-09-01", derived: false\}}};
+  \node[card=76mm, anchor=north west] (tb) at (66,60) {%
+    \K{the lines, as returned (millions of USD)}{Costco, fiscal years to August}{}\vspace{0.5mm}
+    {\fontsize{5.2}{6.6}\selectfont
+    \begin{tabular}{@{}p{34mm}>{\raggedleft\arraybackslash}p{12mm}>{\raggedleft\arraybackslash}p{12mm}@{}}
+    \thead{LINE} & \thead{FY2026} & \thead{FY2025}\\\hline
+    Net revenue & 303,154 & 275,235\\
+    Cost of revenue & 264,279 & ---\\
+    SG\&A & 27,190 & ---\\
+    Operating income & 11,685 & 10,383\\
+    Income before income taxes & 12,251 & ---\\
+    Income tax & 3,025 & ---\\
+    Net income & 9,226 & 8,099\\
+    Diluted EPS (USD) & 20.76 & 18.21\\\hline
+    \end{tabular}\par}\vspace{1mm}
+    \bt{The tag of each line is in \cd{tag} (Net revenue is \cd{us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax}). Values come back in full units: \cd{303154000000}. Line names here are plain English; --- marks values not shown.}};
+\end{fig}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{13 · example · quarters and one concept}
+\status{Real calls on 2026-10-17, shortened.}{\cd{test\_periods.py} checks this rule on 22 companies: the four quarters sum to the year within 0.05\%.}
+\begin{frame}{Example 2: a derived quarter, and a figure no statement holds}
+\framesubtitle{Costco never files its fourth quarter on its own. The tool derives it from two filings and says so. The share count lives on the cover page, under dei.}
+\centering
+\begin{fig}
+  \node[card=70mm, anchor=north west] (q1) at (2,60) {%
+    \call{get\_financial\_statement("COST", "IS", period\_type="quarterly")}\vspace{0.6mm}
+    \out{Net revenue, by quarter end (millions):}
+    \out{\oc{3mm}{}\oc{15mm}{2026-08-30}\oc{9mm}{95,723}derived}
+    \out{\oc{3mm}{}\oc{15mm}{2026-05-10}\oc{9mm}{70,527}}
+    \out{\oc{3mm}{}\oc{15mm}{2026-02-15}\oc{9mm}{69,597}}
+    \out{\oc{3mm}{}\oc{15mm}{2025-11-23}\oc{9mm}{67,307}sum 303,154 = the 10-K year}\vspace{0.6mm}
+    \out{sources["2026-08-30"]: \{derived: true,}
+    \out{\ \ cumulative: 303,154 (10-K 0000909832-26-000093, year),}
+    \out{\ \ minus: 207,431 (10-Q 0000909832-26-000051, 36 weeks)\}}\vspace{1mm}
+    \bt{The quarter is the year less the year to date at the third quarter. Both filings are named, so a reader can check the subtraction.}};
+  \node[card=66mm, anchor=north west] (q2) at (78,60) {%
+    \call{get\_concept("COST", "EntityCommonStockSharesOutstanding",}
+    \call{\ \ taxonomy="dei", limit=2)}\vspace{0.6mm}
+    \out{label: "Entity Common Stock, Shares Outstanding"}
+    \out{unit: "shares"\ \ total\_rows: 68\ \ next\_offset: 2}
+    \out{facts: [}
+    \out{\ \{end: "2026-09-29", val: 443129349,}
+    \out{\ \ form: "10-K", filed: "2026-10-07", fp: "FY"\},}
+    \out{\ \{end: "2026-05-27", val: 443478804,}
+    \out{\ \ form: "10-Q", filed: "2026-06-03", fp: "Q3"\}]}\vspace{1mm}
+    \bt{Newest first. \cd{next\_offset} reads the next two; \cd{as\_of} and the period range narrow the rows; \cd{scope: "whole-entity values only"}.}};
+\end{fig}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{14 · example · filings, exhibits, text}
+\status{Real calls on 2026-10-17, shortened.}{\cd{test\_mcp\_stdio.py} runs the same chain on a live company each time it runs.}
+\begin{frame}{Example 3: what did the earnings release say?}
+\framesubtitle{The numbers of an 8-K earnings release are in its exhibit 99.1, not in the 8-K. Three calls find it and read the passage.}
+\centering
+\begin{fig}
+  \node[card=46mm, anchor=north west] (a) at (2,60) {%
+    \K[1]{list\_filings}{The 8-Ks, newest first}{}
+    \call{list\_filings("COST", form="8-K", limit=10)}\vspace{0.6mm}
+    \out{\oc{15mm}{2026-10-16}items 5.02, 9.01}
+    \out{\oc{15mm}{2026-10-14}items 8.01, 9.01}
+    \out{...}
+    \out{\oc{15mm}{2026-09-24}items 2.02, 9.01}\vspace{0.6mm}
+    \bt{Item 2.02 is ``Results of operations'': the earnings release. Each row carries the main document's \cd{url}.}};
+  \node[card=46mm, anchor=north west] (b) at (51,60) {%
+    \K[2]{list\_filing\_documents}{What the filing holds}{}
+    \call{list\_filing\_documents(url=<the 2026-09-24 8-K>)}\vspace{0.6mm}
+    \out{count: 18}
+    \out{\oc{12mm}{type}\oc{23mm}{document}readable}
+    \out{\oc{12mm}{8-K}\oc{23mm}{main document}yes}
+    \out{\oc{12mm}{EX-99.1}\oc{23mm}{costex9918-k92426.htm}yes}
+    \out{\oc{12mm}{EX-99.2}\oc{23mm}{.htm}yes}
+    \out{\oc{12mm}{GRAPHIC}\oc{23mm}{.jpg}no}
+    \out{\oc{12mm}{EX-101.SCH}\oc{23mm}{.xsd}no}
+    \out{\oc{12mm}{XML}\oc{23mm}{XBRL instance}yes}};
+  \node[card=46mm, anchor=north west] (c) at (100,60) {%
+    \K[3]{get\_filing\_text}{Find, then read}{}
+    \call{get\_filing\_text(url=<EX-99.1>, find="net income")}\vspace{0.6mm}
+    \out{total\_chars: 8708\ \ match\_count: 6}
+    \out{extraction: "tags-stripped-v2"}
+    \out{sha256: "651f6ec2..."}\vspace{0.6mm}
+    \bt{``Net income for the fourth quarter was \$2.998 billion, \$6.75 per diluted share, compared to \$2.610 billion\ldots''}
+    \bt{``Net income for the fiscal year was \$9.226 billion, \$20.76 per diluted share\ldots''}\vspace{0.6mm}
+    \bt{Each match has an \cd{offset}; \cd{start=<offset>} reads the paragraph around it.}};
+  \draw[farr] ([yshift=-4.2mm]a.north east) -- ([yshift=-4.2mm]b.north west);
+  \draw[farr] ([yshift=-4.2mm]b.north east) -- ([yshift=-4.2mm]c.north west);
+\end{fig}
+\par\vspace{1mm}
+{\centering\fontsize{5.2}{6.4}\selectfont\color{ink!70}The release's \$9.226 billion matches the 10-K's 9,226 million in Example 1: two sources, one figure.\par}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{15 · example · segments, search, peers}
+\status{Real calls on 2026-10-17, shortened.}{The segment total equals the 10-K's revenue: 219,823 + 42,770 + 40,561 = 303,154 million.}
+\begin{frame}{Example 4: where the revenue comes from, and who else says ``membership fee''}
+\framesubtitle{Segments from the 10-K's XBRL instance; candidates from full-text search and from the local index. The last two find names to check, not answers.}
+\centering
+\begin{fig}
+  \node[card=56mm, anchor=north west] (a) at (2,60) {%
+    \call{get\_segment\_revenue("COST")}\vspace{0.6mm}
+    \out{form: "10-K", filing\_date: "2026-10-07"}
+    \out{fiscal\_year: 2025-09-01 to 2026-08-30}
+    \out{source\_url: .../cost-20260830\_htm.xml}
+    \out{unit: "USD"\ \ skipped: []\ \ frozen: false}
+    \out{total\_revenue: 303,154 (millions)}\vspace{0.6mm}
+    \out{business\_segments:}
+    \out{\oc{3mm}{}\oc{22mm}{United States}\oc{10mm}{219,823}0.7251}
+    \out{\oc{3mm}{}\oc{22mm}{Other International}\oc{10mm}{42,770}0.1411}
+    \out{\oc{3mm}{}\oc{22mm}{Canada}\oc{10mm}{40,561}0.1338}
+    \out{products\_and\_services:}
+    \out{\oc{3mm}{}\oc{22mm}{Product}\oc{10mm}{297,247}0.4951 \textcolor{accent}{(a total)}}
+    \out{\oc{3mm}{}\oc{22mm}{Foodand Sundries}\oc{10mm}{116,788}0.1945}
+    \out{\oc{3mm}{}\oc{22mm}{Non Foods}\oc{10mm}{77,375}0.1289}
+    \out{\oc{3mm}{}Other, Fresh Food, ...}};
+  \node[card=42mm, anchor=north west] (b) at (62,60) {%
+    \call{search\_filings('"membership fee"',}
+    \call{\ \ forms="10-K", filed\_from="2025-01-01",}
+    \call{\ \ filed\_to="2025-12-31", limit=2)}\vspace{0.6mm}
+    \out{total\_hits: 46\ \ total\_is\_exact: true}
+    \out{next\_offset: 2}
+    \out{\oc{22mm}{Exceed World, Inc.}SIC 8200}
+    \out{\oc{22mm}{BJ's Wholesale Club}SIC 5331}
+    \out{\ \ bj-20250201.htm\ \ readable}\vspace{0.6mm}
+    \bt{Hits include filers far from retail: the phrase alone does not make a peer.}};
+  \node[card=36mm, anchor=north west] (c) at (108,60) {%
+    \call{search\_companies(sic="5331", limit=3)}\vspace{0.6mm}
+    \out{index\_origin: "snapshot in the package"}
+    \out{index\_built: "unknown"}
+    \out{use: "candidate discovery only"}
+    \out{\oc{14mm}{COSTCO}US · WA}
+    \out{\oc{14mm}{PRICESMART}US · DE}
+    \out{\oc{14mm}{MINISO}US · KY}
+    \out{truncated: true}\vspace{0.6mm}
+    \bt{SIC 5331 is ``Variety Stores''. BJ's, found by search, is in it too.}};
+\end{fig}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{16 · example · errors}
+\status{Real calls on 2026-10-17; the messages are verbatim, but for the URL at the end of the last one.}{\cd{test\_cases.py} and \cd{test\_mcp\_stdio.py} assert each code.}
+\begin{frame}{Example 5: four errors, each telling the model what to do}
+\framesubtitle{The message is written for the model that made the call: it names the bad argument, or the CIKs to choose from, or the setting to fix.}
+\centering
+\begin{fig}
+  \node[card=70mm, gate, anchor=north west] (e1) at (2,60) {%
+    \call{get\_financial\_statement("Costco", "IS", as\_of="2024-13-01")}\vspace{0.6mm}
+    \out{INVALID\_INPUT: '2024-13-01' is not a calendar date}};
+  \node[card=70mm, gate, anchor=north west] (e2) at (76,60) {%
+    \call{list\_filings("Apple Hosp")}\vspace{0.6mm}
+    \out{AMBIGUOUS\_COMPANY: 'Apple Hosp' is not an exact ticker or}
+    \out{company name. Call again with the CIK of one of: PPL Corp}
+    \out{(PPL, CIK 0000922224); Apple Inc. (AAPL, CIK 0000320193)}};
+  \node[card=70mm, gate, anchor=north west] (e3) at (2,38) {%
+    \call{get\_concept("COST", "NoSuchConcept")}\vspace{0.6mm}
+    \out{NOT\_FOUND: nothing at https://data.sec.gov/api/xbrl/}
+    \out{companyconcept/CIK0000909832/us-gaap/NoSuchConcept.json}};
+  \node[card=70mm, gate, anchor=north west] (e4) at (76,38) {%
+    \call{list\_filings("COST")\ \ \ \# server started without EDGAR\_USER\_AGENT}\vspace{0.6mm}
+    \out{NO\_USER\_AGENT: set EDGAR\_USER\_AGENT to your name and email,}
+    \out{e.g. "Jane Doe jane@example.com"; the SEC asks every client}
+    \out{to identify itself (<the URL it would have read>)}};
+  \node[note=142mm] at (2,17) {Note the second case: ``Apple Hosp'' (for Apple Hospitality REIT, ticker APLE) gets two fuzzy candidates, neither the one meant. The error does not pick one; the model must. \cd{lookup\_company("APLE")} settles it. On startup without a User-Agent the server also prints a warning to stderr, which most MCP clients show in their log.};
+\end{fig}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{17 · limitations · by design}
+\status{The tool docstrings and README.md (Limitations) state each of these to the model and the user.}{Not tested as failures: these are the edges of what the server claims.}
+\begin{frame}{Limitations: what the server does not do}
+\framesubtitle{Each is a boundary chosen on purpose, and each is written into the tool's description so the model sees it before calling.}
+\centering
+\begin{fig}
+  \matrix[column sep=3mm, row sep=3mm, ampersand replacement=\&] (m) {
+    \node[card=44mm] {\K{statements}{Reported facts, not the statement as printed}{Whole-company facts only: lines split by share class, segment or geography, and company-specific (extension) tags are left out; read them in the text. USD only; other currencies are named in \cd{skipped\_units}, so most 20-F and 40-F filers in euros or yen return little.}}; \&
+    \node[card=44mm] {\K{classification}{A mapping, not the company's layout}{Lines are placed by a fixed tag mapping, not by the filing's presentation linkbase. Order and sections are approximate, and tags are matched by local name; reviewed rules correct the known errors (next page). \cd{metadata.unclassified} counts what was left out.}}; \&
+    \node[card=44mm] {\K{text}{Plain text, and only text}{Tables become tab-separated lines; layout and footnote marks are lost. PDFs, images and files over 60 MB are refused. No OCR. Full-text search starts in 2001; filings from before EDGAR are not there.}}; \\
+    \node[card=44mm] {\K{names}{Today's tickers and names}{\cd{company\_tickers.json} lists current tickers. A company renamed, merged or delisted may not resolve by name; use its CIK. Fuzzy matches can be wrong (Example 5).}}; \&
+    \node[card=44mm] {\K{freshness}{An hour behind, at most}{Filing lists and facts are cached for an hour and tickers for a day; \cd{cache\_hit} says when an answer is from the cache. The company index behind \cd{search\_companies} is the packaged snapshot until one is built.}}; \&
+    \node[card=44mm] {\K{scale and scope}{One user, one machine, read only}{8 requests a second per process; two servers on one machine share the SEC's 10 per second between them. No bulk download, no writing, no stock prices, no insider (Forms 3/4/5) or 13F parsing beyond reading the text.}}; \\
+  };
+\end{fig}
+
+\vspace{2mm}
+\parbox{0.93\linewidth}{\raggedright\scriptsize\textbf{Not yet built: an output schema.} Every tool returns structured JSON, but its shape is described in words (tool descriptions, README), not in a machine-checkable schema. A program reading the answers directly should check the fields it uses; names may change between versions.}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{18 · limitations · seen in the examples}
+\status{Seen in the Costco calls of 2026-10-17 (Examples 1 and 4), before and after the fixes of version 0.5.0; causes in \cd{sec\_tag\_mapping.json} and in Costco's own member names.}{\cd{test\_tools\_offline.py} (classifier and segment cases) holds each row's current behaviour.}
+\begin{frame}{The Costco quirks: what was fixed, what is kept on purpose}
+\framesubtitle{The headline figures were always right. Four mapping errors are now corrected by reviewed rules; three behaviours stay, because changing them would hide what the company tagged.}
+\begin{tbl}[5.0]
+\begin{tabular}{P{50mm}P{50mm}P{45mm}}
+\tstart
+\thead{WHAT CAME BACK IN 0.4.0} & \thead{NOW} & \thead{WHY} \tmid
+\cd{us-gaap:InterestExpense} (145 million) in category ``Revenue''. & Category ``Income'', label ``Interest expense''. & An expense; order 8 keeps a bank's interest lines together. \tmid
+\cd{IncomeLossAttributableToParent} labelled ``Income before income taxes''. & ``Income (loss) attributable to parent, before tax''. & The taxonomy's own meaning. \tmid
+\cd{InterestAndOtherIncome} labelled ``Interest income''. & ``Interest and other income''. & The tag holds more than interest. \tmid
+Dividends, restricted stock issued and unrealized debt gains in the income statement. & Dividends and restricted stock in EQ; the debt gain left out, its reason in \cd{metadata.unclassified}. & Equity movements; the gain can be net income or OCI. Lease cost stays: it is a reported expense. \tmid
+\cd{us-gaap:Revenues} null; \cd{RevenueFromContract\ldots} holds 303,154. & \textit{Kept:} two lines, nulls shown. & Two tags can differ in scope; the model picks by \cd{tag}. \tmid
+\cd{ProductMember} (297,247) listed beside its parts. & \textit{Kept:} listed as tagged; \cd{note} warns. & A total member is the company's choice; guessing which is a total could drop a real member. \tmid
+Label ``Foodand Sundries''. & \textit{Kept:} built from the member name. & The \cd{member} field is exact; labels from the filing's label linkbase are a possible next step. \tend
+\end{tabular}
+\end{tbl}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{19 · setup · configure and connect}
+\status{\cd{edgar\_mcp/config/constants.py} (\cd{USER\_AGENT}), \cd{edgar\_mcp/config/settings.py} (\cd{\_user\_dir}), \cd{edgar\_mcp/\_\_main\_\_.py}, \cd{pyproject.toml} (script \cd{edgar-search-mcp}).}{\cd{test\_mcp\_stdio.py} starts the server the way the command below does.}
+\begin{frame}{Install, configure, connect}
+\framesubtitle{Python 3.11 or later. Three direct dependencies, pinned: httpx 0.28.1, jsonschema 4.26.0, mcp 2.3.0; \cd{requirements.lock} holds the hashed closure.}
+\centering
+\begin{fig}
+  \node[card=68mm, anchor=north west] (i) at (2,60) {%
+    \K[1]{install}{An ordinary install in a virtual environment}{}
+    \out{git clone https://github.com/jibarix/edgar-search-mcp}
+    \out{cd edgar-search-mcp}
+    \out{python -m venv .venv}
+    \out{.venv/Scripts/python -m pip install .\ \ \ \ \# or bin/ on macOS, Linux}\vspace{0.6mm}
+    \bt{The package carries the tag mapping and the index snapshot; the cache and any index you build go to your user folders, never next to the code.}};
+  \node[card=68mm, anchor=north west, below=2mm of i] (c) {%
+    \K[3]{connect}{Claude Code}{}
+    \out{claude mcp add edgar-search \textbackslash}
+    \out{\ \ -e EDGAR\_USER\_AGENT="Jane Doe jane@example.com" \textbackslash}
+    \out{\ \ -- <repo>/.venv/Scripts/python -X utf8 -m edgar\_mcp}\vspace{0.6mm}
+    \bt{Claude Desktop: the same command, arguments and \cd{env} in \cd{claude\_desktop\_config.json} (README).}};
+  \node[card=70mm, anchor=north west] (e) at (76,60) {%
+    \K[2]{configure}{Environment variables}{}\vspace{0.4mm}
+    {\fontsize{5.1}{6.4}\selectfont
+    \begin{tabular}{@{}>{\ttfamily\fontsize{4.6}{6}\selectfont}p{22mm}p{44mm}@{}}
+    EDGAR\_USER\_AGENT & \textbf{Required.} A name and email the SEC can reach. No default: without it nothing is sent.\\[0.6mm]
+    EDGAR\_CACHE\_DIR & Where the JSON cache lives; default the user cache folder (\cd{\%LOCALAPPDATA\%}, \cd{\textasciitilde/Library/Caches}, XDG).\\[0.6mm]
+    EDGAR\_COMPANY\_INDEX & A company index to use instead of the built or packaged one.\\[0.6mm]
+    EDGAR\_RECORD\_DIR & Record each answer (200, or 404 as empty) as a frozen copy here.\\[0.6mm]
+    EDGAR\_FROZEN\_DIR & Replay frozen copies from here; never touch the network.\\
+    \end{tabular}\par}\vspace{1mm}
+    \bt{Record and replay make a run repeatable: the same calls give the same answers next month, for a test or an audit.}};
+\end{fig}
+\end{frame}
+
+% =====================================================================
+\renewcommand{\kicker}{20 · tests and status}
+\status{\cd{tests/}: run each from the repository root, \cd{python -X utf8 tests/<name>.py}; the live ones need \cd{EDGAR\_USER\_AGENT}.}{All five, 0 problems, on 2026-10-17 (Windows 11, CPython 3.13).}
+\begin{frame}{Five tests, and where the project stands}
+\framesubtitle{Offline checks run anywhere in seconds. The live checks read the SEC, pacing themselves, and keep what they fetched for the next run.}
+\begin{tbl}[5.2]
+\begin{tabular}{C{22mm}P{13mm}P{68mm}P{27mm}}
+\tstart
+\thead{TEST} & \thead{NETWORK} & \thead{WHAT IT CHECKS} & \thead{2026-10-17} \tmid
+test\_cases.py & none & Argument bounds, company resolution, URL checks, text extraction and \cd{find}, segment axes, search paging, the client's pacing, retries, Retry-After, size caps, and that no request is sent without a User-Agent. & 45 checks, 0 problems \tmid
+test\_tools\_offline.py & none, guarded & The tools against made-up SEC answers: malformed search answers and the 10,000 ceiling, retries and long pauses, frozen copies, history errors, segment currencies, units and periods, classification rules, index precedence and builder, user folders. & 86 checks, 0 problems \tmid
+test\_frozen.py & records once & Records a set of calls with \cd{EDGAR\_RECORD\_DIR}, replays them with \cd{EDGAR\_FROZEN\_DIR} and the network blocked, compares; a missing copy gives NO\_FROZEN\_COPY. & 0 problems \tmid
+test\_periods.py & cached & 22 companies with different fiscal calendars: annual periods and values against the 10-K rows of the raw Company Facts (not the 10-K documents), four quarters summing to the year, year to date at the year end. & 243 + 46 + 46 figures, 0 problems \tmid
+test\_mcp\_stdio.py & live & Starts the server as a client does, lists the nine tools, calls each, follows the document chain, checks error codes over the protocol, and that a server with no User-Agent answers NO\_USER\_AGENT. & 0 problems \tend
+\end{tabular}
+\end{tbl}
+\vspace{2mm}
+{\fontsize{5.4}{6.8}\selectfont
+\textbf{Status.} Version 0.5.0, MIT licence; the fixes are not yet committed or published. The final review's six findings (segment units, search continuation, replay timestamps, index date, empty search responses, historical-file errors) are fixed, with the classification corrections, a command to build the company index and per-user folders; each has an offline test. \textbf{Possible next step:} segment member labels from the filing's label linkbase.\par}
+\end{frame}
+
+\end{document}

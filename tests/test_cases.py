@@ -16,12 +16,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ["EDGAR_CACHE_DIR"] = tempfile.mkdtemp(prefix="edgar_cache_test_")
 
-from edgar import company_lookup  # noqa: E402
-from edgar.filing_retrieval import FilingRetrieval  # noqa: E402
-from edgar.xbrl_parser import XBRLParser  # noqa: E402
+from edgar_mcp.edgar import company_lookup  # noqa: E402
+from edgar_mcp.edgar.filing_retrieval import FilingRetrieval  # noqa: E402
+from edgar_mcp.edgar.xbrl_parser import XBRLParser  # noqa: E402
 from edgar_mcp.server import _document_url, _resolve  # noqa: E402
-from utils import sec_client  # noqa: E402
-from utils.cache import Cache  # noqa: E402
+from edgar_mcp.utils import sec_client  # noqa: E402
+from edgar_mcp.utils.cache import Cache  # noqa: E402
 
 problems = []
 
@@ -224,7 +224,7 @@ def lookup_cases():
                   "AMBIGUOUS_COMPANY" in str(e) and "CIK 0000000002" in str(e), str(e)[:90])
     finally:
         company_lookup.get_json = real
-        company_lookup.company_cache.delete("company_tickers_v4")
+        company_lookup.company_cache.delete("company_tickers_v5")
 
 
 def client_cases():

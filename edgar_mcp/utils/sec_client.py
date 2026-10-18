@@ -14,11 +14,12 @@ import threading
 import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from typing import NamedTuple
 
 import httpx
 
-from config.constants import HTTP_HEADERS, USER_AGENT
-from config.settings import (
+from edgar_mcp.config.constants import HTTP_HEADERS, USER_AGENT
+from edgar_mcp.config.settings import (
     API_REQUEST_TIMEOUT, API_RETRY_COUNT, API_RETRY_DELAY, FROZEN_DIR,
     RATE_LIMIT_REQUESTS_PER_SECOND, RECORD_DIR,
 )
@@ -64,31 +65,54 @@ def _copy_paths(folder, url):
     return os.path.join(folder, name + ".body"), os.path.join(folder, name + ".json")
 
 
+def _now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class Response(NamedTuple):
+    """One answer from the SEC: the body, its content type, the UTC time it
+    left the SEC, and whether it was read back from a frozen copy."""
+    body: bytes
+    content_type: str
+    retrieved_at: str
+    frozen: bool = False
+
+
 def _read_frozen(url, max_bytes):
     body_path, about_path = _copy_paths(FROZEN_DIR, url)
     try:
         with open(about_path, encoding="utf-8") as f:
             about = json.load(f)
+        size = os.path.getsize(body_path)
         with open(body_path, "rb") as f:
-            body = f.read()
-    except OSError:
+            body = f.read(max_bytes + 1)
+    except FileNotFoundError:
         raise SecNoFrozenCopy(f"live sources are blocked and there is no frozen copy of {url}") from None
-    if about.get("url") != url or hashlib.sha256(body).hexdigest() != about.get("sha256"):
-        raise SecError(f"the frozen copy of {url} does not match its description")
-    if about.get("status") == 404:
+    except (OSError, ValueError) as e:
+        raise SecError(f"the frozen copy of {url} could not be read ({e})") from None
+    if not (isinstance(about, dict) and about.get("url") == url and about.get("status") in (200, 404)
+            and isinstance(about.get("sha256"), str) and isinstance(about.get("content_type"), str)
+            and isinstance(about.get("retrieved_at"), str)):
+        raise SecError(f"the description of the frozen copy of {url} is not readable")
+    if about["status"] == 404:
+        if size:
+            raise SecError(f"the frozen copy of {url} does not match its description")
         raise SecNotFound(f"nothing at {url} (frozen copy)")
-    if len(body) > max_bytes:
+    if size > max_bytes:
         raise SecUnsupported(f"{url} is larger than {max_bytes:,} bytes")
-    return body, about.get("content_type", "")
+    if hashlib.sha256(body).hexdigest() != about["sha256"]:
+        raise SecError(f"the frozen copy of {url} does not match its description")
+    # A replay reports when the copy left the SEC, not when it was read back.
+    return Response(body, about["content_type"], about["retrieved_at"], frozen=True)
 
 
-def _record(url, status, body, content_type):
+def _record(url, status, body, content_type, retrieved_at):
     """Save a live response as a frozen copy; written whole or not at all."""
     os.makedirs(RECORD_DIR, exist_ok=True)
     body_path, about_path = _copy_paths(RECORD_DIR, url)
     about = {"url": url, "status": status, "content_type": content_type,
              "sha256": hashlib.sha256(body).hexdigest(),
-             "retrieved_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+             "retrieved_at": retrieved_at}
     for path, data in ((body_path, body), (about_path, json.dumps(about, indent=1).encode("utf-8"))):
         handle, temp = tempfile.mkstemp(dir=RECORD_DIR, suffix=".tmp")
         with os.fdopen(handle, "wb") as f:
@@ -148,14 +172,22 @@ def _retry_after(response, default):
 
 
 def fetch(url, max_bytes=MAX_JSON_BYTES):
-    """GET `url`. Returns (body bytes, content type).
+    """GET `url`. Returns (body bytes, content type); see fetch_response."""
+    response = fetch_response(url, max_bytes)
+    return response.body, response.content_type
+
+
+def fetch_response(url, max_bytes=MAX_JSON_BYTES):
+    """GET `url`. Returns a Response; its retrieved_at is the UTC time the
+    body left the SEC (the recorded time, for a frozen copy).
 
     Retries timeouts, HTTP 429 and HTTP 5xx. A Retry-After from the SEC is
     honoured in full by every thread: a short one is waited out, a long one
     raises at once with the pause left in force. Raises SecNotFound for 404,
     SecRateLimited for 403/429, SecUnsupported when the body exceeds
     `max_bytes`, SecNoUserAgent when EDGAR_USER_AGENT is not set, and
-    SecError for anything else. With EDGAR_FROZEN_DIR set,
+    SecError for anything else; a 5xx whose Retry-After is too long to wait
+    raises SecRateLimited, since the SEC has set a pause. With EDGAR_FROZEN_DIR set,
     answers from the frozen copies only (SecNoFrozenCopy when there is none);
     with EDGAR_RECORD_DIR set, saves each live answer, a 404 included.
     """
@@ -166,14 +198,14 @@ def fetch(url, max_bytes=MAX_JSON_BYTES):
                              f"the SEC asks every client to identify itself ({url})")
     failure = SecError(f"no response from {url}")
     for attempt in range(API_RETRY_COUNT + 1):
-        wait = API_RETRY_DELAY * (2 ** attempt)
+        wait, asked = API_RETRY_DELAY * (2 ** attempt), False
         _wait_for_turn(url)
         try:
             with _client.stream("GET", url) as response:
                 status = response.status_code
                 if status == 404:
                     if RECORD_DIR:
-                        _record(url, 404, b"", "")
+                        _record(url, 404, b"", "", _now())
                     raise SecNotFound(f"nothing at {url}")
                 if status == 403:
                     # The SEC answers 403 when it has blocked a client for its request rate.
@@ -183,6 +215,7 @@ def fetch(url, max_bytes=MAX_JSON_BYTES):
                     wait = _retry_after(response, wait)
                 elif status >= 500:
                     failure = SecError(f"SEC server error (HTTP {status}) for {url}")
+                    asked = "Retry-After" in response.headers
                     wait = _retry_after(response, wait)
                 elif status != 200:
                     raise SecError(f"unexpected HTTP {status} for {url}")
@@ -194,15 +227,18 @@ def fetch(url, max_bytes=MAX_JSON_BYTES):
                             raise SecUnsupported(f"{url} is larger than {max_bytes:,} bytes")
                         chunks.append(chunk)
                     body, content_type = b"".join(chunks), response.headers.get("Content-Type", "")
+                    retrieved_at = _now()  # once, so a recording and the answer agree
                     if RECORD_DIR:
-                        _record(url, 200, body, content_type)
-                    return body, content_type
+                        _record(url, 200, body, content_type, retrieved_at)
+                    return Response(body, content_type, retrieved_at)
         except httpx.HTTPError as e:
             failure = SecError(f"request to {url} failed: {e}")
         _back_off(wait)
         if wait > MAX_RETRY_WAIT:
-            # Too long to hold a tool call open; the pause stays in force.
-            raise type(failure)(f"{failure}; the SEC asked for a pause of {wait:.0f} seconds")
+            # Too long to hold a tool call open; the pause stays in force. A
+            # server error with a long Retry-After is a pause the SEC has set.
+            kind = SecRateLimited if asked else type(failure)
+            raise kind(f"{failure}; the SEC asked for a pause of {wait:.0f} seconds")
         if attempt < API_RETRY_COUNT:
             logger.warning(f"{failure}; retrying in {wait:.0f}s")
     raise failure
@@ -212,20 +248,22 @@ def get_json(url, cache=None, key=None, ttl=None):
     """Fetch and parse JSON. Returns (data, meta).
 
     `meta` records where the data came from and when it left the SEC:
-    {'source_url', 'retrieved_at', 'cache_hit'}.
+    {'source_url', 'retrieved_at', 'cache_hit', 'frozen'}; a cache hit keeps
+    the retrieval time of the answer it holds.
     """
     if cache is not None:
         entry = cache.get_entry(key or url)
         if entry:
             return entry['data'], {**entry.get('meta', {}), 'source_url': url, 'cache_hit': True}
-    body, _ = fetch(url)
+    response = fetch_response(url)
     try:
-        data = json.loads(body)
+        data = json.loads(response.body)
     except ValueError as e:
         raise SecError(f"{url} did not return JSON: {e}") from e
     meta = {
         'source_url': url,
-        'retrieved_at': datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        'retrieved_at': response.retrieved_at,
+        'frozen': response.frozen,
     }
     if cache is not None:
         cache.set(key or url, data, ttl=ttl, meta=meta)

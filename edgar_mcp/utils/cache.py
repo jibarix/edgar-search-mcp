@@ -11,7 +11,7 @@ import os
 import tempfile
 import time
 
-from config.settings import CACHE_DIR, CACHE_ENABLED, CACHE_EXPIRY
+from edgar_mcp.config.settings import CACHE_DIR, CACHE_ENABLED, CACHE_EXPIRY
 
 
 class Cache:

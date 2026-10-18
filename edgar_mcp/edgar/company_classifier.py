@@ -3,27 +3,45 @@ Company classification by industry (SIC), country of incorporation,
 and dominant revenue country (50 % rule) using SEC Financial Statement Data Sets.
 
 Usage:
-    python -m edgar.company_classifier          # build / refresh index
-    python -m edgar.company_classifier --query US  # list US-revenue-dominant companies
+    python -m edgar_mcp.edgar.company_classifier --build [--datasets-dir DIR] [--output FILE]
+    python -m edgar_mcp.edgar.company_classifier --query US  # list US-revenue-dominant companies
+
+The index is read from EDGAR_COMPANY_INDEX if set, else from the one built
+into the user's data folder, else from the snapshot shipped in the package.
 """
 
 import csv
 import json
 import logging
 import os
+import tempfile
 from collections import defaultdict
+from datetime import datetime, timezone
+from importlib import resources
 
-from config.settings import BASE_DIR
-from config.sic_codes import sic_to_subindustry
+from edgar_mcp.config.settings import COMPANY_INDEX, USER_DATA_DIR
+from edgar_mcp.config.sic_codes import sic_to_subindustry
 
 logger = logging.getLogger(__name__)
 
 # ── Paths ────────────────────────────────────────────────────────────────────
-DATA_DIR = os.path.join(BASE_DIR, "data", "sec_datasets")
-INDEX_FILE = os.path.join(BASE_DIR, "data", "company_index.json")
+# The data sets the builder reads, unless --datasets-dir names another folder.
+DATA_DIR = os.path.join(USER_DATA_DIR, "sec_datasets")
+# Where a built index goes, unless --output names another file.
+USER_INDEX_FILE = os.path.join(USER_DATA_DIR, "company_index.json")
+# The file holds {"schema_version", "metadata", "companies"}. The metadata
+# says when and from which quarters it was built: a file's modification
+# time is no guide, since a checkout or an install sets it.
+INDEX_SCHEMA_VERSION = 1
 
-# Revenue concept names we look for (us-gaap, no namespace prefix in num.txt)
-REVENUE_TAGS = {
+
+class IndexUnavailable(Exception):
+    """A company index that was named, or found, cannot be read."""
+
+
+# Revenue concept names we look for (us-gaap, no namespace prefix in num.txt),
+# in the order tried when a filing reports more than one.
+REVENUE_TAGS = (
     "Revenues",
     "RevenueFromContractWithCustomerExcludingAssessedTax",
     "RevenueFromContractWithCustomerIncludingAssessedTax",
@@ -32,7 +50,8 @@ REVENUE_TAGS = {
     "SalesRevenueServicesNet",
     "RevenueFromRelatedParties",
     "InterestAndDividendIncomeOperating",
-}
+)
+_REVENUE_TAG_SET = frozenset(REVENUE_TAGS)
 
 # Annual report form types
 ANNUAL_FORMS = {"10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A"}
@@ -116,30 +135,34 @@ def _extract_geo_value(segments_field):
 
 # ── Core builder ─────────────────────────────────────────────────────────────
 
-def _available_quarters():
+def _available_quarters(data_dir=DATA_DIR):
     """Return quarter folder names in newest-first order."""
     quarters = []
-    for name in os.listdir(DATA_DIR):
-        dpath = os.path.join(DATA_DIR, name)
+    if not os.path.isdir(data_dir):
+        return quarters
+    for name in os.listdir(data_dir):
+        dpath = os.path.join(data_dir, name)
         if os.path.isdir(dpath) and os.path.isfile(os.path.join(dpath, "num.txt")):
             quarters.append(name)
     return sorted(quarters, reverse=True)
 
 
-def build_index(max_quarters=5):
+def build_index(max_quarters=5, data_dir=DATA_DIR):
     """Build the company classification index from SEC data sets.
 
-    Scans num.txt + sub.txt from the most recent *max_quarters* quarters,
-    picks the latest annual filing per CIK, and classifies each company.
+    Scans num.txt + sub.txt from the most recent *max_quarters* quarters in
+    *data_dir*. Name, SIC and country come from each CIK's latest annual
+    filing; revenue from the latest one with revenue data.
 
     Returns:
-        dict: {cik_str: {name, sic, industry, country_inc, revenue_country,
-                         revenue_pct, period, geo_breakdown}}
+        (dict, list): {cik_str: {name, sic, industry, country_inc, state_inc,
+        period, revenue_country, revenue_pct, revenue_period, geo_breakdown}}
+        and the quarters read.
     """
-    quarters = _available_quarters()[:max_quarters]
+    quarters = _available_quarters(data_dir)[:max_quarters]
     if not quarters:
-        logger.error("No SEC dataset quarters found in %s", DATA_DIR)
-        return {}
+        logger.error("No SEC dataset quarters found in %s", data_dir)
+        return {}, []
 
     logger.info("Building company index from quarters: %s", quarters)
 
@@ -147,7 +170,7 @@ def build_index(max_quarters=5):
     # We only care about annual filings (10-K, 20-F, 40-F)
     filings = {}  # adsh → {cik, name, sic, countryinc, form, period}
     for qtr in quarters:
-        sub_path = os.path.join(DATA_DIR, qtr, "sub.txt")
+        sub_path = os.path.join(data_dir, qtr, "sub.txt")
         with open(sub_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter="\t")
             for row in reader:
@@ -174,13 +197,13 @@ def build_index(max_quarters=5):
     revenue_geo = defaultdict(lambda: defaultdict(dict))  # adsh → tag → geo → value
 
     for qtr in quarters:
-        num_path = os.path.join(DATA_DIR, qtr, "num.txt")
+        num_path = os.path.join(data_dir, qtr, "num.txt")
         logger.info("Scanning %s ...", num_path)
         with open(num_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter="\t")
             for row in reader:
                 tag = row.get("tag", "")
-                if tag not in REVENUE_TAGS:
+                if tag not in _REVENUE_TAG_SET:
                     continue
                 if row.get("qtrs") != "4":
                     continue
@@ -217,8 +240,9 @@ def build_index(max_quarters=5):
 
     index = {}
     for cik, filing_list in cik_filings.items():
-        # Sort by period descending, pick the latest
-        filing_list.sort(key=lambda x: x[0], reverse=True)
+        # Sort by period descending: the latest says who the company is now.
+        filing_list.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        latest = filing_list[0][2]
         best_adsh = None
         best_info = None
         for period, adsh, info in filing_list:
@@ -278,16 +302,17 @@ def build_index(max_quarters=5):
                             revenue_country = geo_label
                             revenue_pct = round(pct, 1)
 
-        sic = best_info.get("sic", "")
-        countryinc = best_info.get("countryinc", "")
-        stprinc = best_info.get("stprinc", "")
+        # Classification from the latest filing, even when an older one has the revenue split.
+        sic = latest.get("sic", "")
+        countryinc = latest.get("countryinc", "")
+        stprinc = latest.get("stprinc", "")
 
         # Normalize country of incorporation
         # SEC uses US state codes (e.g., DE, CA) when countryinc=US
         inc_country = countryinc if countryinc != "US" else "US"
 
         index[cik] = {
-            "name": best_info["name"],
+            "name": latest["name"],
             "sic": sic,
             "industry": sic_to_industry(sic),
             "subindustry": sic_to_subindustry(sic),
@@ -295,32 +320,95 @@ def build_index(max_quarters=5):
             "state_inc": stprinc if countryinc == "US" else "",
             "revenue_country": revenue_country,
             "revenue_pct": revenue_pct,
-            "period": best_info["period"],
+            "period": latest["period"],
+            "revenue_period": best_info["period"] if best_adsh in revenue_total or best_adsh in revenue_geo else None,
             "geo_breakdown": pct_breakdown,
         }
 
     logger.info("Built index with %d companies (%d with revenue country)",
                 len(index), sum(1 for v in index.values() if v["revenue_country"]))
-    return index
+    return index, quarters
 
 
-def save_index(index=None):
-    """Build (if needed) and save the company index to disk."""
-    if index is None:
-        index = build_index()
-    os.makedirs(os.path.dirname(INDEX_FILE), exist_ok=True)
-    with open(INDEX_FILE, "w", encoding="utf-8") as f:
-        json.dump(index, f, indent=2)
-    logger.info("Saved company index to %s (%d companies)", INDEX_FILE, len(index))
-    return index
+def save_index(index, quarters, output=USER_INDEX_FILE):
+    """Write the index and its build record to `output`, whole or not at all."""
+    periods = [v.get("period", "") for v in index.values() if v.get("period")]
+    latest = max(periods) if periods else None
+    document = {
+        "schema_version": INDEX_SCHEMA_VERSION,
+        "metadata": {
+            "built": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "source": "SEC Financial Statement Data Sets",
+            "quarters": list(quarters),
+            "latest_period": f"{latest[:4]}-{latest[4:6]}-{latest[6:8]}" if latest else None,
+            "companies": len(index),
+        },
+        "companies": index,
+    }
+    folder = os.path.dirname(os.path.abspath(output))
+    os.makedirs(folder, exist_ok=True)
+    handle, temp = tempfile.mkstemp(dir=folder, suffix=".tmp")
+    with os.fdopen(handle, "w", encoding="utf-8") as f:
+        json.dump(document, f, indent=2)
+    os.replace(temp, output)
+    logger.info("Saved company index to %s (%d companies)", output, len(index))
+    return document
+
+
+def _read_index(text, origin):
+    """Companies and metadata of one index file. A file without the envelope
+    is an older index: its companies are read, its provenance is unknown."""
+    try:
+        document = json.loads(text)
+    except ValueError as e:
+        raise IndexUnavailable(f"the company index at {origin} is not JSON ({e})") from None
+    if isinstance(document, dict) and "schema_version" in document:
+        companies, metadata = document.get("companies"), document.get("metadata")
+        if document["schema_version"] != INDEX_SCHEMA_VERSION or not isinstance(companies, dict) \
+                or not isinstance(metadata, dict):
+            raise IndexUnavailable(f"the company index at {origin} is not in a layout this version reads")
+    elif isinstance(document, dict):
+        companies, metadata = document, {"built": None, "note": "an older index with no build record"}
+    else:
+        raise IndexUnavailable(f"the company index at {origin} is not in a layout this version reads")
+    if not all(isinstance(v, dict) for v in companies.values()):
+        raise IndexUnavailable(f"the company index at {origin} has entries that are not companies")
+    return companies, metadata
+
+
+def load_index_with_meta():
+    """The company index and its build record, read together from one file.
+
+    Taken from EDGAR_COMPANY_INDEX if set (an error if it cannot be read),
+    else from the index built into the user's data folder, else from the
+    snapshot in the package. The metadata names which (`origin`, `path`).
+    """
+    if COMPANY_INDEX:
+        origin, path = "EDGAR_COMPANY_INDEX", COMPANY_INDEX
+    elif os.path.isfile(USER_INDEX_FILE):
+        origin, path = "built by the user", USER_INDEX_FILE
+    else:
+        origin, path = "snapshot in the package", None
+    try:
+        if path:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+        else:
+            text = resources.files("edgar_mcp").joinpath("data", "company_index.json").read_text(encoding="utf-8")
+    except OSError as e:
+        raise IndexUnavailable(f"the company index ({origin}) cannot be read ({e})") from None
+    companies, metadata = _read_index(text, path or origin)
+    return companies, {**metadata, "origin": origin, "path": path}
 
 
 def load_index():
-    """Load the company index from disk. Returns empty dict if not found."""
-    if not os.path.isfile(INDEX_FILE):
-        return {}
-    with open(INDEX_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    """The companies of the company index; see load_index_with_meta."""
+    return load_index_with_meta()[0]
+
+
+def load_index_meta():
+    """The build record of the company index; see load_index_with_meta."""
+    return load_index_with_meta()[1]
 
 
 # ── Query helpers ────────────────────────────────────────────────────────────
@@ -359,25 +447,29 @@ def query_by_country_inc(country_code, index=None):
 
 if __name__ == "__main__":
     import argparse
-    import sys
-
-    sys.path.insert(0, str(BASE_DIR))
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     parser = argparse.ArgumentParser(description="Build / query company classification index")
     parser.add_argument("--build", action="store_true", help="Rebuild the index from SEC datasets")
+    parser.add_argument("--datasets-dir", default=DATA_DIR,
+                        help=f"Folder of quarter folders holding sub.txt and num.txt (default: {DATA_DIR})")
+    parser.add_argument("--output", default=USER_INDEX_FILE,
+                        help=f"Where to write the built index (default: {USER_INDEX_FILE})")
+    parser.add_argument("--quarters", type=int, default=5, help="How many recent quarters to read (default: 5)")
     parser.add_argument("--query", metavar="COUNTRY", help="Query companies by dominant revenue country (ISO 2-letter code)")
     parser.add_argument("--industry", metavar="SIC_OR_NAME", help="Query companies by SIC code or industry name")
     parser.add_argument("--inc", metavar="COUNTRY", help="Query companies by country of incorporation")
     parser.add_argument("--limit", type=int, default=20, help="Max results to display (default: 20)")
     args = parser.parse_args()
 
-    if args.build or not os.path.isfile(INDEX_FILE):
+    if args.build:
         print("Building company classification index...")
-        idx = build_index()
-        save_index(idx)
-        print(f"Done. {len(idx)} companies indexed.")
+        idx, used = build_index(args.quarters, args.datasets_dir)
+        if not idx:
+            raise SystemExit(f"no SEC data set quarters found in {args.datasets_dir}")
+        save_index(idx, used, args.output)
+        print(f"Done. {len(idx)} companies indexed from {', '.join(used)}; written to {args.output}.")
 
         # Summary stats
         with_rev = sum(1 for v in idx.values() if v["revenue_country"])
