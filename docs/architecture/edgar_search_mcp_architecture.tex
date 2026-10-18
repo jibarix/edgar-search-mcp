@@ -1,4 +1,4 @@
-% edgar-search-mcp -- the architecture, in diagrams (version 0.5.0, the code as of 2026-10-17)
+% edgar-search-mcp -- the architecture, in diagrams (version 0.5.1, the code as of 2026-10-17)
 % Build: latexmk -xelatex edgar_search_mcp_architecture.tex
 % Drawn from the code: edgar_mcp/server.py, edgar_mcp/utils/*.py, edgar_mcp/edgar/*.py, edgar_mcp/config/*.py.
 % The examples are real calls to the server on 2026-10-17 (Costco, CIK 0000909832), shortened.
@@ -42,7 +42,7 @@
 \newcommand{\stline}[2]{\makebox[9mm][l]{\ttfamily\fontsize{4.6}{5.6}\selectfont\color{accent}#1}{\fontsize{5}{6}\selectfont\color{ink!80}#2}}
 \setbeamertemplate{footline}{%
   \ifx\stcode\empty
-    \hspace{5mm}{\ttfamily\fontsize{5}{6}\selectfont\color{muted}EDGAR-SEARCH-MCP · ARCHITECTURE IN DIAGRAMS · VERSION 0.5.0 · THE CODE AS OF 2026-10-17}%
+    \hspace{5mm}{\ttfamily\fontsize{5}{6}\selectfont\color{muted}EDGAR-SEARCH-MCP · ARCHITECTURE IN DIAGRAMS · VERSION 0.5.1 · THE CODE AS OF 2026-10-17}%
   \else
     \hspace{5mm}\parbox[b]{150mm}{\raggedright\hyphenpenalty=10000
       \stline{CODE}{\stcode}\\[0.2mm]\stline{CHECKED}{\stcheck}}%
@@ -128,7 +128,7 @@
     {\large\color{muted} Every figure carries the filing it came from.}\\[10mm]
     {\ttfamily\fontsize{6}{7.6}\selectfont\color{muted}FRAMING · THE WHOLE SYSTEM · THE NINE TOOLS · HOW THEY CHAIN · ONE CALL · SEC ACCESS · STATEMENTS ·}\\
     {\ttfamily\fontsize{6}{7.6}\selectfont\color{muted}FILING TEXT · SEGMENTS · BOUNDS · ERRORS · EXAMPLES · LIMITATIONS · SETUP · TESTS}\\[5mm]
-    {\ttfamily\fontsize{6}{7.6}\selectfont\color{muted}VERSION 0.5.0 · OCTOBER 17, 2026 · JIBARIX · GITHUB.COM/JIBARIX/EDGAR-SEARCH-MCP · MIT LICENCE}};
+    {\ttfamily\fontsize{6}{7.6}\selectfont\color{muted}VERSION 0.5.1 · OCTOBER 17, 2026 · JIBARIX · GITHUB.COM/JIBARIX/EDGAR-SEARCH-MCP · MIT LICENCE}};
 \end{tikzpicture}
 \end{frame}
 
@@ -713,7 +713,7 @@ test\_mcp\_stdio.py & live & Starts the server as a client does, lists the nine 
 \end{tbl}
 \vspace{2mm}
 {\fontsize{5.4}{6.8}\selectfont
-\textbf{Status.} Version 0.5.0, MIT licence; the fixes are not yet committed or published. The final review's six findings (segment units, search continuation, replay timestamps, index date, empty search responses, historical-file errors) are fixed, with the classification corrections, a command to build the company index and per-user folders; each has an offline test. \textbf{Possible next step:} segment member labels from the filing's label linkbase.\par}
+\textbf{Status.} Version 0.5.1, MIT licence, published with a wheel on the releases page; 0.5.1 adds only the server's version in its answer to a starting session. The final review's six findings (segment units, search continuation, replay timestamps, index date, empty search responses, historical-file errors) are fixed, with the classification corrections, a command to build the company index and per-user folders; each has an offline test. \textbf{Possible next step:} segment member labels from the filing's label linkbase.\par}
 \end{frame}
 
 \end{document}

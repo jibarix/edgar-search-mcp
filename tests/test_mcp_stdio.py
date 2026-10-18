@@ -15,6 +15,9 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+
+from edgar_mcp import __version__  # noqa: E402
 
 
 def payload(result):
@@ -42,7 +45,9 @@ async def main():
 
     async with stdio_client(server) as (read, write):
         async with ClientSession(read, write) as session:
-            await session.initialize()
+            started = await session.initialize()
+            check("server reports its version", started.server_info.version == __version__,
+                  f"{started.server_info.name} {started.server_info.version}")
 
             async def call(tool, **arguments):
                 return payload(await session.call_tool(tool, arguments))

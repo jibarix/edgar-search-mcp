@@ -30,6 +30,7 @@ is reported as a coded error, never as an empty answer.
 - [Tests](#tests)
 - [Project layout](#project-layout)
 - [Limitations](#limitations)
+- [Changes in 0.5.1](#changes-in-051)
 - [Changes in 0.5.0](#changes-in-050)
 - [License](#license)
 
@@ -78,7 +79,7 @@ Each version is also published as a wheel on the
 that pins this server can install that file, with its SHA-256 in a hashed lock:
 
 ```bash
-pip install https://github.com/jibarix/edgar-search-mcp/releases/download/v0.5.0/edgar_search_mcp-0.5.0-py3-none-any.whl
+pip install https://github.com/jibarix/edgar-search-mcp/releases/download/v0.5.1/edgar_search_mcp-0.5.1-py3-none-any.whl
 ```
 
 An ordinary install works: the package carries the tag mapping and a snapshot
@@ -557,6 +558,13 @@ edgar-search-mcp/
   described only in this README and in each tool's description, not in a
   machine-checkable schema. A program that reads the answers directly should
   check the fields it uses; field names may change between versions.
+
+## Changes in 0.5.1
+
+- **Server version**: the server reports its own version (`0.5.1`) when a
+  session starts, so a client's record says which release answered. Before,
+  it reported the MCP SDK's default. The version is set in one place,
+  `edgar_mcp/__init__.py`, and `pyproject.toml` reads it from there.
 
 ## Changes in 0.5.0
 

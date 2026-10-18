@@ -34,13 +34,14 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import ToolAnnotations
 
+from edgar_mcp import __version__
 from edgar_mcp.edgar.company_lookup import find_company, format_cik, get_company_tickers
 from edgar_mcp.edgar.filing_retrieval import FilingRetrieval
 from edgar_mcp.edgar.xbrl_parser import XBRLParser
 from edgar_mcp.utils.helpers import iso_date
 from edgar_mcp.utils.sec_client import SecError, SecNotFound, SecUnsupported, fetch_response, get_json
 
-mcp = MCPServer("edgar-search")
+mcp = MCPServer("edgar-search", version=__version__)
 
 _filings = FilingRetrieval()
 _parser = XBRLParser()
