@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edgar-search-mcp"
+version = "0.4.0"
+description = "Retrieve SEC EDGAR filings and reported financial facts, as an MCP server"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+# Direct dependencies of the MCP server. The exact, hashed versions of these
+# and of everything they pull in are in requirements.lock.
+dependencies = [
+    "httpx==0.28.1",
+    "jsonschema==4.26.0",
+    "mcp==2.3.0",
+]
+
+[project.urls]
+Repository = "https://github.com/jibarix/edgar-search-mcp"
+
+[project.scripts]
+edgar-search-mcp = "edgar_mcp.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["edgar*", "edgar_mcp*", "config*", "utils*"]
+
+# The tag-to-statement mapping the classifier cannot work without.
+[tool.setuptools.package-data]
+edgar = ["data/*.json"]

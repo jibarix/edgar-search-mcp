@@ -1,0 +1,12 @@
+venv/
+.venv/
+cache/
+logs/
+output/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.claude/
+data/sec_datasets/
