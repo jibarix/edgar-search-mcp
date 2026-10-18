@@ -172,7 +172,7 @@
   \node[card=30mm, store, anchor=north west] (idx) at (84,62)
     {\K{company index · snapshot or built}{Company index}{CIK, name, SIC, country and state of incorporation; read by \cd{search\_companies}. \cd{EDGAR\_COMPANY\_INDEX}, else one built, else the packaged snapshot.}};
   \node[card=30mm, store, below=1.6mm of idx] (map)
-    {\K{edgar\_mcp/edgar/data/sec\_tag\_mapping.json}{Tag mapping}{Which XBRL tag is which statement line, its order and label.}};
+    {\K{edgar/data/sec\_tag\_mapping.json}{Tag mapping}{Which XBRL tag is which statement line, its order and label.}};
   \node[card=30mm, store, below=1.6mm of map] (cache)
     {\K{user cache folder · in memory}{Caches}{JSON on disk, outside the package: tickers 24 h, filing lists and facts 1 h. Text of the last 8 documents in memory.}};
   % the SEC
@@ -210,7 +210,7 @@
 \begin{frame}{The nine tools and what each is for}
 \framesubtitle{A company is a CIK, an exact ticker, an exact name or a unique name without its suffix (Apple \ra{} Apple Inc.); anything else is an AMBIGUOUS\_COMPANY error that lists the candidates.}
 \begin{tbl}[4.9]
-\begin{tabular}{C{27mm}P{50mm}P{37mm}P{28mm}}
+\begin{tabular}{@{}C{26mm}P{48mm}P{36mm}P{28mm}@{}}
 \tstart
 \thead{TOOL} & \thead{PURPOSE} & \thead{KEY ARGUMENTS} & \thead{READS} \tmid
 lookup\_company & Turn a name or ticker into a CIK. Says how it matched: ticker, name, shared name, prefix or fuzzy (up to 5 candidates), none. & \cd{query} & company\_tickers.json \tmid
@@ -390,7 +390,7 @@ search\_companies & Candidate peers by SIC code, industry, country or name; disc
 \begin{frame}{Parameters, defaults and bounds}
 \framesubtitle{Dates are YYYY-MM-DD and must exist. \cd{as\_of} means ``as the record stood that day'': anything filed later is ignored.}
 \begin{tbl}[5.2]
-\begin{tabular}{C{30mm}C{26mm}P{24mm}P{62mm}}
+\begin{tabular}{@{}C{29mm}C{26mm}P{24mm}P{59mm}@{}}
 \tstart
 \thead{TOOL} & \thead{PARAMETER} & \thead{DEFAULT · BOUND} & \thead{NOTE} \tmid
 get\_financial\_statement & statement\_type & BS IS CF EQ CI ALL & ALL returns every statement in one call. \\
@@ -417,7 +417,7 @@ search\_companies & limit & 25 · 1--200 & \cd{truncated} says more matched. \tm
 \begin{frame}{Error codes, and what to do about each}
 \framesubtitle{A tool error is one line, \cd{CODE: message}. A result with nothing in it is not an error: an empty list, or a reason in \cd{metadata.empty\_reason}.}
 \begin{tbl}[5.2]
-\begin{tabular}{C{33mm}P{55mm}P{58mm}}
+\begin{tabular}{@{}C{33mm}P{53mm}P{55mm}@{}}
 \tstart
 \thead{CODE} & \thead{MEANS} & \thead{WHAT TO DO} \tmid
 INVALID\_INPUT & An argument out of bounds, a date that does not exist, a URL that is not an EDGAR document. & Fix the argument; the message names it and its bound. \tmid
@@ -647,7 +647,7 @@ INDEX\_UNAVAILABLE & The company index named or built cannot be read. & Fix or r
 \begin{frame}{The Costco quirks: what was fixed, what is kept on purpose}
 \framesubtitle{The headline figures were always right. Four mapping errors are now corrected by reviewed rules; three behaviours stay, because changing them would hide what the company tagged.}
 \begin{tbl}[5.0]
-\begin{tabular}{P{50mm}P{50mm}P{45mm}}
+\begin{tabular}{@{}P{48mm}P{48mm}P{45mm}@{}}
 \tstart
 \thead{WHAT CAME BACK IN 0.4.0} & \thead{NOW} & \thead{WHY} \tmid
 \cd{us-gaap:InterestExpense} (145 million) in category ``Revenue''. & Category ``Income'', label ``Interest expense''. & An expense; order 8 keeps a bank's interest lines together. \tmid
