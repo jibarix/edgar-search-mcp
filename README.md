@@ -26,6 +26,7 @@ is reported as a coded error, never as an empty answer.
 - [SEC access: rate limit, retries, cache](#sec-access-rate-limit-retries-cache)
 - [Frozen copies for reproducible runs](#frozen-copies-for-reproducible-runs)
 - [The company index](#the-company-index)
+- [Using it from Python](#using-it-from-python)
 - [Tests](#tests)
 - [Project layout](#project-layout)
 - [Limitations](#limitations)
@@ -71,6 +72,14 @@ pip install --no-deps .
 
 The hashes in the lock are for Windows wheels. On other platforms, use
 `pip install .`.
+
+Each version is also published as a wheel on the
+[releases page](https://github.com/jibarix/edgar-search-mcp/releases). A project
+that pins this server can install that file, with its SHA-256 in a hashed lock:
+
+```bash
+pip install https://github.com/jibarix/edgar-search-mcp/releases/download/v0.5.0/edgar_search_mcp-0.5.0-py3-none-any.whl
+```
 
 An ordinary install works: the package carries the tag mapping and a snapshot
 of the company index, and it writes nothing next to its code. Use
@@ -447,6 +456,23 @@ each company's name, SIC code and place of incorporation from its latest
 filing in those quarters, and its revenue split by country from the latest
 filing that has one (`revenue_period` says which). It records the build time
 and the quarters read. It never changes the snapshot in the package.
+
+## Using it from Python
+
+The tools are the main interface, but a program can also import these names.
+They keep their signatures and behaviour within a minor version; a change to
+any of them is a new minor version (0.x) and is listed under Changes.
+
+| Module | Names |
+|---|---|
+| `edgar_mcp.edgar.company_lookup` | `find_company(query)`, `get_company_tickers()` |
+| `edgar_mcp.edgar.xbrl_parser` | `XBRLParser` |
+| `edgar_mcp.utils.sec_client` | `fetch(url, max_bytes)`, `get_json(url, cache, key, ttl)`, `SecError`, `SecNotFound` |
+
+They use the same SEC client, pacing, cache and frozen copies as the tools,
+and read the same environment variables, so set `EDGAR_USER_AGENT` (and
+`EDGAR_CACHE_DIR` if wanted) before importing them. Everything else in the
+package is internal.
 
 ## Tests
 
