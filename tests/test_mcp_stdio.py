@@ -59,7 +59,7 @@ async def main():
 
             tools = (await session.list_tools()).tools
             names = sorted(t.name for t in tools)
-            check("tools", names == ["get_concept", "get_filing_text", "get_financial_statement", "get_segment_revenue",
+            check("tools", names == ["get_concept", "get_filed_statements", "get_filing_text", "get_financial_statement", "get_segment_revenue",
                                      "list_filing_documents", "list_filings", "lookup_company", "search_companies",
                                      "search_filings"], str(names))
             check("tools are marked read-only", all(t.annotations and t.annotations.read_only_hint for t in tools))

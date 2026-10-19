@@ -7,6 +7,7 @@ Tools:
     list_filings         - filings with accession number, dates and document URL
     list_filing_documents - every document of one filing: main document, exhibits, data files
     get_filing_text      - plain text of a filing document (main document or exhibit), in pages
+    get_filed_statements - the primary statements of one filing as filed: lines, labels, own elements, calculations
     get_segment_revenue  - revenue by business segment, product and geography from the annual report's XBRL data
     search_filings       - filings whose text contains given words (SEC full-text search)
     search_companies     - filter the local SIC/country index (discovery only)
@@ -35,6 +36,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import ToolAnnotations
 
 from edgar_mcp import __version__
+from edgar_mcp.edgar import filed_statements as fs
 from edgar_mcp.edgar.company_lookup import find_company, format_cik, get_company_tickers
 from edgar_mcp.edgar.filing_retrieval import FilingRetrieval
 from edgar_mcp.edgar.xbrl_parser import XBRLParser
@@ -626,6 +628,182 @@ def _segment_facts(raw: bytes, document: str) -> list:
         facts.append({"concept": concept, "value": value, "unit": unit, "currency": currency,
                       "unit_issue": issue, **ctx})
     return facts
+
+
+_FILED_FORMS = ("10-K", "10-Q", "20-F", "40-F", "10-K/A", "10-Q/A", "20-F/A", "40-F/A")
+_ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")
+_AS_OF_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+_HEADER_ACCEPTED = re.compile(r"<ACCEPTANCE-DATETIME>\s*(\d{14})")
+
+
+def _eastern_to_utc(stamp: str) -> str:
+    """YYYYMMDDhhmmss in US Eastern civil time as ISO UTC. Daylight time runs
+    from 2:00 on the second Sunday of March to 2:00 on the first Sunday of
+    November (the rule since 2007; filings with XBRL statements start in 2009)."""
+    from datetime import timedelta
+    local = datetime.strptime(stamp, "%Y%m%d%H%M%S")
+
+    def sunday(month, nth):
+        first = datetime(local.year, month, 1)
+        return first + timedelta(days=(6 - first.weekday()) % 7 + 7 * (nth - 1), hours=2)
+
+    offset = 4 if sunday(3, 2) <= local < sunday(11, 1) else 5
+    return (local + timedelta(hours=offset)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _acceptance(cik: str, filing: dict) -> dict:
+    """When the SEC accepted a filing: the header's Eastern time, that time in
+    UTC, and the submissions feed's value. The feed's value can disagree with
+    the header, so both are kept; `utc` is the header's, else the feed's."""
+    feed = filing.get("acceptance_datetime") or None
+    url = (f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{filing['accession_number'].replace('-', '')}/"
+           f"{filing['accession_number']}-index-headers.html")
+    header = None
+    try:
+        m = _HEADER_ACCEPTED.search(fetch_response(url, max_bytes=_MAX_DOCUMENT_BYTES).body.decode("latin-1"))
+        header = m.group(1) if m else None
+    except SecNotFound:
+        pass
+    utc = _eastern_to_utc(header) if header else (feed[:19] + "Z" if feed else None)
+    return {"header_eastern": header, "utc": utc, "submissions_feed": feed,
+            "agree": None if not (header and feed) else utc[:19] == feed[:19]}
+
+
+@_tool
+def get_filed_statements(
+    cik_or_ticker: str,
+    form: Literal["10-K", "10-Q", "20-F", "40-F", "10-K/A", "10-Q/A", "20-F/A", "40-F/A"] = "10-K",
+    accession_number: str | None = None,
+    as_of: str | None = None,
+) -> dict:
+    """The primary financial statements of one filing, as the company filed them.
+
+    Read from the XBRL files inside the filing, not from Company Facts: each
+    statement the company's schema names as a statement, with its lines in
+    the company's order and nesting, the company's own labels, and the
+    element behind each line, a standard one or one the company defined
+    (`extension`: true). The company's own elements carry their definition
+    (type, period type, debit or credit, documentation) and any definition
+    links the company gave them. `calculation_parent` and `weight` say which
+    total a line adds into, as the company's calculation linkbase states.
+
+    This is the company's data, not a standard layout: no line is mapped to a
+    category here. `values` are the whole-company figures for the statement's
+    `columns`, exactly as tagged (signs as the element defines them, not as
+    printed; a label whose `label_role` is "negatedLabel" is printed with the
+    opposite sign). `by_member` holds figures split along an axis the statement
+    itself shows (equity components, share classes). `calculation_checks`
+    compares each total with the weighted sum of its lines per column, within
+    the rounding the figures allow. `conflicts` lists any figure tagged twice
+    with different values.
+
+    The filing is the latest `form` on file, or `accession_number` (of this
+    company). `as_of`, YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ, leaves out filings
+    filed (or accepted by the SEC) after it.
+    """
+    if as_of is not None and not _AS_OF_TIME.fullmatch(as_of):
+        iso_date(as_of)
+    if accession_number is not None and not _ACCESSION.fullmatch(accession_number):
+        raise ValueError(f"accession_number must look like 0000320193-24-000123, got {accession_number!r}")
+    company = _resolve(cik_or_ticker)
+    cutoff = as_of[:10] if as_of else None
+    if accession_number:
+        rows, _, _ = _filings.get_filing_metadata(company["cik"], filing_type="ALL", limit=100_000, strict=True)
+        rows = [r for r in rows if r["accession_number"] == accession_number]
+        if not rows:
+            raise ToolError(f"NOT_FOUND: {accession_number} is not a filing of CIK {company['cik']}")
+        if cutoff and rows[0]["filing_date"] > cutoff:
+            raise ToolError(f"NOT_FOUND: {accession_number} was filed after {as_of}")
+    else:
+        rows, _, _ = _filings.get_filing_metadata(company["cik"], filing_type=form, end_date=cutoff, limit=10,
+                                                  strict=True)
+        rows = [r for r in rows if r["form"].upper() == form]
+        if not rows:
+            raise ToolError(f"NOT_FOUND: no {form} on file for CIK {company['cik']}"
+                            + (f" as of {as_of}" if as_of else ""))
+    if as_of and len(as_of) > 10:
+        # By the acceptance time in the filing's own header, read for each candidate, newest first.
+        for row in rows:
+            row["acceptance"] = _acceptance(company["cik"], row)
+        rows = [r for r in rows if (r["acceptance"]["utc"] or r["filing_date"]) <= as_of]
+        if not rows:
+            raise ToolError(f"NOT_FOUND: no {form} of CIK {company['cik']} was accepted by {as_of}")
+    filing = rows[0]
+    acceptance = filing.get("acceptance") or _acceptance(company["cik"], filing)
+    folder = f"https://www.sec.gov/Archives/edgar/data/{int(company['cik'])}/{filing['accession_number'].replace('-', '')}/"
+
+    sources = []
+
+    def read(name):
+        answer = fetch_response(folder + name, max_bytes=_MAX_DOCUMENT_BYTES)
+        sources.append({"file": name, "url": folder + name, "sha256": hashlib.sha256(answer.body).hexdigest(),
+                        "retrieved_at": answer.retrieved_at, "frozen": answer.frozen})
+        return answer.body
+
+    try:
+        summary = read("FilingSummary.xml")
+    except SecNotFound:
+        raise ToolError(f"UNSUPPORTED_DOCUMENT: {filing['accession_number']} has no XBRL financial data "
+                        "(no FilingSummary.xml in its folder)") from None
+    try:
+        files = fs.input_files(summary)
+        if not (files["instance"] and files["schema"]):
+            listing, meta = get_json(folder + "index.json")
+            sources.append({"file": "index.json", "url": folder + "index.json", "retrieved_at": meta["retrieved_at"],
+                            "frozen": meta["frozen"]})
+            files = fs.files_from_folder([i.get("name", "") for i in listing.get("directory", {}).get("item", [])],
+                                         files)
+        missing = [k for k in ("instance", "schema") if not files[k]]
+        if missing:
+            raise ToolError(f"UNSUPPORTED_DOCUMENT: {filing['accession_number']} lacks its XBRL {', '.join(missing)}")
+        schema_raw = read(files["schema"])
+        schema = fs.read_schema(schema_raw)
+
+        # Each linkbase is a file the summary lists, else one the schema names, else inside the schema.
+        def linkbase(kind):
+            name = files[kind] or schema["linkbase_refs"].get(kind)
+            if name:
+                return read(name)
+            return schema_raw if kind in schema["embedded"] else None
+
+        pre = linkbase("presentation")
+        if pre is None:
+            raise ToolError(f"UNSUPPORTED_DOCUMENT: {filing['accession_number']} has no presentation linkbase")
+        presentation = fs.read_presentation(pre)
+        calculation, versions = fs.read_calculation(linkbase("calculation"))
+        labels = fs.read_labels(linkbase("label"))
+        definition = fs.read_definition(linkbase("definition"))
+        instance = fs.read_instance(read(files["instance"]))
+        statements, conflicts = fs.build_statements(schema, presentation, calculation, labels, definition,
+                                                    instance, files["reports"])
+    except fs.FilingDataError as e:
+        raise ToolError(f"UNSUPPORTED_DOCUMENT: {filing['accession_number']}: {e}") from e
+    if not statements:
+        raise ToolError(f"NOT_FOUND: the schema of {filing['accession_number']} names no statement roles")
+    for s in statements:
+        page = files["reports"].get(s["role"], {}).get("page")
+        s["report_page"] = page and folder + page
+    entities = sorted({f["entity"] for f in instance["facts"]})
+    return {
+        "cik": company["cik"],
+        "matched_on": company["matched_on"],
+        "as_of": as_of,
+        "data_kind": "filer data: the company's statements as filed, not mapped to any standard layout",
+        "filing": {"accession_number": filing["accession_number"], "form": filing["form"],
+                   "filing_date": filing["filing_date"], "acceptance": acceptance,
+                   "reporting_date": filing["reporting_date"], "document": files["document"] and folder + files["document"],
+                   "inline_xbrl": files["inline"]},
+        "document_facts": fs.document_facts(instance),
+        "registered_securities": fs.registered_securities(instance),
+        "cover_shares": fs.cover_shares(instance),
+        "company_namespace": schema["namespace"],
+        "calculation_versions": sorted(versions),
+        "entities": entities,
+        "statements": statements,
+        "conflicts": conflicts,
+        "sources": sources,
+        "returned_at": _now(),
+    }
 
 
 def _document_url(url: str) -> str:

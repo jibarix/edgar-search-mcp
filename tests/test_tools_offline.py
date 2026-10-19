@@ -1,4 +1,4 @@
-"""The tools against made-up SEC answers: search, segments, filing history,
+"""The tools against made-up SEC answers: search, segments, filed statements, filing history,
 retries and frozen copies, statement classification and the company index.
 
 No network: every request goes to a stand-in transport, and any request a
@@ -26,7 +26,7 @@ import httpx  # noqa: E402
 
 from edgar_mcp import server  # noqa: E402
 from edgar_mcp.config import settings  # noqa: E402
-from edgar_mcp.edgar import company_classifier, company_lookup, filing_retrieval  # noqa: E402
+from edgar_mcp.edgar import company_classifier, company_lookup, filed_statements, filing_retrieval  # noqa: E402
 from edgar_mcp.edgar.tag_classifier import TagClassifier  # noqa: E402
 from edgar_mcp.utils import sec_client  # noqa: E402
 
@@ -422,6 +422,330 @@ def segment_cases():
     check("segments: a live answer says it was not frozen", r["frozen"] is False)
 
 
+# ── get_filed_statements ────────────────────────────────────────────────────
+
+def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=False, prohibit=False,
+          duplicate=None, member_total=False, header="20260702060102"):
+    """A made-up filing folder: name -> bytes. Statements: an income statement
+    with an own element that adds into costs, a balance sheet with a line
+    tagged only under a member, and a parenthetical page."""
+    ns = 'xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xlink="http://www.w3.org/1999/xlink"'
+    gaap = "https://xbrl.fasb.org/us-gaap/2024/elts/us-gaap-2024.xsd"
+    roles = {"IS": "http://t.example/role/Income", "BS": "http://t.example/role/Balance",
+             "BSP": "http://t.example/role/BalanceParenthetical", "N1": "http://t.example/role/Policies"}
+    titles = {"IS": "0000002 - Statement - CONSOLIDATED STATEMENTS OF OPERATIONS",
+              "BS": "0000003 - Statement - CONSOLIDATED BALANCE SHEETS",
+              "BSP": "0000004 - Statement - CONSOLIDATED BALANCE SHEETS (Parenthetical)",
+              "N1": "0000005 - Disclosure - Accounting Policies"}
+
+    def loc(element):
+        own = element.startswith("t_")
+        return (f'<link:loc xlink:type="locator" xlink:href="{"t-20251231.xsd" if own else gaap}#{element}" '
+                f'xlink:label="{element}"/>')
+
+    def link(kind, role, arcs, arcrole):
+        elements = sorted({e for a in arcs for e in a[:2]})
+        body = "".join(loc(e) for e in elements)
+        for a in arcs:
+            parent, child, attr = a[0], a[1], a[2] if len(a) > 2 else ""
+            body += (f'<link:{kind}Arc xlink:type="arc" xlink:arcrole="{arcrole}" xlink:from="{parent}" '
+                     f'xlink:to="{child}" {attr}/>')
+        return f'<link:{kind}Link xlink:type="extended" xlink:role="{role}">{body}</link:{kind}Link>'
+
+    parent_child = "http://www.xbrl.org/2003/arcrole/parent-child"
+    pre = (link("presentation", roles["IS"], [
+                ("us-gaap_IncomeStatementAbstract", "us-gaap_Revenues", 'order="1"'),
+                ("us-gaap_IncomeStatementAbstract", "us-gaap_CostsAndExpensesAbstract", 'order="2"'),
+                ("us-gaap_CostsAndExpensesAbstract", "us-gaap_CostOfRevenue", 'order="1"'),
+                ("us-gaap_CostsAndExpensesAbstract", "t_FulfillmentExpense", 'order="2"'),
+                ("us-gaap_CostsAndExpensesAbstract", "us-gaap_CostsAndExpenses",
+                 'order="3" preferredLabel="http://www.xbrl.org/2003/role/totalLabel"'),
+                ("us-gaap_IncomeStatementAbstract", "us-gaap_OperatingIncomeLoss", 'order="3"')], parent_child)
+           + link("presentation", roles["BS"], [
+                ("us-gaap_StatementOfFinancialPositionAbstract", "us-gaap_StatementTable", 'order="1"'),
+                ("us-gaap_StatementTable", "us-gaap_PropertyPlantAndEquipmentByTypeAxis", 'order="1"'),
+                ("us-gaap_PropertyPlantAndEquipmentByTypeAxis", "t_VehiclesMember", 'order="1"'),
+                ("us-gaap_StatementTable", "us-gaap_StatementLineItems", 'order="2"'),
+                ("us-gaap_StatementLineItems", "us-gaap_Cash", 'order="1"'),
+                ("us-gaap_StatementLineItems", "t_LeasedAssetsNet", 'order="2"'),
+                ("us-gaap_StatementLineItems", "us-gaap_Assets", 'order="3"')], parent_child)
+           + link("presentation", roles["BSP"], [
+                ("us-gaap_StatementOfFinancialPositionAbstract", "us-gaap_Cash", 'order="1"')], parent_child)
+           + link("presentation", roles["N1"], [
+                ("us-gaap_AccountingPoliciesAbstract", "us-gaap_Revenues", 'order="1"')], parent_child))
+    summation = ("https://xbrl.org/2023/arcrole/summation-item" if calc11
+                 else "http://www.xbrl.org/2003/arcrole/summation-item")
+    is_arcs = [("us-gaap_CostsAndExpenses", "us-gaap_CostOfRevenue", 'weight="1" order="1"'),
+               ("us-gaap_CostsAndExpenses", "t_FulfillmentExpense", 'weight="1" order="2"'),
+               ("us-gaap_OperatingIncomeLoss", "us-gaap_Revenues", 'weight="1" order="1"'),
+               ("us-gaap_OperatingIncomeLoss", "us-gaap_CostsAndExpenses", 'weight="-1" order="2"')]
+    if prohibit:
+        # A wrong arc, then the same arc prohibited at a higher priority: no relationship is left.
+        is_arcs += [("us-gaap_OperatingIncomeLoss", "us-gaap_Cash", 'weight="1" order="3"'),
+                    ("us-gaap_OperatingIncomeLoss", "us-gaap_Cash",
+                     'weight="1" order="3" use="prohibited" priority="1"')]
+    cal = (link("calculation", roles["IS"], is_arcs, summation)
+           + link("calculation", roles["BS"], [("us-gaap_Assets", "us-gaap_Cash", 'weight="1" order="1"'),
+                                               ("us-gaap_Assets", "t_LeasedAssetsNet", 'weight="1" order="2"')],
+                  summation))
+    labels = {"us-gaap_Revenues": "Net sales", "us-gaap_CostOfRevenue": "Cost of sales",
+              "t_FulfillmentExpense": "Fulfillment", "us-gaap_CostsAndExpenses": "Costs and expenses",
+              "us-gaap_OperatingIncomeLoss": "Operating income", "us-gaap_Cash": "Cash",
+              "t_LeasedAssetsNet": "Vehicles, net", "us-gaap_Assets": "Total assets"}
+    concept_label = "http://www.xbrl.org/2003/arcrole/concept-label"
+
+    def label(element, key, role, text):
+        return (f'<link:label xlink:type="resource" xlink:label="{key}" xml:lang="en-US" '
+                f'xlink:role="http://www.xbrl.org/2003/role/{role}">{text}</link:label>'
+                f'<link:labelArc xlink:type="arc" xlink:arcrole="{concept_label}" '
+                f'xlink:from="{element}" xlink:to="{key}"/>')
+    lab_body = "".join(loc(e) + label(e, f"l{i}", "label", t) for i, (e, t) in enumerate(labels.items()))
+    lab_body += label("us-gaap_CostsAndExpenses", "l1t", "totalLabel", "Total costs and expenses")
+    lab_body += label("t_FulfillmentExpense", "l2d", "documentation", "Costs of fulfillment centers.")
+    lab = (f'<link:labelLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">'
+           f'{lab_body}</link:labelLink>')
+    definition = link("definition", roles["IS"], [("us-gaap_CostsAndExpenses", "t_FulfillmentExpense")],
+                      "http://www.xbrl.org/2003/arcrole/general-special")
+
+    def linkbase(body):
+        return f'<link:linkbase {ns}>{body}</link:linkbase>'.encode()
+
+    role_types = "".join(f'<link:roleType roleURI="{roles[k]}" id="{k}"><link:definition>{t}</link:definition>'
+                         f'<link:usedOn>link:presentationLink</link:usedOn></link:roleType>'
+                         for k, t in titles.items())
+    xbrli_ns = 'xmlns:xbrli="http://www.xbrl.org/2003/instance"'
+    elements = ('<xs:element id="t_FulfillmentExpense" name="FulfillmentExpense" type="xbrli:monetaryItemType" '
+                'substitutionGroup="xbrli:item" abstract="false" xbrli:periodType="duration" xbrli:balance="debit"/>'
+                '<xs:element id="t_LeasedAssetsNet" name="LeasedAssetsNet" type="xbrli:monetaryItemType" '
+                'substitutionGroup="xbrli:item" abstract="false" xbrli:periodType="instant" xbrli:balance="debit"/>'
+                '<xs:element id="t_VehiclesMember" name="VehiclesMember" type="dtr-types:domainItemType" '
+                'substitutionGroup="xbrli:item" abstract="true" xbrli:periodType="duration"/>')
+    if embedded:
+        inside = (f"<xs:annotation><xs:appinfo>{role_types}<link:linkbase>{pre}</link:linkbase>"
+                  f"<link:linkbase>{cal}</link:linkbase><link:linkbase>{lab}</link:linkbase>"
+                  f"<link:linkbase>{definition}</link:linkbase></xs:appinfo></xs:annotation>")
+    else:
+        refs = "".join(f'<link:linkbaseRef xlink:type="simple" '
+                       f'xlink:role="http://www.xbrl.org/2003/role/{k}LinkbaseRef" '
+                       f'xlink:href="t-20251231_{s}.xml"/>' for k, s in
+                       (("presentation", "pre"), ("calculation", "cal"), ("label", "lab"), ("definition", "def")))
+        inside = f"<xs:annotation><xs:appinfo>{refs}{role_types}</xs:appinfo></xs:annotation>"
+    xsd = (f'<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" {ns} {xbrli_ns} '
+           f'targetNamespace="http://t.example/2025">{inside}{elements}</xs:schema>').encode()
+
+    def ctx(cid, period, members=()):
+        seg = "".join(f'<xbrldi:explicitMember dimension="{d}">{m}</xbrldi:explicitMember>' for d, m in members)
+        seg = f"<xbrli:segment>{seg}</xbrli:segment>" if seg else ""
+        when = (f"<xbrli:startDate>{period[0]}</xbrli:startDate><xbrli:endDate>{period[1]}</xbrli:endDate>"
+                if isinstance(period, tuple) else f"<xbrli:instant>{period}</xbrli:instant>")
+        return (f'<xbrli:context id="{cid}"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">'
+                f"0000000001</xbrli:identifier>{seg}</xbrli:entity><xbrli:period>{when}</xbrli:period>"
+                f"</xbrli:context>")
+    veh = [("us-gaap:PropertyPlantAndEquipmentByTypeAxis", "t:VehiclesMember")]
+    contexts = (ctx("D25", ("2025-01-01", "2025-12-31")) + ctx("D24", ("2024-01-01", "2024-12-31"))
+                + ctx("I25", "2025-12-31") + ctx("I24", "2024-12-31") + ctx("V25", "2025-12-31", veh)
+                + ctx("V24", "2024-12-31", veh))
+    facts = [("us-gaap:Revenues", "D25", revenue), ("us-gaap:Revenues", "D24", 90),
+             ("us-gaap:CostOfRevenue", "D25", 50), ("us-gaap:CostOfRevenue", "D24", 45),
+             ("t:FulfillmentExpense", "D25", 20), ("t:FulfillmentExpense", "D24", 15),
+             ("us-gaap:CostsAndExpenses", "D25", 70), ("us-gaap:CostsAndExpenses", "D24", 60),
+             ("us-gaap:OperatingIncomeLoss", "D25", 30), ("us-gaap:OperatingIncomeLoss", "D24", 30),
+             ("us-gaap:Cash", "I25", 10), ("us-gaap:Cash", "I24", 8),
+             ("t:LeasedAssetsNet", "V25", 5), ("t:LeasedAssetsNet", "V24", 4),
+             ("us-gaap:Assets", "I25", 15), ("us-gaap:Assets", "I24", 12)]
+    if member_total:
+        facts.append(("us-gaap:Assets", "V25", 5))
+    if duplicate is not None:
+        facts.append(("us-gaap:Revenues", "D25", duplicate))
+    body = "".join(f'<{c} contextRef="{x}" unitRef="usd" decimals="-6">{v * 1_000_000}</{c}>' for c, x, v in facts)
+    body += ('<dei:DocumentType contextRef="D25">10-K</dei:DocumentType>'
+             '<dei:DocumentPeriodEndDate contextRef="D25">2025-12-31</dei:DocumentPeriodEndDate>'
+             '<dei:Security12bTitle contextRef="S1">Common Stock</dei:Security12bTitle>'
+             '<dei:TradingSymbol contextRef="S1">TT</dei:TradingSymbol>'
+             '<dei:Security12bTitle contextRef="S2">Mortgage Bonds due 2066</dei:Security12bTitle>'
+             '<dei:TradingSymbol contextRef="S2">TTB</dei:TradingSymbol>'
+             '<dei:EntityCentralIndexKey contextRef="E2">0000000002</dei:EntityCentralIndexKey>'
+             '<dei:EntityCommonStockSharesOutstanding contextRef="SA" unitRef="shares" decimals="INF">700</dei:EntityCommonStockSharesOutstanding>'
+             '<dei:EntityCommonStockSharesOutstanding contextRef="SB" unitRef="shares" decimals="INF">300</dei:EntityCommonStockSharesOutstanding>')
+    contexts += (ctx("S1", ("2025-01-01", "2025-12-31"), [("us-gaap:StatementClassOfStockAxis", "us-gaap:CommonStockMember")])
+                 + ctx("S2", ("2025-01-01", "2025-12-31"), [("dei:EntityAxis", "t:SubMember"),
+                                                            ("us-gaap:StatementClassOfStockAxis", "t:BondsMember")])
+                 + ctx("E2", ("2025-01-01", "2025-12-31"), [("dei:EntityAxis", "t:SubMember")])
+                 + ctx("SA", "2026-02-01", [("us-gaap:StatementClassOfStockAxis", "t:ClassAMember")])
+                 + ctx("SB", "2026-02-01", [("us-gaap:StatementClassOfStockAxis", "t:ClassBMember")]))
+    instance_xml = (f'<xbrli:xbrl {xbrli_ns} xmlns:xbrldi="http://xbrl.org/2006/xbrldi" '
+                    f'xmlns:us-gaap="{US_GAAP}" xmlns:iso4217="http://www.xbrl.org/2003/iso4217" '
+                    'xmlns:t="http://t.example/2025" xmlns:dei="http://xbrl.sec.gov/dei/2024">'
+                    f'{contexts}<xbrli:unit id="usd"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>'
+                    '<xbrli:unit id="shares"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>'
+                    f"{body}</xbrli:xbrl>").encode()
+    instance_name = "t-20251231_htm.xml" if inline else "t-20251231.xml"
+    listed = (['<File doctype="10-K" original="t-20251231.htm">t-20251231.htm</File>'] if inline
+              else ["<File>t-20251231.xml</File>"]) + ["<File>t-20251231.xsd</File>"]
+    if not embedded:
+        listed += [f"<File>t-20251231_{s}.xml</File>" for s in ("cal", "def", "lab", "pre")]
+    reports = "".join(
+        f"<Report><Role>{roles[k]}</Role><HtmlFileName>R{i}.htm</HtmlFileName>"
+        + (f"<MenuCategory>{'Statements' if k != 'N1' else 'Policies'}</MenuCategory>" if summary_menu else "")
+        + "</Report>" for i, k in enumerate(roles, 2))
+    summary = (f"<FilingSummary><MyReports>{reports}</MyReports>"
+               f"<InputFiles>{''.join(listed)}</InputFiles></FilingSummary>")
+    folder = {"FilingSummary.xml": summary.encode(), "t-20251231.xsd": xsd, instance_name: instance_xml,
+              "0000000001-26-000001-index-headers.html":
+                  f"<SEC-HEADER><ACCEPTANCE-DATETIME>{header}</SEC-HEADER>".encode()}
+    if not embedded:
+        folder.update({"t-20251231_pre.xml": linkbase(pre), "t-20251231_cal.xml": linkbase(cal),
+                       "t-20251231_lab.xml": linkbase(lab), "t-20251231_def.xml": linkbase(definition)})
+    return folder
+
+
+def statements(folder, rows=None, **kwargs):
+    """get_filed_statements on one made-up folder; returns (result, code)."""
+    rows = rows or [{"accession_number": "0000000001-26-000001", "form": "10-K", "filing_date": "2026-07-02",
+                     "acceptance_datetime": "2026-07-02T14:01:02.000Z", "reporting_date": "2025-12-31",
+                     "url": "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/t-20251231.htm"}]
+    real = (server._resolve, server._filings.get_filing_metadata, server.fetch_response)
+    server._resolve = lambda s: {"cik": "0000000001", "matched_on": "cik"}
+    server._filings.get_filing_metadata = lambda *a, **k: ([dict(r) for r in rows], [], {})
+
+    def fetch(url, **k):
+        name = url.rsplit("/", 1)[1]
+        if name not in folder:
+            raise sec_client.SecNotFound(f"nothing at {url}")
+        return sec_client.Response(folder[name], "application/xml", "2026-07-03T00:00:00Z")
+    server.fetch_response = fetch
+    try:
+        return call(server.get_filed_statements, cik_or_ticker="1", **kwargs)
+    finally:
+        server._resolve, server._filings.get_filing_metadata, server.fetch_response = real
+
+
+def face(result, kind):
+    return next(s for s in result["statements"] if s["kind"] == kind and not s["parenthetical"])
+
+
+def line(result, kind, element):
+    return next(l for l in face(result, kind)["lines"] if l["element"] == element)
+
+
+def filed_cases():
+    r, code = statements(filed())
+    check("filed: reads the statements of a filing", code is None, code)
+    if code:
+        return
+    kinds = sorted((s["kind"], s["parenthetical"]) for s in r["statements"])
+    check("filed: statements by the summary's menu, notes left out, parenthetical marked",
+          kinds == [("balance_sheet", False), ("balance_sheet", True), ("income_statement", False)], str(kinds))
+    own = line(r, "income_statement", "t:FulfillmentExpense")
+    check("filed: an own element comes with its label, definition and documentation",
+          own["extension"] and own["label"] == "Fulfillment" and own["definition"]["balance"] == "debit"
+          and own["documentation"] == "Costs of fulfillment centers.", str(own))
+    check("filed: an own element names the total it adds into",
+          own["calculation_parent"] == "us-gaap:CostsAndExpenses" and own["weight"] == 1, str(own))
+    check("filed: definition links of an own element are kept",
+          bool(own.get("related")) and own["related"][0]["arcrole"].endswith("general-special"),
+          str(own.get("related")))
+    total = line(r, "income_statement", "us-gaap:CostsAndExpenses")
+    check("filed: a preferred label is used", total["label"] == "Total costs and expenses"
+          and total["label_role"] == "totalLabel", str(total))
+    check("filed: values are exact and newest first",
+          [v["value"] for v in total["values"]] == [70_000_000, 60_000_000], str(total["values"]))
+    order = [l["element"] for l in face(r, "income_statement")["lines"] if not l.get("structure")]
+    check("filed: lines keep the company's order", order ==
+          ["us-gaap:Revenues", "us-gaap:CostOfRevenue", "t:FulfillmentExpense", "us-gaap:CostsAndExpenses",
+           "us-gaap:OperatingIncomeLoss"], str(order))
+    every = [c for s in r["statements"] for c in s["calculation_checks"]]
+    check("filed: every total ties", bool(every) and all(c["consistent"] for c in every), str(every))
+    vehicles = line(r, "balance_sheet", "t:LeasedAssetsNet")
+    check("filed: a face line tagged only under a member takes the member's value",
+          bool(vehicles.get("values_from_member"))
+          and [v["value"] for v in vehicles["values"]] == [5_000_000, 4_000_000], str(vehicles))
+    check("filed: the acceptance time is the header's, in UTC, and a feed that disagrees is flagged",
+          r["filing"]["acceptance"] == {"header_eastern": "20260702060102", "utc": "2026-07-02T10:01:02Z",
+                                        "submissions_feed": "2026-07-02T14:01:02.000Z", "agree": False},
+          str(r["filing"]["acceptance"]))
+    check("filed: the cover facts are read", r["document_facts"].get("DocumentType") == "10-K",
+          str(r["document_facts"]))
+    sec = sorted((s.get("trading_symbol"), s.get("title"), s.get("registrant_cik")) for s in r["registered_securities"])
+    check("filed: the cover's registered securities are read, a combined filer's with the registrant's CIK",
+          sec == [("TT", "Common Stock", None), ("TTB", "Mortgage Bonds due 2066", "2")], str(sec))
+    shares = sorted((c["share_class"], c["value"], c["date"]) for c in r["cover_shares"])
+    check("filed: the cover's shares outstanding are read per class",
+          shares == [("t:ClassAMember", 700, "2026-02-01"), ("t:ClassBMember", 300, "2026-02-01")], str(shares))
+    dei = "http://xbrl.sec.gov/dei/2025"
+    cls = lambda m: {"us-gaap:StatementClassOfStockAxis": m}
+    fact = lambda v, dims, unit="shares": {"namespace": dei, "local": "EntityCommonStockSharesOutstanding", "value": v,
+                                           "period": "2026-02-01", "dimensions": dims, "unit": unit}
+    rows = filed_statements.cover_shares({"facts": [fact(95, cls("t:ClassAMember")), fact(5, cls("t:ClassBMember")),
+                                                    fact(5, cls("t:ClassBMember"))]})
+    check("filed: a cover share fact tagged twice alike is one row",
+          sorted((c["share_class"], c["value"]) for c in rows) == [("t:ClassAMember", 95), ("t:ClassBMember", 5)], str(rows))
+    rows = filed_statements.cover_shares({"facts": [fact(95, cls("t:ClassAMember")), fact(5, cls("t:ClassBMember")),
+                                                    fact(6, cls("t:ClassBMember"))]})
+    b = [c for c in rows if c["share_class"] == "t:ClassBMember"]
+    check("filed: a cover share fact tagged twice with two values is one row with no value and both figures",
+          len(b) == 1 and b[0]["value"] is None and b[0]["conflicting_values"] == [5, 6], str(rows))
+    rows = filed_statements.cover_shares({"facts": [fact(129_563_390, cls("us-gaap:CommonStockMember")),
+                                                    fact(149_425, cls("us-gaap:PreferredStockMember"))]})
+    check("filed: a preferred class on the cover is kept as tagged, for the reader to classify",
+          sorted(c["share_class"] for c in rows) == ["us-gaap:CommonStockMember", "us-gaap:PreferredStockMember"], str(rows))
+    check("filed: every file read is named with its hash", all(s.get("sha256") for s in r["sources"])
+          and any(s["url"].endswith("t-20251231_pre.xml") for s in r["sources"]), str(r["sources"]))
+    check("filed: the result says it is the filer's data", r["data_kind"].startswith("filer data"))
+
+    r, _ = statements(filed(member_total=True))
+    check("filed: a member with its own total is a sub-statement, not the line's value",
+          not line(r, "balance_sheet", "t:LeasedAssetsNet")["values"])
+    bs = face(r, "balance_sheet")["calculation_checks"]
+    check("filed: then the gap is not checkable, not inconsistent",
+          bool(bs) and all(c["consistent"] is None for c in bs), str(bs))
+
+    # Mutations: a wrong figure must show.
+    r, _ = statements(filed(revenue=1000))
+    off = [c for c in face(r, "income_statement")["calculation_checks"] if c["consistent"] is False]
+    check("filed: a wrong figure (x10) breaks its total",
+          len(off) == 1 and off[0]["total"] == "us-gaap:OperatingIncomeLoss", str(off))
+    r, _ = statements(filed(duplicate=103))
+    check("filed: a figure tagged twice with two values is a conflict", len(r["conflicts"]) == 1, str(r["conflicts"]))
+    r, _ = statements(filed(duplicate=100))
+    check("filed: a figure tagged twice alike is one figure", not r["conflicts"]
+          and len(line(r, "income_statement", "us-gaap:Revenues")["values"]) == 2, str(r["conflicts"]))
+    r, _ = statements(filed(prohibit=True))
+    checks = face(r, "income_statement")["calculation_checks"]
+    check("filed: a prohibited arc removes the relationship", all(c["consistent"] for c in checks)
+          and not any("us-gaap:Cash" in c["missing"] for c in checks), str(checks))
+
+    r, code = statements(filed(calc11=True))
+    check("filed: Calculation 1.1 arcs are read", code is None and r["calculation_versions"] == ["1.1"]
+          and bool(face(r, "income_statement")["calculation_checks"]), code or str(r["calculation_versions"]))
+    r, code = statements(filed(embedded=True))
+    check("filed: linkbases inside the schema are read", code is None and
+          line(r, "income_statement", "t:FulfillmentExpense")["calculation_parent"] == "us-gaap:CostsAndExpenses",
+          code)
+    r, code = statements(filed(inline=False))
+    check("filed: an instance from before inline XBRL is read", code is None and not r["filing"]["inline_xbrl"]
+          and bool(line(r, "income_statement", "us-gaap:Revenues")["values"]), code)
+    r, code = statements(filed(summary_menu=False))
+    check("filed: without the summary's menu the schema's role category decides",
+          code is None and len([s for s in r["statements"] if not s["parenthetical"]]) == 2, code)
+    r, _ = statements(filed(header="20260115093000"))
+    check("filed: winter acceptance is Eastern standard time",
+          r["filing"]["acceptance"]["utc"] == "2026-01-15T14:30:00Z", str(r["filing"]["acceptance"]))
+
+    _, code = statements(filed(), as_of="2026-07-02T09:00:00Z")
+    check("filed: as_of with a time leaves out a filing accepted later", code == "NOT_FOUND", code)
+    _, code = statements(filed(), as_of="2026-07-02T10:30:00Z")
+    check("filed: as_of with a time keeps a filing accepted before", code is None, code)
+    _, code = statements({})
+    check("filed: a filing without XBRL is UNSUPPORTED_DOCUMENT", code == "UNSUPPORTED_DOCUMENT", code)
+    _, code = statements(filed(), accession_number="12-34")
+    check("filed: a malformed accession number is INVALID_INPUT", code == "INVALID_INPUT", code)
+    broken = filed()
+    broken["t-20251231_pre.xml"] = b"<link:linkbase"
+    _, code = statements(broken)
+    check("filed: an unreadable linkbase is UNSUPPORTED_DOCUMENT", code == "UNSUPPORTED_DOCUMENT", code)
+
+
 def text_cases():
     url = "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/frozen-test.htm"
     real = server.fetch_response
@@ -587,6 +911,7 @@ if __name__ == "__main__":
     lookup_cases()
     history_cases()
     segment_cases()
+    filed_cases()
     text_cases()
     classifier_cases()
     index_cases()

@@ -155,6 +155,7 @@ class FilingRetrieval:
         documents = filings_data.get("primaryDocument", [])
         reporting_dates = filings_data.get("reportDate", [])
         items = filings_data.get("items", [])
+        accepted = filings_data.get("acceptanceDateTime", [])
 
         wanted = filing_type.upper()
         for i in range(min(len(accession_numbers), len(form_types))):
@@ -189,6 +190,8 @@ class FilingRetrieval:
                 "description": document,
                 "url": url,
                 "reporting_date": reporting_dates[i] if i < len(reporting_dates) else "",
+                # When the SEC accepted the filing, in UTC as the feed gives it ("2026-02-20T14:46:32.000Z").
+                "acceptance_datetime": accepted[i] if i < len(accepted) else "",
                 # The numbered items of a current report (8-K), as the SEC lists them: ["2.01", "9.01"].
                 "items": [x for x in str(items[i] if i < len(items) else "").split(",") if x],
             })
