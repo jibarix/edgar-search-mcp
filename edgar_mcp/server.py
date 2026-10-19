@@ -709,7 +709,8 @@ def get_filed_statements(
 
     `facts`, up to 50 element names ("us-gaap:FinanceLeaseLiabilityCurrent", or
     a name without its prefix), returns in `requested_facts` the whole-company
-    values of those elements wherever the filing tags them, a note included.
+    values of those elements wherever the filing tags them, a note included,
+    and in `by_member` each value tagged under members, with its dimensions.
 
     The filing is the latest `form` on file, or `accession_number` (of this
     company). `as_of`, YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ, leaves out filings

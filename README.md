@@ -621,6 +621,14 @@ edgar-search-mcp/
   machine-checkable schema. A program that reads the answers directly should
   check the fields it uses; field names may change between versions.
 
+## Changes in 0.8.0
+
+- **Named facts by member**: each fact asked for with `facts=` in
+  `get_filed_statements` now also gives `by_member`, every numeric value
+  tagged under members with its period, unit, decimals and dimensions (a
+  conflict on its own cell), so a figure a filing tags only by award type or
+  segment can be read member by member. `tagged_by_member` still counts them.
+
 ## Changes in 0.7.0
 
 - **Statements as filed**: opening and closing balances are read per column

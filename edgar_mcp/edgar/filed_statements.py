@@ -404,7 +404,10 @@ def _identities(text: str, prefix_of: dict) -> dict:
 
 def named_facts(instance: dict, names: list) -> dict:
     """The whole-company facts of the elements asked for, wherever the filing
-    tags them (a note as well as a statement): name -> {values, tagged_by_member}.
+    tags them (a note as well as a statement): name -> {values, tagged_by_member,
+    by_member}. `by_member` gives each value tagged under members, with its
+    dimensions (axis -> member), so a client can see which members a figure is
+    split into; the tool does not add them up.
     A name without a prefix matches the one element of that name. A fact with no
     unit (an extensible list naming the lines a lease liability is in, a text
     block) is returned as its text, once per period and text; a text that is a
@@ -422,7 +425,7 @@ def named_facts(instance: dict, names: list) -> dict:
     for name in names:
         concepts = [name] if ":" in name else by_local.get(name, [])
         if len(concepts) > 1:
-            out[name] = {"values": [], "tagged_by_member": 0, "ambiguous": sorted(concepts)}
+            out[name] = {"values": [], "tagged_by_member": 0, "by_member": [], "ambiguous": sorted(concepts)}
             continue
         found = facts_by_concept.get(concepts[0], []) if concepts else []
         values = [{"period": f["period"], "value": f["value"], "unit": f["unit"], "decimals": f["decimals"],
@@ -435,8 +438,12 @@ def named_facts(instance: dict, names: list) -> dict:
             values = [{"period": period, "value": text, "unit": None, "decimals": None, **_identities(text, prefix_of)}
                       for period, text in seen]
         values.sort(key=lambda c: (c["period"].split("/")[-1], _days(c["period"]) or 0), reverse=True)
+        by_member = [{"period": f["period"], "value": f["value"], "unit": f["unit"], "decimals": f["decimals"],
+                      "dimensions": dict(f["dimensions"]), **({"conflict": f["conflict"]} if "conflict" in f else {})}
+                     for f in found if f["dimensions"] and f["unit"] is not None]
+        by_member.sort(key=lambda c: (c["period"].split("/")[-1], sorted(c["dimensions"].items())), reverse=True)
         out[name] = {"element": concepts[0] if concepts else None, "values": values,
-                     "tagged_by_member": sum(1 for f in found if f["dimensions"])}
+                     "tagged_by_member": sum(1 for f in found if f["dimensions"]), "by_member": by_member}
     return out
 
 

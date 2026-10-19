@@ -815,8 +815,12 @@ def filed_cases():
     check("filed: a name without its prefix finds the element; one tagged only by member returns no value",
           asked["LeasedAssetsNet"]["element"] == "t:LeasedAssetsNet" and not asked["LeasedAssetsNet"]["values"]
           and asked["LeasedAssetsNet"]["tagged_by_member"] == 2, str(asked["LeasedAssetsNet"]))
+    check("filed: a fact tagged only by member returns each member's value with its dimensions",
+          len(asked["LeasedAssetsNet"]["by_member"]) == 2
+          and all(m["dimensions"] and isinstance(m["value"], (int, float)) for m in asked["LeasedAssetsNet"]["by_member"]),
+          str(asked["LeasedAssetsNet"]["by_member"]))
     check("filed: an element the filing does not tag returns nothing",
-          asked["us-gaap:Nothing"] == {"element": "us-gaap:Nothing", "values": [], "tagged_by_member": 0},
+          asked["us-gaap:Nothing"] == {"element": "us-gaap:Nothing", "values": [], "tagged_by_member": 0, "by_member": []},
           str(asked["us-gaap:Nothing"]))
     listed = f"{US_GAAP}#OtherLiabilitiesNoncurrent http://t.example/2025#LeaseLiabilities"
     r, code = statements(filed(lease_list=listed), facts=["OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"])
