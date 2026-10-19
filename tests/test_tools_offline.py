@@ -425,10 +425,15 @@ def segment_cases():
 # ── get_filed_statements ────────────────────────────────────────────────────
 
 def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=False, prohibit=False,
-          duplicate=None, member_total=False, header="20260702060102"):
+          duplicate=None, member_total=False, header="20260702060102", cash_flow=None, opening_2024=7,
+          missing_child=False, lease_list=None):
     """A made-up filing folder: name -> bytes. Statements: an income statement
     with an own element that adds into costs, a balance sheet with a line
-    tagged only under a member, and a parenthetical page."""
+    tagged only under a member, and a parenthetical page. `cash_flow` adds a
+    cash flow statement whose opening and closing balance is that element
+    ("us-gaap_Cash", on the balance sheet too, or one of restricted cash);
+    `opening_2024` is its balance at the end of 2023. `lease_list` is the text of
+    the extensible list naming the lines operating leases are in, at the end of 2025."""
     ns = 'xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xlink="http://www.w3.org/1999/xlink"'
     gaap = "https://xbrl.fasb.org/us-gaap/2024/elts/us-gaap-2024.xsd"
     roles = {"IS": "http://t.example/role/Income", "BS": "http://t.example/role/Balance",
@@ -437,6 +442,12 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
               "BS": "0000003 - Statement - CONSOLIDATED BALANCE SHEETS",
               "BSP": "0000004 - Statement - CONSOLIDATED BALANCE SHEETS (Parenthetical)",
               "N1": "0000005 - Disclosure - Accounting Policies"}
+    if cash_flow:
+        roles["CF"] = "http://t.example/role/CashFlows"
+        titles["CF"] = "0000006 - Statement - CONSOLIDATED STATEMENTS OF CASH FLOWS"
+    change = "us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect"
+    fx = "us-gaap_EffectOfExchangeRateOnCashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"
+    period_label = "http://www.xbrl.org/2003/role/period"
 
     def loc(element):
         own = element.startswith("t_")
@@ -473,6 +484,15 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
                 ("us-gaap_StatementOfFinancialPositionAbstract", "us-gaap_Cash", 'order="1"')], parent_child)
            + link("presentation", roles["N1"], [
                 ("us-gaap_AccountingPoliciesAbstract", "us-gaap_Revenues", 'order="1"')], parent_child))
+    if cash_flow:
+        # Opening and closing cash: two arcs to one element under one parent, told apart by their labels.
+        pre += link("presentation", roles["CF"], [
+            ("us-gaap_StatementOfCashFlowsAbstract", "us-gaap_NetCashProvidedByUsedInOperatingActivities", 'order="1"'),
+            ("us-gaap_StatementOfCashFlowsAbstract", fx, 'order="2"'),
+            ("us-gaap_StatementOfCashFlowsAbstract", change, 'order="3" preferredLabel="http://www.xbrl.org/2003/role/totalLabel"'),
+            ("us-gaap_StatementOfCashFlowsAbstract", cash_flow, f'order="4" preferredLabel="{period_label}StartLabel"'),
+            ("us-gaap_StatementOfCashFlowsAbstract", cash_flow, f'order="5" preferredLabel="{period_label}EndLabel"')],
+            parent_child)
     summation = ("https://xbrl.org/2023/arcrole/summation-item" if calc11
                  else "http://www.xbrl.org/2003/arcrole/summation-item")
     is_arcs = [("us-gaap_CostsAndExpenses", "us-gaap_CostOfRevenue", 'weight="1" order="1"'),
@@ -488,6 +508,10 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
            + link("calculation", roles["BS"], [("us-gaap_Assets", "us-gaap_Cash", 'weight="1" order="1"'),
                                                ("us-gaap_Assets", "t_LeasedAssetsNet", 'weight="1" order="2"')],
                   summation))
+    if cash_flow:
+        cal += link("calculation", roles["CF"], [
+            (change, "us-gaap_NetCashProvidedByUsedInOperatingActivities", 'weight="1" order="1"'),
+            (change, fx, 'weight="1" order="2"')], summation)
     labels = {"us-gaap_Revenues": "Net sales", "us-gaap_CostOfRevenue": "Cost of sales",
               "t_FulfillmentExpense": "Fulfillment", "us-gaap_CostsAndExpenses": "Costs and expenses",
               "us-gaap_OperatingIncomeLoss": "Operating income", "us-gaap_Cash": "Cash",
@@ -502,6 +526,8 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
     lab_body = "".join(loc(e) + label(e, f"l{i}", "label", t) for i, (e, t) in enumerate(labels.items()))
     lab_body += label("us-gaap_CostsAndExpenses", "l1t", "totalLabel", "Total costs and expenses")
     lab_body += label("t_FulfillmentExpense", "l2d", "documentation", "Costs of fulfillment centers.")
+    if cash_flow:
+        lab_body += (loc(cash_flow) if cash_flow != "us-gaap_Cash" else "")             + label(cash_flow, "lcs", "periodStartLabel", "Cash, beginning of year")             + label(cash_flow, "lce", "periodEndLabel", "Cash, end of year")
     lab = (f'<link:labelLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">'
            f'{lab_body}</link:labelLink>')
     definition = link("definition", roles["IS"], [("us-gaap_CostsAndExpenses", "t_FulfillmentExpense")],
@@ -555,6 +581,22 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
              ("us-gaap:Assets", "I25", 15), ("us-gaap:Assets", "I24", 12)]
     if member_total:
         facts.append(("us-gaap:Assets", "V25", 5))
+    if missing_child:
+        # Fulfillment untagged for 2025, and costs filed as cost of sales alone: the sum agrees, the lines are not all there.
+        facts = [f for f in facts if f[:2] != ("t:FulfillmentExpense", "D25")]
+        facts = [(c, x, 50 if (c, x) == ("us-gaap:CostsAndExpenses", "D25") else
+                  50 if (c, x) == ("us-gaap:OperatingIncomeLoss", "D25") else v) for c, x, v in facts]
+    if cash_flow:
+        # Operating cash 1 and 2, exchange rates +1 and -1: 8 + 2 = 10 in 2025, 7 + 1 = 8 in 2024.
+        cash = cash_flow.replace("_", ":", 1)
+        facts += [("us-gaap:NetCashProvidedByUsedInOperatingActivities", "D25", 1),
+                  ("us-gaap:NetCashProvidedByUsedInOperatingActivities", "D24", 2),
+                  (fx.replace("_", ":", 1), "D25", 1), (fx.replace("_", ":", 1), "D24", -1),
+                  (change.replace("_", ":", 1), "D25", 2), (change.replace("_", ":", 1), "D24", 1),
+                  (cash, "I23", opening_2024)]
+        if cash != "us-gaap:Cash":
+            facts += [(cash, "I25", 10), (cash, "I24", 8)]
+        contexts += ctx("I23", "2023-12-31")
     if duplicate is not None:
         facts.append(("us-gaap:Revenues", "D25", duplicate))
     body = "".join(f'<{c} contextRef="{x}" unitRef="usd" decimals="-6">{v * 1_000_000}</{c}>' for c, x, v in facts)
@@ -567,6 +609,9 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
              '<dei:EntityCentralIndexKey contextRef="E2">0000000002</dei:EntityCentralIndexKey>'
              '<dei:EntityCommonStockSharesOutstanding contextRef="SA" unitRef="shares" decimals="INF">700</dei:EntityCommonStockSharesOutstanding>'
              '<dei:EntityCommonStockSharesOutstanding contextRef="SB" unitRef="shares" decimals="INF">300</dei:EntityCommonStockSharesOutstanding>')
+    if lease_list:
+        tag = "us-gaap:OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"
+        body += f'<{tag} contextRef="I25">{lease_list}</{tag}>' * 2       # tagged twice, as a note and a table do
     contexts += (ctx("S1", ("2025-01-01", "2025-12-31"), [("us-gaap:StatementClassOfStockAxis", "us-gaap:CommonStockMember")])
                  + ctx("S2", ("2025-01-01", "2025-12-31"), [("dei:EntityAxis", "t:SubMember"),
                                                             ("us-gaap:StatementClassOfStockAxis", "t:BondsMember")])
@@ -714,6 +759,79 @@ def filed_cases():
     checks = face(r, "income_statement")["calculation_checks"]
     check("filed: a prohibited arc removes the relationship", all(c["consistent"] for c in checks)
           and not any("us-gaap:Cash" in c["missing"] for c in checks), str(checks))
+
+    r, _ = statements(filed(missing_child=True))
+    costs = [c for c in face(r, "income_statement")["calculation_checks"]
+             if c["total"] == "us-gaap:CostsAndExpenses" and c["period"] == "2025-01-01/2025-12-31"]
+    check("filed: a sum that agrees with a line missing is consistent but not complete",
+          len(costs) == 1 and costs[0]["consistent"] is True and costs[0]["complete"] is False
+          and costs[0]["missing"] == ["t:FulfillmentExpense"] and costs[0]["missing_in_every_column"] == [], str(costs))
+    r, _ = statements(filed())
+    every = [c for s in r["statements"] for c in s["calculation_checks"] if s["kind"] == "income_statement"]
+    check("filed: a sum with every line is complete", bool(every) and all(c["complete"] for c in every), str(every))
+    r, _ = statements(filed(duplicate=103))
+    cell = line(r, "income_statement", "us-gaap:Revenues")["values"][0]
+    check("filed: a conflicting figure carries the conflict on its cell", cell.get("conflict") == [100_000_000, 103_000_000],
+          str(cell))
+
+    # Opening and closing balances, per column.
+    r, code = statements(filed(cash_flow="us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"))
+    check("filed: a cash flow statement is read", code is None, code)
+    if code:
+        return
+    cf = face(r, "cash_flow")
+    check("filed: the cash flow statement's columns are its durations", cf["columns"] ==
+          ["2025-01-01/2025-12-31", "2024-01-01/2024-12-31"], str(cf["columns"]))
+    bounds = [(l["label_role"], [(v["period"][:4], v["instant"], v["value"]) for v in l["values"]])
+              for l in cf["lines"] if l.get("label_role", "").startswith("period")]
+    check("filed: the opening line holds each column's opening balance and the closing line its closing one",
+          bounds == [("periodStartLabel", [("2025", "2024-12-31", 8_000_000), ("2024", "2023-12-31", 7_000_000)]),
+                     ("periodEndLabel", [("2025", "2025-12-31", 10_000_000), ("2024", "2024-12-31", 8_000_000)])],
+          str(bounds))
+    rolls = cf["roll_forward_checks"]
+    check("filed: opening cash plus the change is closing cash, each year",
+          len(rolls) == 2 and all(x["consistent"] for x in rolls) and rolls[0]["exchange_rate_element"] is None,
+          str(rolls))
+    check("filed: cash of another scope than the balance sheet's is not tied to it",
+          all(x["closing_on_balance_sheet"] is None for x in rolls), str(rolls))
+    check("filed: the opening and closing lines are left out of the sum checks",
+          all(c["total"].endswith("IncludingExchangeRateEffect") for c in cf["calculation_checks"])
+          and all(c["consistent"] and c["complete"] for c in cf["calculation_checks"]), str(cf["calculation_checks"]))
+    r, _ = statements(filed(cash_flow="us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+                            opening_2024=4))
+    off = [x for x in face(r, "cash_flow")["roll_forward_checks"] if x["consistent"] is False]
+    check("filed: a wrong opening balance breaks the roll-forward",
+          [x["period"] for x in off] == ["2024-01-01/2024-12-31"] and off[0]["difference"] == 3_000_000, str(off))
+    r, _ = statements(filed(cash_flow="us-gaap_Cash"))
+    rolls = face(r, "cash_flow")["roll_forward_checks"]
+    check("filed: closing cash the balance sheet shows is tied to it",
+          len(rolls) == 2 and all(x["consistent"] and x["closing_on_balance_sheet"] is True for x in rolls), str(rolls))
+
+    # Facts asked for by name, wherever they are tagged.
+    r, code = statements(filed(), facts=["us-gaap:Cash", "LeasedAssetsNet", "us-gaap:Nothing"])
+    asked = r and r.get("requested_facts", {})
+    check("filed: a fact asked for by name returns its whole-company values",
+          code is None and [v["value"] for v in asked["us-gaap:Cash"]["values"]] == [10_000_000, 8_000_000], code or str(asked))
+    check("filed: a name without its prefix finds the element; one tagged only by member returns no value",
+          asked["LeasedAssetsNet"]["element"] == "t:LeasedAssetsNet" and not asked["LeasedAssetsNet"]["values"]
+          and asked["LeasedAssetsNet"]["tagged_by_member"] == 2, str(asked["LeasedAssetsNet"]))
+    check("filed: an element the filing does not tag returns nothing",
+          asked["us-gaap:Nothing"] == {"element": "us-gaap:Nothing", "values": [], "tagged_by_member": 0},
+          str(asked["us-gaap:Nothing"]))
+    listed = f"{US_GAAP}#OtherLiabilitiesNoncurrent http://t.example/2025#LeaseLiabilities"
+    r, code = statements(filed(lease_list=listed), facts=["OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"])
+    asked = r and r["requested_facts"]["OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"]
+    check("filed: a fact with no unit, the lines a lease liability is in, is returned once as its text and its elements",
+          code is None and asked["values"] == [{"period": "2025-12-31", "value": listed, "unit": None, "decimals": None,
+                                               "elements": ["us-gaap:OtherLiabilitiesNoncurrent", "t:LeaseLiabilities"]}],
+          code or str(asked))
+    r, _ = statements(filed(lease_list="http://unknown.example/x#Debt"),
+                      facts=["OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"])
+    asked = r["requested_facts"]["OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"]
+    check("filed: an identity in a namespace the instance does not declare gives no elements, only the text",
+          [v.get("elements") for v in asked["values"]] == [None], str(asked))
+    _, code = statements(filed(), facts=["not a name"])
+    check("filed: a malformed element name is INVALID_INPUT", code == "INVALID_INPUT", code)
 
     r, code = statements(filed(calc11=True))
     check("filed: Calculation 1.1 arcs are read", code is None and r["calculation_versions"] == ["1.1"]

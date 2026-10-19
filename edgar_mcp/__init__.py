@@ -2,4 +2,4 @@
 
 # The one place the version is set: pyproject.toml reads it, and the server
 # reports it to every client when the session starts.
-__version__ = "0.6.0"
+__version__ = "0.7.0"

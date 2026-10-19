@@ -179,10 +179,14 @@ def _locators(link) -> dict:
 
 def _effective(link, arc_tag):
     """The arcs of one extended link that are in force: of equivalent arcs (same
-    ends and arcrole) the highest priority wins, and a prohibiting arc there removes the relationship."""
+    ends, arcrole, order, weight and preferred label: every attribute but use and
+    priority, XBRL 2.1 section 3.5.3.9.7.4) the highest priority wins, and a
+    prohibiting arc there removes the relationship. Two arcs that differ only
+    in their preferred label are two lines (opening and closing cash)."""
     best = {}
     for a in link.iter(arc_tag):
-        key = (a.get(f"{_XL}from"), a.get(f"{_XL}to"), a.get(f"{_XL}arcrole"))
+        key = (a.get(f"{_XL}from"), a.get(f"{_XL}to"), a.get(f"{_XL}arcrole"), float(a.get("order") or 1),
+               a.get("weight") and float(a.get("weight")), a.get("preferredLabel"))
         priority = int(a.get("priority") or 0)
         held = best.get(key)
         if held is None or priority > held[0]:
@@ -354,13 +358,23 @@ def _days(period: str) -> int | None:
     return (date.fromisoformat(b) - date.fromisoformat(a)).days
 
 
-def build_statements(schema: dict, presentation: dict, calculation: dict, labels: dict,
-                     definition: list, instance: dict, reports: dict) -> tuple[list, list]:
-    """The primary statements of the filing, and the duplicate facts that disagree."""
-    facts_by_concept, conflicts = {}, []
-    # One value per concept, period, dimensions and unit: duplicates that agree
-    # within their rounding become one, the most precise; others are reported.
-    grouped = {}
+def _day_before(day: str) -> str:
+    from datetime import date, timedelta
+    return (date.fromisoformat(day) - timedelta(days=1)).isoformat()
+
+
+def _bound(label_role: str) -> str | None:
+    """"start" for a period-start label (an opening balance), "end" for a
+    period-end label (a closing balance), else None. Negated forms count too."""
+    r = (label_role or "").lower()
+    return "start" if "periodstart" in r else "end" if "periodend" in r else None
+
+
+def group_facts(instance: dict) -> tuple[dict, list]:
+    """One numeric fact per concept, period, dimensions and unit: duplicates that
+    agree within their rounding become one, the most precise; a duplicate that
+    disagrees is listed, and the fact kept carries all the values (`conflict`)."""
+    facts_by_concept, conflicts, grouped = {}, [], {}
     for f in instance["facts"]:
         if f["typed"] or not isinstance(f["value"], (int, float)):
             continue
@@ -371,10 +385,113 @@ def build_statements(schema: dict, presentation: dict, calculation: dict, labels
                    else -1)
         for other in group:
             if abs(other["value"] - best["value"]) > _half_width(other["decimals"]) + _half_width(best["decimals"]):
+                values = sorted({g["value"] for g in group})
                 conflicts.append({"concept": key[0], "period": key[1], "dimensions": dict(key[2]), "unit": key[3],
-                                  "values": sorted({g["value"] for g in group})})
+                                  "values": values})
+                best = {**best, "conflict": values}
                 break
         facts_by_concept.setdefault(key[0], []).append(best)
+    return facts_by_concept, conflicts
+
+
+def _identities(text: str, prefix_of: dict) -> dict:
+    """{"elements": [prefix:name, ...]} for a text of element identities (namespace#name), else {}."""
+    tokens = text.split()
+    names = [f"{prefix_of[uri]}:{local}" for uri, _, local in (t.rpartition("#") for t in tokens)
+             if uri in prefix_of and local]
+    return {"elements": names} if tokens and len(names) == len(tokens) else {}
+
+
+def named_facts(instance: dict, names: list) -> dict:
+    """The whole-company facts of the elements asked for, wherever the filing
+    tags them (a note as well as a statement): name -> {values, tagged_by_member}.
+    A name without a prefix matches the one element of that name. A fact with no
+    unit (an extensible list naming the lines a lease liability is in, a text
+    block) is returned as its text, once per period and text; a text that is a
+    list of element identities (namespace#name) also gives them as prefixed
+    names (`elements`), when every namespace is one the instance declares."""
+    facts_by_concept, _ = group_facts(instance)
+    texts = {}
+    for f in instance["facts"]:
+        if not f["typed"] and f["unit"] is None and isinstance(f["value"], str) and f["value"]:
+            texts.setdefault(f["concept"], []).append(f)
+    by_local = {}
+    for concept in {*facts_by_concept, *texts}:
+        by_local.setdefault(concept.split(":", 1)[-1], []).append(concept)
+    out = {}
+    for name in names:
+        concepts = [name] if ":" in name else by_local.get(name, [])
+        if len(concepts) > 1:
+            out[name] = {"values": [], "tagged_by_member": 0, "ambiguous": sorted(concepts)}
+            continue
+        found = facts_by_concept.get(concepts[0], []) if concepts else []
+        values = [{"period": f["period"], "value": f["value"], "unit": f["unit"], "decimals": f["decimals"],
+                   **({"conflict": f["conflict"]} if "conflict" in f else {})}
+                  for f in found if not f["dimensions"]]
+        if concepts and not found:
+            found = texts.get(concepts[0], [])
+            seen = {(f["period"], f["value"]) for f in found if not f["dimensions"]}
+            prefix_of = {uri: prefix for prefix, uri in instance.get("namespaces", {}).items()}
+            values = [{"period": period, "value": text, "unit": None, "decimals": None, **_identities(text, prefix_of)}
+                      for period, text in seen]
+        values.sort(key=lambda c: (c["period"].split("/")[-1], _days(c["period"]) or 0), reverse=True)
+        out[name] = {"element": concepts[0] if concepts else None, "values": values,
+                     "tagged_by_member": sum(1 for f in found if f["dimensions"])}
+    return out
+
+
+def _roll_forward(lines: list) -> list:
+    """Opening balance plus the change for the period equals the closing balance,
+    per column, for each element the statement shows with both a period-start
+    and a period-end label (cash on a cash flow statement). The change is the
+    line whose element names an increase or decrease for the period; the effect
+    of exchange rates is added only when that element excludes it and the effect
+    does not already add into it."""
+    def cells(line):
+        return {v["period"]: v for v in line.get("values", [])}
+    starts = {l["element"]: l for l in lines if _bound(l["label_role"]) == "start" and l.get("values")}
+    ends = {l["element"]: l for l in lines if _bound(l["label_role"]) == "end" and l.get("values")}
+    flows = [l for l in lines if not l.get("structure") and not _bound(l["label_role"])
+             and any("/" in v["period"] for v in l.get("values", []))]
+    changes = [l for l in flows if "PeriodIncreaseDecrease" in l["element"]]
+    # Including the effect first, then a name that says nothing, then one that excludes it.
+    changes.sort(key=lambda l: 0 if "IncludingExchangeRateEffect" in l["element"] else
+                 2 if "ExcludingExchangeRateEffect" in l["element"] else 1)
+    fx = [l for l in flows if l["element"].split(":", 1)[-1].startswith("EffectOfExchangeRate")]
+    out = []
+    for element in sorted(set(starts) & set(ends)):
+        opening, closing = cells(starts[element]), cells(ends[element])
+        change = changes[0] if changes else None
+        add_fx = None
+        if change and fx and "ExcludingExchangeRateEffect" in change["element"] \
+                and fx[0].get("calculation_parent") != change["element"]:
+            add_fx = fx[0]
+        for period in sorted(set(opening) & set(closing), reverse=True):
+            o, c = opening[period], closing[period]
+            row = {"balance": element, "period": period, "opening": o["value"], "opening_instant": o.get("instant"),
+                   "closing": c["value"], "closing_instant": c.get("instant"),
+                   "change_element": change and change["element"], "exchange_rate_element": add_fx and add_fx["element"]}
+            ch = change and cells(change).get(period)
+            ex = add_fx and cells(add_fx).get(period)
+            if not ch or (add_fx and not ex):
+                row.update(computed=None, difference=None, consistent=None,
+                           missing=[n for n, v in (("change", ch), ("exchange_rate_effect", ex if add_fx else True)) if not v])
+                out.append(row)
+                continue
+            parts = [o, ch] + ([ex] if ex else [])
+            computed = sum(p["value"] for p in parts)
+            slack = _half_width(c["decimals"]) + sum(_half_width(p["decimals"]) for p in parts)
+            difference = c["value"] - computed
+            row.update(change=ch["value"], exchange_rate_effect=ex and ex["value"], computed=round(computed, 6),
+                       difference=round(difference, 6), consistent=abs(difference) <= slack + 1e-9, missing=[])
+            out.append(row)
+    return out
+
+
+def build_statements(schema: dict, presentation: dict, calculation: dict, labels: dict,
+                     definition: list, instance: dict, reports: dict) -> tuple[list, list]:
+    """The primary statements of the filing, and the duplicate facts that disagree."""
+    facts_by_concept, conflicts = group_facts(instance)
     # A locator names an element by its id, "prefix_Name"; the instance names it
     # "prefix:Name". If prefixes differ, an element whose name is unique still matches.
     by_local = {}
@@ -452,32 +569,74 @@ def build_statements(schema: dict, presentation: dict, calculation: dict, labels
         # The role's axes and members: a dimensional value belongs to the
         # statement when every axis and member it carries appears in it.
         in_role = {l["element"] for l in lines}
-        totals = {}
-        for line in lines:
-            if line.get("structure"):
-                continue
-            for f in facts_by_concept.get(line["element"], []):
-                if not f["dimensions"]:
-                    totals.setdefault(f["period"], set()).add(line["element"])
-        # The statement's columns: the periods that carry whole-company values for
-        # at least half as many lines as the period with the most, durations
-        # and instants counted apart (a cash flow statement has both).
-        columns = []
-        for instant in (False, True):
-            counts = {p: len(c) for p, c in totals.items() if ("/" not in p) == instant}
-            if counts:
-                top = max(counts.values())
-                columns += [p for p, n in counts.items() if n * 2 >= top]
-        columns.sort(key=lambda p: (p.split("/")[-1], _days(p) or 0), reverse=True)
+        # Opening and closing balances (a period-start or period-end label on an
+        # instant element, as cash on a cash flow statement) are read per column.
+        bound_lines = {id(l) for l in lines if not l.get("structure") and _bound(l["label_role"]) and any(
+            not f["dimensions"] and "/" not in f["period"] for f in facts_by_concept.get(l["element"], []))}
+
+        def column_periods(skip):
+            # The periods that carry whole-company values for at least half as many
+            # lines as the period with the most, durations and instants counted
+            # apart (a statement can have both).
+            totals = {}
+            for line in lines:
+                if line.get("structure") or id(line) in skip:
+                    continue
+                for f in facts_by_concept.get(line["element"], []):
+                    if not f["dimensions"]:
+                        totals.setdefault(f["period"], set()).add(line["element"])
+            out = []
+            for instant in (False, True):
+                counts = {p: len(c) for p, c in totals.items() if ("/" not in p) == instant}
+                if counts:
+                    top = max(counts.values())
+                    out += [p for p, n in counts.items() if n * 2 >= top]
+            return sorted(out, key=lambda p: (p.split("/")[-1], _days(p) or 0), reverse=True)
+
+        columns = column_periods(bound_lines)
+        durations = [c for c in columns if "/" in c]
+        if not durations:
+            bound_lines, columns = set(), column_periods(set())
+
+        def cell_of(f, period):
+            return {"period": period, "value": f["value"], "unit": f["unit"], "decimals": f["decimals"],
+                    **({"conflict": f["conflict"]} if "conflict" in f else {})}
+
+        def in_statement(f):
+            return all(a in in_role and m in in_role for a, m in f["dimensions"].items())
+
         for line in lines:
             if line.get("structure"):
                 continue
             values, members = [], []
+            if id(line) in bound_lines:
+                # An opening on 1 January is the balance at the end of 31 December
+                # (XBRL dates an instant at the end of its day); the start date
+                # itself is taken only when the filer tagged no day before.
+                at = {}
+                for f in facts_by_concept.get(line["element"], []):
+                    if "/" not in f["period"]:
+                        at.setdefault(f["period"], []).append(f)
+                for col in durations:
+                    start, end = col.split("/")
+                    days = [_day_before(start), start] if _bound(line["label_role"]) == "start" else [end]
+                    day = next((d for d in days if any(not f["dimensions"] for f in at.get(d, []))),
+                               next((d for d in days if d in at), None))
+                    for f in at.get(day, []):
+                        cell = {**cell_of(f, col), "instant": day}
+                        if not f["dimensions"]:
+                            values.append(cell)
+                        elif in_statement(f):
+                            members.append({**cell, "dimensions": f["dimensions"]})
+                line["values"] = sorted(values, key=lambda c: columns.index(c["period"]))
+                if members:
+                    line["by_member"] = members
+                continue
             for f in facts_by_concept.get(line["element"], []):
-                cell = {"period": f["period"], "value": f["value"], "unit": f["unit"], "decimals": f["decimals"]}
+                cell = cell_of(f, f["period"])
                 if not f["dimensions"] and f["period"] in columns:
                     values.append(cell)
-                elif f["dimensions"] and all(a in in_role and m in in_role for a, m in f["dimensions"].items()):
+                elif f["dimensions"] and in_statement(f):
                     if f["period"] in columns or _bounds(f["period"], columns):
                         members.append({**cell, "dimensions": f["dimensions"]})
             # Some companies tag a face line only with a member of the statement's axis
@@ -506,7 +665,16 @@ def build_statements(schema: dict, presentation: dict, calculation: dict, labels
                            "kind": kind_of(role["title"]), "parenthetical": parenthetical, "columns": columns,
                            "lines": lines,
                            "calculation_checks": _checks(lines, [(concept_of(p), concept_of(c), w)
-                                                                 for p, c, w in arcs_calc])})
+                                                                 for p, c, w in arcs_calc]),
+                           "roll_forward_checks": _roll_forward(lines)})
+    # A closing balance is tied to the balance sheet when the balance sheet shows
+    # the same element at that date: otherwise their scopes differ (restricted cash).
+    sheets = [s for s in statements if s["kind"] == "balance_sheet" and not s["parenthetical"]]
+    shown = {(l["element"], v["period"]): v["value"] for s in sheets for l in s["lines"] for v in l.get("values", [])}
+    for s in statements:
+        for row in s["roll_forward_checks"]:
+            on_sheet = shown.get((row["balance"], row["closing_instant"]))
+            row["closing_on_balance_sheet"] = None if on_sheet is None else on_sheet == row["closing"]
     return statements, conflicts
 
 
@@ -522,14 +690,21 @@ def _checks(lines: list, arcs: list) -> list:
     """Each total against the weighted sum of the lines the company says add
     into it, per column. Consistent when the two agree within the rounding
     their decimals allow (the interval rule of Calculation 1.1); None when
-    they disagree and a missing line was tagged only under members."""
+    they disagree and a missing line was tagged only under members. `complete`
+    is false when a line that adds into the total has no value: a sum that
+    agrees without it is consistent but does not show the lines are all there.
+    `missing_in_every_column` names the missing lines with no value in any
+    column (a line printed blank, such as commitments and contingencies).
+    Opening and closing balances (read per duration column) are left out."""
     if not arcs:
         return []
     cells = {}
     for line in lines:
         for v in line.get("values", []):
-            cells.setdefault((line["element"], v["period"], v["unit"]), v)
+            if "instant" not in v:
+                cells.setdefault((line["element"], v["period"], v["unit"]), v)
     member_only = {(line["element"], m["period"]) for line in lines for m in line.get("by_member", [])}
+    with_value = {e for (e, p, u) in cells}
     # Every relationship of the role counts, a line the statement does not show included.
     items = {}
     for parent, child, weight in arcs:
@@ -555,7 +730,8 @@ def _checks(lines: list, arcs: list) -> list:
             out.append({"total": total, "period": period, "unit": unit, "reported": reported["value"],
                         "computed": round(computed, 6), "difference": round(difference, 6),
                         "consistent": True if consistent else (None if by_member else False),
-                        "missing": missing, "missing_tagged_only_by_member": by_member})
+                        "complete": not missing, "missing": missing,
+                        "missing_in_every_column": [e for e in missing if e not in with_value], "missing_tagged_only_by_member": by_member})
     return out
 
 

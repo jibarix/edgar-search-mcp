@@ -631,6 +631,7 @@ def _segment_facts(raw: bytes, document: str) -> list:
 
 
 _FILED_FORMS = ("10-K", "10-Q", "20-F", "40-F", "10-K/A", "10-Q/A", "20-F/A", "40-F/A")
+_ELEMENT = re.compile(r"([A-Za-z][\w.-]*:)?[A-Za-z_][\w.-]*")
 _ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")
 _AS_OF_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 _HEADER_ACCEPTED = re.compile(r"<ACCEPTANCE-DATETIME>\s*(\d{14})")
@@ -675,6 +676,7 @@ def get_filed_statements(
     form: Literal["10-K", "10-Q", "20-F", "40-F", "10-K/A", "10-Q/A", "20-F/A", "40-F/A"] = "10-K",
     accession_number: str | None = None,
     as_of: str | None = None,
+    facts: list[str] | None = None,
 ) -> dict:
     """The primary financial statements of one filing, as the company filed them.
 
@@ -694,8 +696,20 @@ def get_filed_statements(
     opposite sign). `by_member` holds figures split along an axis the statement
     itself shows (equity components, share classes). `calculation_checks`
     compares each total with the weighted sum of its lines per column, within
-    the rounding the figures allow. `conflicts` lists any figure tagged twice
-    with different values.
+    the rounding the figures allow; `complete` is false when a line that adds
+    into the total has no value. `conflicts` lists any figure tagged twice with
+    different values, and the cell itself carries them (`conflict`).
+
+    A line with a period-start or period-end label (opening and closing cash,
+    equity at the start and end of the year) has one value per duration column,
+    the balance at the column's start or end (`instant`; an opening on 1 January
+    is the balance of 31 December). `roll_forward_checks` adds the change for
+    the period to the opening balance and compares it with the closing one, and
+    says whether the balance sheet shows the same element at that date.
+
+    `facts`, up to 50 element names ("us-gaap:FinanceLeaseLiabilityCurrent", or
+    a name without its prefix), returns in `requested_facts` the whole-company
+    values of those elements wherever the filing tags them, a note included.
 
     The filing is the latest `form` on file, or `accession_number` (of this
     company). `as_of`, YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ, leaves out filings
@@ -705,6 +719,8 @@ def get_filed_statements(
         iso_date(as_of)
     if accession_number is not None and not _ACCESSION.fullmatch(accession_number):
         raise ValueError(f"accession_number must look like 0000320193-24-000123, got {accession_number!r}")
+    if facts is not None and (len(facts) > 50 or not all(isinstance(n, str) and _ELEMENT.fullmatch(n) for n in facts)):
+        raise ValueError("facts must be up to 50 element names such as us-gaap:LongTermDebt")
     company = _resolve(cik_or_ticker)
     cutoff = as_of[:10] if as_of else None
     if accession_number:
@@ -801,6 +817,7 @@ def get_filed_statements(
         "entities": entities,
         "statements": statements,
         "conflicts": conflicts,
+        **({"requested_facts": fs.named_facts(instance, facts)} if facts else {}),
         "sources": sources,
         "returned_at": _now(),
     }
