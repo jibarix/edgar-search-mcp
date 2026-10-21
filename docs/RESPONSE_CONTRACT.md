@@ -255,6 +255,21 @@ an instance that is itself unresolved) is named in `unresolved` with the
 reason, so an empty `items` with an empty `unresolved` means every dependency
 was read and none held anything of that part.
 
+Every part keeps what the files it parses write, and says what it leaves
+out: `not_returned` lists it (comments and processing instructions, the XML
+declaration, whitespace between elements, the prefix each name was written
+with, how characters were escaped or encoded, and per part what another part
+or the `concepts` selection returns instead). Anything not listed there is in
+the response. The file itself, byte for byte, is what `get_filing_document`
+returns. Each file parsed is given with its document element (`root`: `seq`,
+`element`, every attribute) and, when any namespace is declared below the
+document element, every declaration in document order
+(`namespace_declarations`, null when all are on the document element and
+`namespaces` therefore has them all). A fact, a label or reference resource
+and a schema documentation have `lang`: the `xml:lang` in effect (its
+`value`, and the `seq` of the element it is written on, an ancestor when it
+is inherited), or null; the attribute as written stays in `attributes`.
+
 The XBRL files of one filing, one `part` at a time:
 
 - `summary`: the filing's submissions record, its acceptance time as the
@@ -271,7 +286,12 @@ The XBRL files of one filing, one `part` at a time:
   `other` as XML): elements with every attribute (`name`, `id`, `type`,
   `substitutionGroup`, `abstract`, `nillable`, `xbrli:periodType`,
   `xbrli:balance`, ...) and `type` and `substitutionGroup` resolved as QNames;
-  role and arcrole types with their `definition` as written and `usedOn`.
+  role and arcrole types with their `definition` as written and `usedOn`,
+  and their markup as `xml`; each top-level `xs:annotation` is an
+  `annotation` item with its `documentation` (`text`, `xml` when it holds
+  markup, `lang`) and `appinfo` elements, and appinfo content of none of
+  these kinds is `other`, as XML. Each `schemas` entry read has `root`,
+  `namespaces` and `namespace_declarations`.
   An `import`, `include` or `linkbaseRef` also has `url`, its
   `schemaLocation` or `href` resolved. `target_namespace` and `namespaces` are
   the company schema's; each schema's own `target_namespace` is in `schemas`.
@@ -282,16 +302,20 @@ The XBRL files of one filing, one `part` at a time:
   `{http://www.xbrl.org/2003/linkbase}calculationLink`) in every linkbase
   reached as described above: those of the schemas in discovery order, then
   those the instance references. `linkbases` lists each reference with
-  `seq`, `href`, `url`, `name`, `read`, `discovered_by`, its namespaces and how
-  many extended links of this kind it holds (or, for one inside a schema,
-  `embedded_in`); one the filing lacks or outside the filing is `read: false`
+  `seq`, `href`, `url`, `name`, `read`, `discovered_by`, `root`, its
+  `namespaces` and `namespace_declarations`, how many extended links of this
+  kind it holds (`extended_links`) and how many of every element
+  (`extended_links_by_element`, so the links another part returns are
+  counted, not hidden), or, for one inside a schema, `embedded_in`; one the filing lacks or outside the filing is `read: false`
   and unresolved, and a second reference to a linkbase already read has
   `repeat_of` and no items of its own. `schemas` is as for `schema`, and
   imported schemas outside the filing are listed in `unresolved` here too. Items are flattened in document order: the linkbase's
-  `roleRef` and `arcroleRef` (only from a linkbase holding a link of this
-  kind), each `extendedLink`, then its children by `xlink:type`: `loc` (with
-  `href` as written), `arc`, `resource` (with `text`, and `xml` when it holds
-  markup) or `other` (as XML). Each child has `file` and `link_seq`, the
+  `roleRef`, `arcroleRef` and any other child that is not an extended link
+  (`other`, as XML), from a linkbase holding a link of this kind or holding
+  no extended link that a part returns (only roleRefs, say: those are
+  returned by every part), each `extendedLink`, then its children by `xlink:type`: `loc` (with
+  `href` as written), `arc`, `resource` (with `text`, `lang`, and `xml` when it
+  holds markup) or `other` (as XML). Each child has `file` and `link_seq`, the
   `seq` of its extended link. Every attribute is kept (`xlink:role`,
   `xlink:arcrole`, `order`, `weight`, `priority`, `use`, `preferredLabel`,
   `xml:lang`, ...). Prohibited and overriding arcs, repeated arcs, equal
@@ -316,9 +340,15 @@ The XBRL files of one filing, one `part` at a time:
   returns (a generic link, say) is listed in `unresolved`.
 - `instance`: the instance in document order: contexts (entity identifier and
   scheme, period as written, explicit members, typed members as XML), units
-  (measures, divide) and facts (concept as namespace URI plus local name,
-  `contextRef`, `unitRef`, `decimals`, `precision`, `nil` as written in
-  `xsi:nil`, the text exactly as written). Duplicates are all returned; none is chosen.
+  (measures, divide) and facts. Every element of a context keeps its
+  attributes: `entity.attributes`, `entity.identifier_attributes`,
+  `period_element.attributes`, each `period` entry's `attributes` and
+  `namespace`, and `segment.attributes` and `scenario.attributes`; a child of
+  a context, entity, unit or divide of no XBRL kind is in its `other`, as
+  XML. Each measure keeps its `seq` and `attributes`. Facts have
+  their concept as namespace URI plus local name, `contextRef`, `unitRef`,
+  `decimals`, `precision`, `nil` as written in `xsi:nil`, the text exactly as
+  written and `lang`. Duplicates are all returned; none is chosen.
 
 `concepts` (with `part="instance"`) keeps only facts of the named concepts and
 the contexts and units they use. A name is `prefix:local` (prefix resolved

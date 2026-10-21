@@ -712,6 +712,8 @@ def get_filing_xbrl(
     every namespace; `concept_matches` says what each name matched.
     Items are paged by `offset` and `limit`; `page.next_offset` is null on the
     last page. Attribute names in a namespace are given as "{namespace}local".
+    Each file parsed comes with its document element (`root`) and namespace
+    declarations; `not_returned` lists what the response leaves out of it.
 
     Files are found only from what the filing publishes: the instance is the
     one row of the filing index page typed EX-101.INS or described as the
@@ -761,7 +763,7 @@ def get_filing_xbrl(
                                "index": files["index"], "input_files": files["input_files"],
                                "instance": files["instance"], "schema": files["schema"]},
                         filing_summary=xs.tree(files["summary"]) if files["summary"] is not None else None,
-                        unresolved=unresolved)
+                        not_returned=list(xs.NOT_RETURNED), unresolved=unresolved)
 
     if part == "instance":
         entry = files["instance"]
@@ -783,10 +785,13 @@ def get_filing_xbrl(
             items, matches, missing = xs.select_concepts(instance, concepts)
             unresolved += missing
             extra["concept_matches"] = matches
-        declarations = instance["declarations"]
-        return envelope("parsed_source", sources, **common, file=entry, namespaces=instance["namespaces"],
-                        namespace_declarations=declarations if any(d["seq"] for d in declarations) else None,
-                        **extra, **_page(items, offset, limit), unresolved=unresolved)
+        not_returned = list(xs.NOT_RETURNED)
+        if concepts is not None:
+            not_returned.append("the items `concepts` does not keep: facts of other concepts, and the contexts and "
+                                "units only those facts use")
+        return envelope("parsed_source", sources, **common, file=entry, root=instance["root"],
+                        namespaces=instance["namespaces"], namespace_declarations=instance["namespace_declarations"],
+                        **extra, **_page(items, offset, limit), not_returned=not_returned, unresolved=unresolved)
 
     schema_entry = files["schema"]
     if not schema_entry["resolved"]:
@@ -801,7 +806,8 @@ def get_filing_xbrl(
         main = dts.schemas[schema_entry["url"]]["_result"]
         return envelope("parsed_source", sources, **common, file=schema_entry,
                         target_namespace=main["target_namespace"], namespaces=main["namespaces"],
-                        schemas=dts.schema_records(), **_page(items, offset, limit), unresolved=unresolved)
+                        schemas=dts.schema_records(), **_page(items, offset, limit),
+                        not_returned=list(xs.NOT_RETURNED), unresolved=unresolved)
 
     # A linkbase part: every linkbase the filing's schemas reference or contain, then every one the instance
     # references, in that order; the extended links of this part's element are returned.
@@ -843,7 +849,14 @@ def get_filing_xbrl(
                                      "fragment as written, and their concept is not resolved here"})
     return envelope("parsed_source", sources, **common, file=schema_entry, schemas=dts.schema_records(),
                     linkbases=linkbase_files, extended_link_element=f"{{{xs.LINK}}}{xs.EXTENDED_LINKS[part]}",
-                    **_page(items, offset, limit), unresolved=unresolved)
+                    **_page(items, offset, limit), not_returned=[*xs.NOT_RETURNED, _OTHER_LINKS],
+                    unresolved=unresolved)
+
+
+_OTHER_LINKS = ("extended links of other elements: the part of that element returns them, and each `linkbases` "
+                "entry counts every extended link of its file by element (`extended_links_by_element`); a "
+                "linkbase's roleRefs and other children that are no extended link go with the part of its extended "
+                "links, or with every part when it holds none that a part returns")
 
 
 class _Dts:
@@ -895,7 +908,9 @@ class _Dts:
             self.unresolved.append({"file": name, "url": url, "discovered_by": discovered_by,
                                     "reason": record["reason"]})
             return record
-        record.update(read=True, target_namespace=result["target_namespace"], _result=result)
+        record.update(read=True, target_namespace=result["target_namespace"], root=result["root"],
+                      namespaces=result["namespaces"], namespace_declarations=result["namespace_declarations"],
+                      _result=result)
         self.unresolved += [{"file": name, **u} for u in result["unresolved"]]
         embedded = iter(result["linkbases"])
         for item in result["items"]:
@@ -955,7 +970,10 @@ class _Dts:
                                               self.target_of(), url=ref["schema_url"])
             self.unresolved += missing
             return found, {"seq": where["seq"], "embedded_in": ref["schema"], "discovered_by": where, "read": True,
-                           "extended_links": sum(1 for i in found if i["node"] == "extendedLink")}
+                           "root": xs.root_record(record["_result"]["doc"], ref["embedded"]),
+                           "extended_links": sum(1 for i in found if i["node"] == "extendedLink"),
+                           "extended_links_by_element": xs.extended_link_counts(record["_result"]["doc"],
+                                                                                ref["embedded"])}
         url, href = ref["url"], ref["href"]
         entry = {"seq": where["seq"], "href": href, "url": url, "attributes": ref["attributes"],
                  "discovered_by": where}
@@ -983,8 +1001,10 @@ class _Dts:
         self.read_linkbases[url] = where
         found, missing = xs.read_linkbase(doc, doc.root, name, part, self.target_of(), url=url)
         self.unresolved += doc.conflicts() + missing
-        entry.update(read=True, name=name, namespaces=doc.namespaces(),
-                     extended_links=sum(1 for i in found if i["node"] == "extendedLink"))
+        entry.update(read=True, name=name, root=xs.root_record(doc), namespaces=doc.namespaces(),
+                     namespace_declarations=xs.scoped_declarations(doc),
+                     extended_links=sum(1 for i in found if i["node"] == "extendedLink"),
+                     extended_links_by_element=xs.extended_link_counts(doc, doc.root))
         return found, entry
 
 

@@ -330,8 +330,17 @@ What 1.0 leaves unresolved, and says so:
   `unresolved` names the missing file.
 - A fact with `xsi:nil` keeps `nil` and its text as written. No value is
   invented for it.
-- A part's `roleRef` and `arcroleRef` items come only from linkbases that
-  hold at least one extended link of that part's kind.
+- A part's `roleRef` and `arcroleRef` items come from linkbases that hold an
+  extended link of that part's kind, and from linkbases that hold no
+  extended link any part returns (a roleRefs-only linkbase is in every
+  part); rc1 dropped the latter.
+- `not_returned` says what a part leaves out of the files it parses.
+  Contexts, entities, periods, units, resources and schema items carry more
+  keys than rc1 (`attributes`, `identifier_attributes`, `period_element`,
+  `other`, `lang`, `xml`, `root`); code that compares whole dicts (for
+  example `entity == {"scheme": ..., "identifier": ...}`) must compare the
+  keys it needs. `part="schema"` now has an `annotation` item for each
+  top-level `xs:annotation`, so item positions shift.
 
 Call sites to change: `valuation/filed_facts.py:4,34,59-69,103,129-131,184-212,570-604,706,743,754,870`,
 `valuation/statements.py:6,274,383-406,631,681,946-950,1106-1123`,

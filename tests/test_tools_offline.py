@@ -1185,11 +1185,103 @@ def locator_cases():
           and any(u.get("id") == "t_FulfillmentExpense" for u in r["unresolved"]), str(r and r["unresolved"]))
 
 
+# ── Round 2, blocker 5: parsed responses keep what was written, or say what they leave out ──
+
+XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
+LINK_NS = "{http://www.xbrl.org/2003/linkbase}"
+
+
+def lossless_cases():
+    inst = "t-20251231_htm.xml"
+    folder = filed()
+    folder[inst] = (folder[inst]
+                    .replace(b'xmlns:dei="http://xbrl.sec.gov/dei/2024">',
+                             b'xmlns:dei="http://xbrl.sec.gov/dei/2024" xml:lang="en-US" id="root1">', 1)
+                    .replace(b'<xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">',
+                             b'<xbrli:entity id="ent"><xbrli:identifier scheme="http://www.sec.gov/CIK" id="ident">', 1)
+                    .replace(b'<xbrli:period><xbrli:startDate>', b'<xbrli:period id="per"><xbrli:startDate id="sd">', 1)
+                    .replace(b'</xbrli:period></xbrli:context>',
+                             b'</xbrli:period><xbrli:scenario id="scen"><t:Note>x</t:Note></xbrli:scenario>'
+                             b'</xbrli:context>', 1)
+                    .replace(b"<xbrli:segment>", b'<xbrli:segment id="seg">', 1))
+    r, code = xbrl_call(folder, part="instance")
+    items = (r or {}).get("items", [])
+    d25 = next((i for i in items if i.get("id") == "D25"), {})
+    v25 = next((i for i in items if i.get("id") == "V25"), {})
+    doc_type = next((i for i in items if i["node"] == "fact" and i["concept"]["local_name"] == "DocumentType"), {})
+    check("b5: the instance response gives the document element's attributes",
+          code is None and (r.get("root") or {}).get("attributes") == {XML_LANG: "en-US", "id": "root1"},
+          code or str(r.get("root")))
+    check("b5: a fact keeps the xml:lang inherited from the document element",
+          doc_type.get("lang") == {"value": "en-US", "seq": 0}, str(doc_type))
+    entity = d25.get("entity") or {}
+    check("b5: every attribute of the context's children is in the response",
+          entity.get("attributes") == {"id": "ent"} and (entity.get("identifier_attributes") or {}).get("id") == "ident"
+          and (d25.get("period_element") or {}).get("attributes") == {"id": "per"}
+          and (d25.get("period") or [{}])[0].get("attributes") == {"id": "sd"}
+          and (d25.get("scenario") or {}).get("attributes") == {"id": "scen"}
+          and "<t:Note>x</t:Note>" in ((d25.get("scenario") or {}).get("other") or [{"xml": ""}])[0]["xml"]
+          and (v25.get("segment") or {}).get("attributes") == {"id": "seg"}, str(d25))
+    check("b5: the instance response says what it does not return",
+          r is not None and any("comment" in n for n in r.get("not_returned") or []), str(r and r.get("not_returned")))
+
+    folder = filed()
+    folder["t-20251231.xsd"] = (folder["t-20251231.xsd"]
+                                .replace(SCHEMA_OPEN, b'targetNamespace="http://t.example/2025" '
+                                         b'elementFormDefault="qualified"><xs:annotation><xs:documentation>'
+                                         b'The company schema.</xs:documentation></xs:annotation>', 1)
+                                .replace(b'<xs:element id="t_LeasedAssetsNet"',
+                                         b'<xs:element xmlns:q="http://q.example" id="t_LeasedAssetsNet"', 1)
+                                .replace(b"</xs:appinfo>", b'<link:linkbaseRef xlink:type="simple" '
+                                         b'xlink:href="t-roles.xml"/></xs:appinfo>', 1))
+    folder["t-roles.xml"] = (f'<link:linkbase {LB_NS}><link:roleRef roleURI="http://t.example/role/Income" '
+                             'xlink:type="simple" xlink:href="t-20251231.xsd#IS"/></link:linkbase>').encode()
+    folder["t-20251231_lab.xml"] = (folder["t-20251231_lab.xml"]
+                                    .replace(b"<link:linkbase ", b'<link:linkbase xml:lang="fr" ', 1)
+                                    .replace(b' xml:lang="en-US"', b"", 1)
+                                    .replace(b"<link:labelLink ", b'<link:labelLink xmlns:q="http://q.example" ', 1))
+    r, code = xbrl_call(folder, part="schema")
+    main = ((r or {}).get("schemas") or [{}])[0]
+    check("b5: the schema response gives each schema's document element with its attributes",
+          code is None and (main.get("root") or {}).get("attributes", {}).get("elementFormDefault") == "qualified",
+          code or str(main))
+    check("b5: the schema's annotation documentation is returned",
+          any(i["node"] == "annotation" and (i.get("documentation") or [{}])[0].get("text") == "The company schema."
+              for i in nodes(r, "annotation")), str(nodes(r, "annotation")))
+    check("b5: the schema response lists namespace declarations below the document element",
+          [d["prefix"] for d in (main.get("namespace_declarations") or []) if d["seq"]] == ["q"], str(main))
+    check("b5: the schema response says what it does not return",
+          r is not None and bool(r.get("not_returned")), str(r and r.get("not_returned")))
+
+    r, code = xbrl_call(folder, part="label")
+    lab = next((e for e in (r or {}).get("linkbases", []) if e.get("name") == "t-20251231_lab.xml"), {})
+    first, second = (nodes(r, "resource") + [{}, {}])[:2]
+    check("b5: a label without xml:lang carries the language inherited from its linkbase",
+          code is None and XML_LANG not in first.get("attributes", {XML_LANG: 1})
+          and first.get("lang") == {"value": "fr", "seq": 0}
+          and (second.get("lang") or {}).get("value") == "en-US", code or str((first, second)))
+    check("b5: a linkbase entry gives its document element and its scoped namespace declarations",
+          (lab.get("root") or {}).get("attributes") == {XML_LANG: "fr"}
+          and [d["prefix"] for d in (lab.get("namespace_declarations") or []) if d["seq"]] == ["q"], str(lab))
+    check("b5: a linkbase holding only roleRefs returns them",
+          [(i["file"], i["href"]) for i in nodes(r, "roleRef") if i["file"] == "t-roles.xml"]
+          == [("t-roles.xml", "t-20251231.xsd#IS")], str(nodes(r, "roleRef")))
+    r, code = xbrl_call(folder, part="presentation")
+    lab = next((e for e in (r or {}).get("linkbases", []) if e.get("name") == "t-20251231_lab.xml"), {})
+    check("b5: each linkbase entry counts its extended links of every element, so what this part leaves out is named",
+          code is None and lab.get("extended_links") == 0
+          and lab.get("extended_links_by_element") == {f"{LINK_NS}labelLink": 1}, code or str(lab))
+    check("b5: and the linkbase response says what it does not return",
+          r is not None and any("other elements" in n for n in r.get("not_returned") or []),
+          str(r and r.get("not_returned")))
+
+
 if __name__ == "__main__":
     no_implicit_filter_cases()
     discovery_cases()
     dependency_cases()
     locator_cases()
+    lossless_cases()
     search_cases()
     client_cases()
     lookup_cases()

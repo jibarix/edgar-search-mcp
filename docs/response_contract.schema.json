@@ -144,7 +144,7 @@
   },
   "get_filing_xbrl": {
    "allOf": [{"$ref": "#/$defs/envelope"}, {
-    "required": ["cik", "filing", "part", "unresolved"],
+    "required": ["cik", "filing", "part", "unresolved", "not_returned"],
     "properties": {
      "representation": {"const": "parsed_source"},
      "part": {"enum": ["summary", "schema", "presentation", "calculation", "definition", "label", "reference", "instance"]},
@@ -154,6 +154,7 @@
                                "source": {"type": "object", "required": ["file", "index"]},
                                "folder": {"type": "string", "pattern": "^https://www\\.sec\\.gov/Archives/edgar/data/"}}},
      "unresolved": {"type": "array", "items": {"type": "object"}},
+     "not_returned": {"type": "array", "items": {"type": "string"}},
      "page": {"type": "object", "required": ["total", "offset", "count", "next_offset"],
               "properties": {"total": {"type": "integer", "minimum": 0}, "offset": {"type": "integer", "minimum": 0},
                              "count": {"type": "integer", "minimum": 0},

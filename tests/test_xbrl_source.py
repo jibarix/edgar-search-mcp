@@ -102,7 +102,7 @@ def multi_entity():
             + "".join(f'<a:Cash contextRef="{c}" unitRef="usd" decimals="0">{v}</a:Cash>'
                       for c, v in (("E1", 1), ("E2", 2), ("E3", 3))))
     r = xs.read_instance(instance(body))
-    entities = [item(r, c)["entity"] for c in ("E1", "E2", "E3")]
+    entities = [{k: item(r, c)["entity"][k] for k in ("scheme", "identifier")} for c in ("E1", "E2", "E3")]
     check("entities: each context keeps its identifier and its scheme",
           entities == [{"scheme": "http://www.sec.gov/CIK", "identifier": "0000000001"},
                        {"scheme": "http://www.sec.gov/CIK", "identifier": "0000000002"},
@@ -150,7 +150,8 @@ def sparse_periods():
             + '<a:Policy contextRef="F">text</a:Policy><a:Policy contextRef="N">x</a:Policy>'
             + '<a:Policy contextRef="S">y</a:Policy><a:Policy contextRef="W">z</a:Policy>')
     r = xs.read_instance(instance(body))
-    periods = {c: item(r, c)["period"] for c in "FNSW"}
+    periods = {c: item(r, c)["period"] and [{k: p[k] for k in ("element", "text")} for p in item(r, c)["period"]]
+               for c in "FNSW"}
     check("periods: forever, a missing period, a start with no end and spaces are kept as written",
           periods == {"F": [{"element": "forever", "text": None}], "N": None,
                       "S": [{"element": "startDate", "text": "2025-01-01"}],
@@ -164,7 +165,7 @@ def misleading_names():
     body = context("D") + USD + "".join(f'<a:{n} contextRef="D" unitRef="usd" decimals="0">1</a:{n}>' for n in names)
     r = xs.read_instance(instance(body))
     keys = {"seq", "node", "concept", "id", "contextRef", "unitRef", "decimals", "precision", "nil", "attributes",
-            "text"}
+            "text", "lang"}
     check("names: a name whose suffix suggests a role is returned as a plain fact, nothing added",
           [f["concept"]["local_name"] for f in facts(r)] == names and all(set(f) == keys for f in facts(r)),
           str([sorted(set(f) - keys) for f in facts(r)]))
@@ -241,6 +242,83 @@ def bad_documents():
 XL = "{http://www.w3.org/1999/xlink}"
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 LB_NS = 'xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xlink="http://www.w3.org/1999/xlink"'
+
+
+XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
+
+
+def lossless_instance():
+    head = HEAD.replace(">", ' xml:lang="en-US" id="i1">', 1)
+    body = ('<xbrli:context id="C"><xbrli:entity id="e"><xbrli:identifier scheme="s" id="i">1</xbrli:identifier>'
+            '<xbrli:segment id="g"><xbrldi:explicitMember dimension="a:Axis">a:M</xbrldi:explicitMember>'
+            '</xbrli:segment><a:EntityNote>n</a:EntityNote></xbrli:entity>'
+            '<xbrli:period id="p"><xbrli:instant id="t">2025-12-31</xbrli:instant></xbrli:period>'
+            '<xbrli:scenario id="sc"><a:Note>x</a:Note></xbrli:scenario><a:ContextNote>c</a:ContextNote>'
+            '</xbrli:context>'
+            '<xbrli:unit id="u"><xbrli:measure id="m">iso4217:USD</xbrli:measure></xbrli:unit>'
+            '<a:Policy contextRef="C">text</a:Policy><a:Policy contextRef="C" xml:lang="fr">texte</a:Policy>')
+    r = xs.read_instance(instance(body, head))
+    c, got = item(r, "C"), facts(r)
+    check("lossless: the instance's document element and its attributes are returned",
+          (r.get("root") or {}).get("attributes") == {XML_LANG: "en-US", "id": "i1"}
+          and (r.get("root") or {}).get("element", {}).get("local_name") == "xbrl", str(r.get("root")))
+    check("lossless: a fact's language is the xml:lang in effect, inherited or its own, with where it is written",
+          [f.get("lang") for f in got] == [{"value": "en-US", "seq": 0}, {"value": "fr", "seq": got[1]["seq"]}]
+          and XML_LANG not in got[0]["attributes"], str([f.get("lang") for f in got]))
+    entity = c.get("entity") or {}
+    check("lossless: entity, identifier, period, period children, segment and scenario keep their attributes",
+          entity.get("attributes") == {"id": "e"} and entity.get("identifier_attributes") == {"scheme": "s", "id": "i"}
+          and (c.get("period_element") or {}).get("attributes") == {"id": "p"}
+          and [p.get("attributes") for p in c["period"]] == [{"id": "t"}]
+          and c["segment"].get("attributes") == {"id": "g"} and c["scenario"].get("attributes") == {"id": "sc"},
+          str(c))
+    check("lossless: a child of a context or entity of no XBRL kind is kept as XML",
+          ["ContextNote" in o["xml"] for o in c.get("other", [])] == [True]
+          and ["EntityNote" in o["xml"] for o in entity.get("other", [])] == [True], str(c))
+    check("lossless: a measure keeps its attributes",
+          item(r, "u")["measures"][0].get("attributes") == {"id": "m"}, str(item(r, "u")))
+
+
+def lossless_schema_and_linkbase():
+    body = ('<xs:annotation id="an"><xs:documentation xml:lang="en">About <b>this</b> schema.</xs:documentation>'
+            '<xs:appinfo><a:note xmlns:a="http://a.example/2025">kept</a:note></xs:appinfo></xs:annotation>'
+            '<xs:element xmlns:q="http://q.example" name="P" id="a_P" type="xbrli:monetaryItemType" '
+            'substitutionGroup="xbrli:item"/>')
+    r = xs.read_schema(schema(body, 'elementFormDefault="qualified"'), "a.xsd")
+    check("lossless: the schema's document element and its attributes are returned",
+          (r.get("root") or {}).get("attributes") == {"elementFormDefault": "qualified", "targetNamespace": A},
+          str(r.get("root")))
+    notes = [i for i in r["items"] if i["node"] == "annotation"]
+    doc = notes[0].get("documentation", [{}])[0] if notes else {}
+    check("lossless: a schema annotation is an item, its documentation as written with its language",
+          notes and notes[0]["attributes"] == {"id": "an"} and doc.get("text") == "About "
+          and "<b>this</b> schema." in doc.get("xml", "") and doc.get("lang") == {"value": "en", "seq": doc.get("seq")},
+          str(notes))
+    check("lossless: content of an appinfo of no XBRL kind is kept as XML",
+          any(i["node"] == "other" and "kept" in i["xml"] for i in r["items"]), str(r["items"]))
+    check("lossless: a namespace declared below the schema's document element is listed where it is written",
+          [d["prefix"] for d in (r.get("namespace_declarations") or []) if d["seq"]] == ["a", "q"],
+          str(r.get("namespace_declarations")))
+    label = ('<link:label xlink:type="resource" xlink:label="l" xlink:role="http://www.xbrl.org/2003/role/label">'
+             'P</link:label><link:label xlink:type="resource" xlink:label="l" xml:lang="de" '
+             'xlink:role="http://www.xbrl.org/2003/role/label">P</link:label>')
+    items, _, _ = linkbase('<link:documentation>About</link:documentation>' + ext("label", loc("P") + label),
+                           "label", root_attrs='xml:lang="fr"')
+    check("lossless: a label without xml:lang has the language inherited from the linkbase, the attribute as written",
+          [(XML_LANG in i["attributes"], (i.get("lang") or {}).get("value")) for i in of(items, "resource")]
+          == [(False, "fr"), (True, "de")], str(of(items, "resource")))
+    check("lossless: a linkbase child that is no link is kept as XML",
+          [("About" in i["xml"]) for i in of(items, "other")] == [True], str(items))
+    lb = xs.XmlDoc(f'<link:linkbase {LB_NS} id="x">{ext("label", loc("P"))}{ext("label", loc("P"))}'
+                   f'{ext("presentation", loc("P"))}</link:linkbase>'.encode(), "x.xml")
+    counts = xs.extended_link_counts(lb, lb.root) if hasattr(xs, "extended_link_counts") else None
+    check("lossless: the extended links of a linkbase are counted by element, whichever part returns them",
+          counts == {"{http://www.xbrl.org/2003/linkbase}labelLink": 2,
+                     "{http://www.xbrl.org/2003/linkbase}presentationLink": 1}, str(counts))
+    root = xs.root_record(lb) if hasattr(xs, "root_record") else None
+    check("lossless: a linkbase's document element is given with its attributes",
+          root == {"seq": 0, "element": {"namespace": "http://www.xbrl.org/2003/linkbase", "local_name": "linkbase",
+                                         "prefixes": ["link"]}, "attributes": {"id": "x"}}, str(root))
 
 
 def schema(body, extra_ns=""):
@@ -416,7 +494,18 @@ def other_links_and_children():
           and all(i["file"] == "x_lab.xml" for i in items) and len(of(items, "extendedLink")) == 1, str(unresolved))
     refs = '<link:roleRef roleURI="http://a.example/role/R1" xlink:type="simple" xlink:href="a.xsd#R1"/>'
     items, _, _ = linkbase(refs + ext("calculation", loc("P")), "presentation")
-    check("links: a linkbase with no link of this part returns nothing, not its roleRefs", items == [], str(items))
+    check("links: a linkbase whose links are all of another part leaves its roleRefs to that part",
+          items == [], str(items))
+    items, _, _ = linkbase(refs + ext("calculation", loc("P")), "calculation")
+    check("links: ... which returns them", of(items, "roleRef") and items[0]["href"] == "a.xsd#R1", str(items))
+    for part in ("presentation", "label"):
+        items, _, _ = linkbase(refs, part)
+        check(f"links: a linkbase holding only roleRefs returns them ({part}), not nothing",
+              [(i["node"], i["href"]) for i in items] == [("roleRef", "a.xsd#R1")], str(items))
+    items, _, _ = linkbase(refs + '<gen:link xlink:type="extended" xlink:role="http://a.example/role/G"/>',
+                           "presentation", gen)
+    check("links: so does one whose only link is of an element no part returns",
+          [i["node"] for i in items] == ["roleRef"], str(items))
     items, _, _ = linkbase(refs + ext("presentation", loc("P")), "presentation")
     check("links: with a link of this part, its roleRefs come first as written",
           items[0]["node"] == "roleRef" and items[0]["href"] == "a.xsd#R1", str(items[0]))
@@ -440,11 +529,14 @@ def schema_declarations():
     r = xs.read_schema(schema(body), "a.xsd")
     nodes = [i["node"] for i in r["items"]]
     check("schema: declarations in document order, each by its XML construct",
-          nodes == ["import", "roleType", "linkbaseRef", "element", "element", "element", "element", "other"], str(nodes))
+          nodes == ["import", "annotation", "roleType", "linkbaseRef", "element", "element", "element", "element",
+                    "other"], str(nodes))
+    r["items"] = [i for i in r["items"] if i["node"] != "annotation"]
     role = r["items"][1]
     check("schema: a role's definition is as written, a misleading title not classified",
           role["definition"] == "100 - Statement - BALANCE SHEET (Parenthetical)"
-          and set(role) == {"seq", "attributes", "node", "definition", "usedOn"}, str(role))
+          and set(role) == {"seq", "attributes", "node", "definition", "usedOn", "xml"}
+          and "100 - Statement" in role["xml"], str(role))
     check("schema: usedOn QNames resolved where written, an undeclared prefix unresolved",
           role["usedOn"][0]["local_name"] == "calculationLink" and role["usedOn"][1]["resolved"] is False,
           str(role["usedOn"]))
@@ -470,8 +562,8 @@ def schema_declarations():
                       + ext("presentation", loc("P")) + '</link:linkbase></xs:appinfo></xs:annotation>')
     r = xs.read_schema(embedded, "a.xsd")
     check("schema: a linkbase written inside the schema is listed and handed back to read",
-          [i["node"] for i in r["items"]] == ["linkbase"] and len(r["linkbases"]) == 1
-          and r["items"][0]["element_count"] == 2, str(r["items"]))
+          [i["node"] for i in r["items"]] == ["annotation", "linkbase"] and len(r["linkbases"]) == 1
+          and r["items"][1]["element_count"] == 2, str(r["items"]))
     r = xs.read_schema(embedded.replace(b"<xs:annotation>", b'<xs:element name="P" id="a_P" '
                                          b'substitutionGroup="xbrli:item"/><xs:annotation>'), "a.xsd", FOLDER + "a.xsd")
     items, _ = xs.read_linkbase(r["doc"], r["linkbases"][0], "a.xsd", "presentation",
@@ -506,6 +598,8 @@ def main():
     locators_and_base_uri()
     other_links_and_children()
     schema_declarations()
+    lossless_instance()
+    lossless_schema_and_linkbase()
     print(f"problems: {len(problems)}")
     return 1 if problems else 0
 

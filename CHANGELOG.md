@@ -40,6 +40,18 @@ A review of 1.0.0rc1 found places where the server still chose or guessed.
   `ambiguous: true`, with all candidates. In the library, `read_schema`'s
   `ids` maps each id to a list, and `concept_at` and `locator_resolver` do the
   lookup.
+- **Parsed responses keep what was written, or say what they do not**: every
+  `get_filing_xbrl` part has `not_returned`. Instance, schema and linkbase
+  files are given with their document element and its attributes (`root`)
+  and their namespace declarations below it (`namespace_declarations`).
+  Facts, label and reference resources and schema documentation carry
+  `lang`, the `xml:lang` in effect, inherited included. Context children
+  keep every attribute (entity, identifier, period and its children,
+  segment, scenario), and unknown children are kept as XML. A top-level
+  `xs:annotation` is an `annotation` item with its documentation. A linkbase
+  that holds only roleRefs, or no link any part returns, gives its roleRefs
+  to every part, and other non-link children of a linkbase are `other`
+  items. Each `linkbases` entry counts its extended links by element.
 
 ## 1.0.0rc1
 

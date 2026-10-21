@@ -297,7 +297,8 @@ def xbrl_instance_checks(result, kwargs):
     wrong = []
     for c in (i for i in items if i["node"] == "context"):
         ident = contexts[c["id"]].find("{%s}entity/{%s}identifier" % (XBRLI_NS, XBRLI_NS))
-        if c["entity"] != {"scheme": ident.get("scheme"), "identifier": ident.text}:
+        if {k: c["entity"].get(k) for k in ("scheme", "identifier")} != {"scheme": ident.get("scheme"),
+                                                                          "identifier": ident.text}:
             wrong.append(c["id"])
     check("get_filing_xbrl instance: each context keeps its entity identifier and scheme", not wrong, str(wrong[:3]))
     if kwargs.get("concepts"):

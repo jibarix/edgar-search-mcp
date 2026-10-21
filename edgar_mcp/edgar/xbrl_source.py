@@ -32,6 +32,19 @@ XBRLDI = "http://xbrl.org/2006/xbrldi"
 XSI = "http://www.w3.org/2001/XMLSchema-instance"
 XS = "http://www.w3.org/2001/XMLSchema"
 XML_NS = "http://www.w3.org/XML/1998/namespace"
+_XML_LANG = f"{{{XML_NS}}}lang"
+
+# What a parsed response leaves out of the files it reads, whatever the part. The file itself, byte for byte, is
+# what get_filing_document returns.
+NOT_RETURNED = (
+    "XML comments, processing instructions, the XML declaration and any DOCTYPE",
+    "text written directly between elements, outside the fragments returned as `xml` and the element tree of "
+    "`filing_summary` (where `tail` keeps it); XBRL 2.1 allows only whitespace there",
+    "the prefix each name was written with: names are a namespace URI and a local name, and `namespaces` and "
+    "`namespace_declarations` give the prefixes declared",
+    "how characters were written (character and entity references, CDATA sections, the file's encoding and line "
+    "ends): text and attribute values are the characters an XML parser reports",
+)
 
 
 class FilingDataError(Exception):
@@ -115,6 +128,16 @@ class XmlDoc:
         """`href`, written on `element`, as an absolute URL (RFC 3986 against the effective base URI)."""
         return urljoin(self.base_uri(element, document_url), href)
 
+    def lang(self, element) -> dict | None:
+        """The xml:lang in effect at `element`: the nearest one written on it
+        or an ancestor, with the seq of the element it is written on; None
+        when none is in scope. The value is as written ("" included)."""
+        for e in reversed(self.ancestry(element)):
+            value = e.get(_XML_LANG)
+            if value is not None:
+                return {"value": value, "seq": self._seq[e]}
+        return None
+
     def namespaces(self) -> dict:
         """The bindings declared on the document element, as written."""
         return {p: u for p, u in self._scope[self.root].items() if p != "xml"}
@@ -191,6 +214,19 @@ def element_name(doc: XmlDoc, element) -> dict:
     return {"namespace": ns, "local_name": local, "prefixes": doc.prefixes_for(ns, element) if ns else []}
 
 
+def root_record(doc: XmlDoc, element=None) -> dict:
+    """The document element (or `element`, a linkbase inside a schema, say) with every attribute as written."""
+    element = doc.root if element is None else element
+    return {"seq": doc.seq(element), "element": element_name(doc, element), "attributes": dict(element.attrib)}
+
+
+def scoped_declarations(doc: XmlDoc) -> list | None:
+    """Every namespace declaration of the file in document order, when any is
+    written below the document element; None when all are on it (then the
+    file's `namespaces` are all of them)."""
+    return doc.declarations if any(d["seq"] for d in doc.declarations) else None
+
+
 def tree(doc: XmlDoc, element=None) -> dict:
     """An element as {tag, attributes, text, children}, every value as written."""
     element = doc.root if element is None else element
@@ -220,35 +256,61 @@ def _members(doc: XmlDoc, container) -> dict | None:
                           "xml": "".join(doc.to_xml(c) for c in child), "text": child.text})
         else:
             other.append({"seq": doc.seq(child), "xml": doc.to_xml(child)})
-    return {"seq": doc.seq(container), "explicit_members": explicit, "typed_members": typed, "other": other}
+    return {"seq": doc.seq(container), "attributes": dict(container.attrib), "explicit_members": explicit,
+            "typed_members": typed, "other": other}
+
+
+def _others(doc: XmlDoc, element, known: tuple) -> list:
+    """The children of `element` that are not the xbrli elements `known`, as XML."""
+    return [{"seq": doc.seq(c), "xml": doc.to_xml(c)} for c in element if split(c.tag) not in
+            [(XBRLI, k) for k in known]]
 
 
 def _context(doc: XmlDoc, element) -> dict:
     entity = element.find(f"{{{XBRLI}}}entity")
     identifier = entity.find(f"{{{XBRLI}}}identifier") if entity is not None else None
     period = element.find(f"{{{XBRLI}}}period")
+
+    def period_child(p):
+        ns, local = split(p.tag)
+        out = {"element": local, "text": p.text, "seq": doc.seq(p), "namespace": ns, "attributes": dict(p.attrib)}
+        if len(p):
+            out["xml"] = doc.to_xml(p)
+        return out
     return {
         "seq": doc.seq(element), "node": "context", "id": element.get("id"), "attributes": dict(element.attrib),
-        "entity": None if identifier is None else {"scheme": identifier.get("scheme"), "identifier": identifier.text},
+        "entity": None if entity is None else {
+            "scheme": None if identifier is None else identifier.get("scheme"),
+            "identifier": None if identifier is None else identifier.text,
+            "seq": doc.seq(entity), "attributes": dict(entity.attrib),
+            "identifier_attributes": None if identifier is None else dict(identifier.attrib),
+            "other": _others(doc, entity, ("identifier", "segment"))},
         "segment": _members(doc, entity.find(f"{{{XBRLI}}}segment") if entity is not None else None),
         "scenario": _members(doc, element.find(f"{{{XBRLI}}}scenario")),
-        "period": None if period is None else [{"element": split(p.tag)[1], "text": p.text} for p in period],
+        "period": None if period is None else [period_child(p) for p in period],
+        "period_element": None if period is None else {"seq": doc.seq(period), "attributes": dict(period.attrib)},
+        "other": _others(doc, element, ("entity", "period", "scenario")),
     }
 
 
 def _measures(doc: XmlDoc, element) -> list:
-    return [doc.qname(m.text, m) for m in element.findall(f"{{{XBRLI}}}measure")]
+    return [{**doc.qname(m.text, m), "seq": doc.seq(m), "attributes": dict(m.attrib)}
+            for m in element.findall(f"{{{XBRLI}}}measure")]
 
 
 def _unit(doc: XmlDoc, element) -> dict:
     divide = element.find(f"{{{XBRLI}}}divide")
     out = {"seq": doc.seq(element), "node": "unit", "id": element.get("id"), "attributes": dict(element.attrib),
-           "measures": _measures(doc, element), "divide": None}
+           "measures": _measures(doc, element), "divide": None, "other": _others(doc, element, ("measure", "divide"))}
     if divide is not None:
         numerator = divide.find(f"{{{XBRLI}}}unitNumerator")
         denominator = divide.find(f"{{{XBRLI}}}unitDenominator")
         out["divide"] = {"numerator": _measures(doc, numerator) if numerator is not None else [],
-                         "denominator": _measures(doc, denominator) if denominator is not None else []}
+                         "denominator": _measures(doc, denominator) if denominator is not None else [],
+                         "seq": doc.seq(divide), "attributes": dict(divide.attrib),
+                         "numerator_attributes": None if numerator is None else dict(numerator.attrib),
+                         "denominator_attributes": None if denominator is None else dict(denominator.attrib),
+                         "other": _others(doc, divide, ("unitNumerator", "unitDenominator"))}
     return out
 
 
@@ -256,7 +318,8 @@ def _fact(doc: XmlDoc, element) -> dict:
     out = {"seq": doc.seq(element), "node": "fact", "concept": element_name(doc, element),
            "id": element.get("id"), "contextRef": element.get("contextRef"), "unitRef": element.get("unitRef"),
            "decimals": element.get("decimals"), "precision": element.get("precision"),
-           "nil": element.get(f"{{{XSI}}}nil"), "attributes": dict(element.attrib), "text": element.text}
+           "nil": element.get(f"{{{XSI}}}nil"), "attributes": dict(element.attrib), "text": element.text,
+           "lang": doc.lang(element)}
     if len(element):
         out["xml"] = doc.to_xml(element)
     return out
@@ -304,8 +367,8 @@ def read_instance(raw: bytes | None, name: str = "instance", doc: XmlDoc | None 
         for m in (item.get("measures") or []) + divide.get("numerator", []) + divide.get("denominator", []):
             if not m["resolved"]:
                 unresolved.append({"seq": item["seq"], "unit": item["id"], "value": m["qname"], "reason": m["reason"]})
-    return {"namespaces": doc.namespaces(), "declarations": doc.declarations, "items": items,
-            "unresolved": unresolved, "doc": doc}
+    return {"root": root_record(doc), "namespaces": doc.namespaces(), "declarations": doc.declarations,
+            "namespace_declarations": scoped_declarations(doc), "items": items, "unresolved": unresolved, "doc": doc}
 
 
 def select_concepts(instance: dict, names: list) -> tuple[list, list, list]:
@@ -374,8 +437,12 @@ def read_schema(raw: bytes, name: str = "schema", url: str | None = None) -> dic
 
     `node` names the XML construct: "import", "include", "linkbaseRef",
     "roleType", "arcroleType", "element" (a top-level xs:element), "linkbase"
-    (a linkbase written inside the schema), or "other" (any other top-level
-    schema component, as XML). Each keeps every attribute; QNames in `type`
+    (a linkbase written inside the schema), "annotation" (a top-level
+    xs:annotation: its `documentation`, each with text, markup as `xml` and
+    the xml:lang in effect, and its `appinfo` elements), or "other" (any
+    other top-level schema component, or appinfo content of none of these
+    kinds, as XML). Each keeps every attribute; a role or arcrole type, and
+    an import, include or linkbaseRef with content, also has `xml`; QNames in `type`
     and `substitutionGroup` are resolved where they are written. `ids` maps
     each element id to every element with that id (namespace, local name and
     seq), which is how a locator's href finds its concept; an id two elements
@@ -394,13 +461,15 @@ def read_schema(raw: bytes, name: str = "schema", url: str | None = None) -> dic
     for element in doc.root.iter():
         ns, local = split(element.tag)
         base = {"seq": doc.seq(element), "attributes": dict(element.attrib)}
+        markup = {"xml": doc.to_xml(element)} if len(element) else {}
         if (ns, local) in ((XS, "import"), (XS, "include")):
-            items.append({**base, "node": local, **located(element, element.get("schemaLocation"))})
+            items.append({**base, "node": local, **located(element, element.get("schemaLocation")), **markup})
         elif (ns, local) == (LINK, "linkbaseRef"):
             href = element.get(f"{{{XLINK}}}href")
-            items.append({**base, "node": "linkbaseRef", "href": href, **located(element, href)})
+            items.append({**base, "node": "linkbaseRef", "href": href, **located(element, href), **markup})
         elif (ns, local) in ((LINK, "roleType"), (LINK, "arcroleType")):
-            items.append({**base, "node": local, **_definition_and_used_on(doc, element)})
+            items.append({**base, "node": local, **_definition_and_used_on(doc, element),
+                          "xml": doc.to_xml(element)})
         elif (ns, local) == (LINK, "linkbase"):
             items.append({**base, "node": "linkbase", "element_count": sum(1 for _ in element.iter()) - 1})
             linkbases.append(element)
@@ -426,11 +495,37 @@ def read_schema(raw: bytes, name: str = "schema", url: str | None = None) -> dic
                                                  "pointing to it is ambiguous and is not resolved"})
                 ids.setdefault(item["id"], []).append({"namespace": target, "local_name": name_attr,
                                                        "seq": item["seq"]})
-        elif (ns, local) not in ((XS, "import"), (XS, "include"), (XS, "annotation")):
+        elif (ns, local) == (XS, "annotation"):
+            items.append({**base, "node": "annotation",
+                          "documentation": [_documentation(doc, d) for d in element.findall(f"{{{XS}}}documentation")],
+                          "appinfo": [{"seq": doc.seq(a), "attributes": dict(a.attrib)}
+                                      for a in element.findall(f"{{{XS}}}appinfo")]})
+            for child in element:
+                inside = list(child) if split(child.tag) == (XS, "appinfo") else (
+                    [] if split(child.tag) == (XS, "documentation") else [child])
+                for c in inside:
+                    if split(c.tag) not in _SCHEMA_CONSTRUCTS:
+                        items.append({"seq": doc.seq(c), "attributes": dict(c.attrib), "node": "other",
+                                      "element": element_name(doc, c), "xml": doc.to_xml(c)})
+        elif (ns, local) not in ((XS, "import"), (XS, "include")):
             items.append({**base, "node": "other", "element": element_name(doc, element), "xml": doc.to_xml(element)})
     items.sort(key=lambda i: i["seq"])
-    return {"target_namespace": target, "namespaces": doc.namespaces(), "items": items, "ids": ids,
+    return {"target_namespace": target, "root": root_record(doc), "namespaces": doc.namespaces(),
+            "namespace_declarations": scoped_declarations(doc), "items": items, "ids": ids,
             "unresolved": unresolved, "linkbases": linkbases, "doc": doc}
+
+
+# The schema constructs read as items of their own wherever they are written.
+_SCHEMA_CONSTRUCTS = ((XS, "import"), (XS, "include"), (LINK, "linkbaseRef"), (LINK, "roleType"),
+                      (LINK, "arcroleType"), (LINK, "linkbase"))
+
+
+def _documentation(doc: XmlDoc, element) -> dict:
+    out = {"seq": doc.seq(element), "attributes": dict(element.attrib), "text": element.text,
+           "lang": doc.lang(element)}
+    if len(element):
+        out["xml"] = doc.to_xml(element)
+    return out
 
 
 def concept_at(schema: dict, file: str, fragment: str) -> dict:
@@ -482,10 +577,13 @@ def read_linkbase(doc: XmlDoc, linkbase, file: str, part: str, target_of,
     "loc" (with `href` as written and `target`, what `target_of` says it
     points to), "arc", "resource" (with its text, and its markup as XML) or
     "other". Each keeps every attribute and the `seq` of its extended link
-    (`link_seq`). Arcs are never combined, overridden or dropped: priority,
+    (`link_seq`); a resource also has `lang`, the xml:lang in effect.
+    Arcs are never combined, overridden or dropped: priority,
     use="prohibited", order and weight are attributes like any other.
-    The roleRef and arcroleRef elements of the linkbase are returned with
-    them when the linkbase holds at least one extended link of this kind.
+    The roleRef and arcroleRef elements of the linkbase, and any child of it
+    that is not an extended link ("other", as XML), are returned with them
+    when the linkbase holds an extended link of this kind, or when it holds
+    no extended link that another part returns (only roleRefs, say).
 
     With `url`, the URL of the file `doc` was read from, each href is also
     resolved against the base URI in effect where it is written (the file's
@@ -497,7 +595,7 @@ def read_linkbase(doc: XmlDoc, linkbase, file: str, part: str, target_of,
     def located(element, href):
         return doc.resolve_href(href, element, url) if url is not None and href else href
     wanted = EXTENDED_LINKS[part]
-    items, unresolved = [], []
+    items, unresolved, another_part = [], [], False
     for element in linkbase:
         ns, local = split(element.tag)
         base = {"seq": doc.seq(element), "file": file, "attributes": dict(element.attrib)}
@@ -507,9 +605,12 @@ def read_linkbase(doc: XmlDoc, linkbase, file: str, part: str, target_of,
                           **({"url": located(element, href)} if url is not None else {})})
             continue
         if element.get(_XLINK_TYPE) != "extended":
+            items.append({**base, "node": "other", "element": element_name(doc, element), "xml": doc.to_xml(element)})
             continue
         if (ns, local) != (LINK, wanted):
-            if local not in EXTENDED_LINKS.values() or ns != LINK:
+            if ns == LINK and local in EXTENDED_LINKS.values():
+                another_part = True
+            else:
                 unresolved.append({"seq": base["seq"], "file": file, "element": element.tag,
                                    "reason": "an extended link of an element no part returns (a generic link, say)"})
             continue
@@ -527,12 +628,21 @@ def read_linkbase(doc: XmlDoc, linkbase, file: str, part: str, target_of,
             elif kind == "arc":
                 entry.update(node="arc")
             elif kind == "resource":
-                entry.update(node="resource", text=child.text)
+                entry.update(node="resource", text=child.text, lang=doc.lang(child))
                 if len(child):
                     entry["xml"] = doc.to_xml(child)
             else:
                 entry.update(node="other", xml=doc.to_xml(child))
             items.append(entry)
-    if not any(i["node"] == "extendedLink" for i in items):
+    if another_part and not any(i["node"] == "extendedLink" for i in items):
         items = []
     return items, unresolved
+
+
+def extended_link_counts(doc: XmlDoc, linkbase) -> dict:
+    """How many extended links of each element ("{namespace}local") the linkbase holds, whichever part returns them."""
+    counts = {}
+    for element in linkbase:
+        if element.get(_XLINK_TYPE) == "extended":
+            counts[element.tag] = counts.get(element.tag, 0) + 1
+    return counts
