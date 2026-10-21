@@ -21,6 +21,8 @@ os.environ["EDGAR_CACHE_DIR"] = tempfile.mkdtemp(prefix="edgar_cache_test_")
 os.environ.pop("EDGAR_FROZEN_DIR", None)
 os.environ.pop("EDGAR_RECORD_DIR", None)
 
+from urllib.parse import quote  # noqa: E402
+
 import httpx  # noqa: E402
 
 from edgar_mcp import server  # noqa: E402
@@ -110,9 +112,7 @@ def search_cases():
         server.get_json = lambda url, *a, **k: (page(1, [odd]), meta(url))
         result, code = call(server.search_filings, query="x")
         check("search: a hit is returned verbatim, names and codes as given, nothing parsed",
-              code is None and result["hits"][0]["record"] == odd
-              and result["hits"][0]["url"] == "https://www.sec.gov/Archives/edgar/data/1/000000000124000001/a.htm",
-              str(result and result["hits"]))
+              code is None and result["hits"][0]["record"] == odd, str(result and result["hits"]))
         check("search: the answer names the address it read",
               result["sources"][0]["url"].startswith(server._SEARCH_URL))
         for label, broken in [("an _id with no file", "0000000001-24-000001"),
@@ -120,7 +120,8 @@ def search_cases():
             server.get_json = lambda url, *a, broken=broken, **k: (page(1, [{**odd, "_id": broken}]), meta(url))
             result, code = call(server.search_filings, query="x")
             check(f"search: {label} keeps its record and has no url",
-                  code is None and result["hits"][0]["url"] is None and result["hits"][0]["record"]["_id"] == broken)
+                  code is None and result["hits"][0]["url"] is None and result["hits"][0].get("urls") == []
+                  and result["hits"][0]["record"]["_id"] == broken)
 
         # 10,000 hits: continuation runs through the last upstream page and stops at the ceiling.
         asked = []
@@ -323,29 +324,29 @@ def history_cases():
         second = table(("0000000001-15-000001", "10-K", "2015-03-01"))
         both = {"CIK0000000001-submissions-001.json": first, "CIK0000000001-submissions-002.json": second}
         result, code = listed({"CIK0000000001-submissions-001.json": first,
-                               "CIK0000000001-submissions-002.json": fail}, limit=1)
+                               "CIK0000000001-submissions-002.json": fail}, form="10-K", limit=1)
         check("list_filings: the form is compared literally (not 10-K/A, 10-KT, 10-K405 or 10-k)",
               code is None and [f["record"]["accessionNumber"] for f in result["filings"]] == ["0000000001-25-000001"])
         check("list_filings: an older file is not read while the recent table fills the limit",
               read == ["CIK0000000001.json"] and result["limit_reached"] and result["complete"], str(read))
         result, code = listed({"CIK0000000001-submissions-001.json": first,
-                               "CIK0000000001-submissions-002.json": fail}, limit=2)
+                               "CIK0000000001-submissions-002.json": fail}, form="10-K", limit=2)
         check("list_filings: older files are read in the order listed, only as far as the limit needs",
               code is None and read == ["CIK0000000001.json", "CIK0000000001-submissions-001.json"]
               and [f["source"]["file"] for f in result["filings"]]
               == ["CIK0000000001.json#filings.recent", "CIK0000000001-submissions-001.json"], str(read))
         _, code = listed({"CIK0000000001-submissions-001.json": sec_client.SecNoFrozenCopy("no copy"),
-                          "CIK0000000001-submissions-002.json": second}, limit=5)
+                          "CIK0000000001-submissions-002.json": second}, form="10-K", limit=5)
         check("list_filings: an unreadable older file is NO_FROZEN_COPY, never a shorter list",
               code == "NO_FROZEN_COPY", code)
-        _, code = listed({"CIK0000000001-submissions-001.json": fail}, limit=5)
+        _, code = listed({"CIK0000000001-submissions-001.json": fail}, form="10-K", limit=5)
         check("list_filings: an older file the SEC fails to serve is UPSTREAM_UNAVAILABLE",
               code == "UPSTREAM_UNAVAILABLE", code)
-        result, code = listed(both, limit=10, include_amendments=True)
+        result, code = listed(both, form="10-K", limit=10, include_amendments=True)
         check("list_filings: amendments come when asked, in the SEC's order, and every file is read",
               code is None and [f["record"]["form"] for f in result["filings"]]
               == ["10-K/A", "10-K", "10-K", "10-K", "10-K"] and not result["limit_reached"] and result["complete"])
-        result, code = listed(both, as_of="2024-12-31")
+        result, code = listed(both, form="10-K", as_of="2024-12-31")
         check("list_filings: as_of keeps rows filed on or before it; a row without a date is left out and named",
               code is None and [f["record"]["filingDate"] for f in result["filings"]] == ["2020-03-01", "2015-03-01"]
               and len(result["warnings"]) == 1 and "0000000001-19-000001" in result["warnings"][0]
@@ -588,18 +589,22 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
     return folder
 
 
-def xbrl_call(folder, **kwargs):
-    """get_filing_xbrl on one made-up folder; returns (result, code)."""
-    record = {"accessionNumber": "0000000001-26-000001", "filingDate": "2026-07-02", "reportDate": "2025-12-31",
-              "acceptanceDateTime": "2026-07-02T14:01:02.000Z", "form": "10-K",
-              "primaryDocument": "t-20251231.htm"}
+RECORD = {"accessionNumber": "0000000001-26-000001", "filingDate": "2026-07-02", "reportDate": "2025-12-31",
+          "acceptanceDateTime": "2026-07-02T14:01:02.000Z", "form": "10-K", "primaryDocument": "t-20251231.htm"}
+
+
+def xbrl_call(folder, records=None, **kwargs):
+    """get_filing_xbrl on one made-up folder; `records` are the submissions rows offered, in order
+    (by default one 10-K row). Returns (result, code)."""
+    records = [RECORD] if records is None else records
     real = (server._resolve, server._filings.iter_filing_records, server.fetch_response)
     server._resolve = lambda s: {"cik": "0000000001", "matched_on": "cik"}
 
     def rows(cik, sources, warnings, older=True):
         sources.append({"source_url": "https://data.sec.gov/submissions/CIK0000000001.json",
                         "retrieved_at": "2026-07-03T00:00:00Z", "frozen": False, "cache_hit": False, "sha256": None})
-        yield {"record": dict(record), "source": {"file": "CIK0000000001.json#filings.recent", "index": 0}}
+        for i, record in enumerate(records):
+            yield {"record": dict(record), "source": {"file": "CIK0000000001.json#filings.recent", "index": i}}
     server._filings.iter_filing_records = rows
 
     def fetch(url, **k):
@@ -872,7 +877,71 @@ def path_cases():
     check("paths: EDGAR_CACHE_DIR still comes first", settings.CACHE_DIR == os.environ["EDGAR_CACHE_DIR"])
 
 
+# ── Round 2, blocker 1: no implicit filter or substitution ────────────────
+
+def no_implicit_filter_cases():
+    real = server.get_json
+    asked = []
+
+    def answer(url, *a, **k):
+        asked.append(url)
+        return page(1, [{"_id": "0000000001-24-000001:a.htm",
+                         "_source": {"ciks": ["0000000001", "0000000002"]}}]), meta(url)
+    server.get_json = answer
+    try:
+        result, code = call(server.search_filings, query="x")
+        check("b1 search: without forms every form is searched (no forms= in the address, filters.forms null)",
+              code is None and "forms=" not in asked[-1] and result["filters"]["forms"] is None, str(asked[-1:]))
+        result, code = call(server.search_filings, query="x", forms="10-K, 8-K")
+        check("b1 search: forms asked for are sent as given", code is None and "&forms=10-K%2C8-K" in asked[-1]
+              and result["filters"]["forms"] == ["10-K", "8-K"], str(asked[-1:]))
+        result, code = call(server.search_filings, query='  "peer   group"\tx ')
+        check("b1 search: the query is sent and echoed exactly as given, whitespace included",
+              code is None and asked[-1].split("?q=", 1)[1].split("&", 1)[0] == quote('  "peer   group"\tx ')
+              and result["filters"]["query"] == '  "peer   group"\tx ', str(asked[-1:]))
+        _, code = call(server.search_filings, query="   ")
+        check("b1 search: a query of whitespace only is INVALID_INPUT", code == "INVALID_INPUT", code)
+        result, code = call(server.search_filings, query="x")
+        h = result["hits"][0]
+        check("b1 search: a hit naming two CIKs gets no single url, and the address under each CIK, in order",
+              h["url"] is None and h.get("urls") == [
+                  "https://www.sec.gov/Archives/edgar/data/1/000000000124000001/a.htm",
+                  "https://www.sec.gov/Archives/edgar/data/2/000000000124000001/a.htm"], str(h))
+        check("b1 search: and the answer says the hit's address is ambiguous",
+              any(u.get("_id") == "0000000001-24-000001:a.htm" and u.get("ciks") == ["0000000001", "0000000002"]
+                  for u in result.get("unresolved", [])), str(result.get("unresolved")))
+    finally:
+        server.get_json = real
+
+    real = filing_retrieval.get_json
+    recent = table(("0000000001-25-000003", "8-K", "2025-04-01"), ("0000000001-25-000001", "10-K", "2025-03-01"))
+    filing_retrieval.get_json = lambda url, *a, **k: ({"filings": {"recent": recent, "files": []}}, meta(url))
+    try:
+        result, code = call(server.list_filings, cik_or_ticker="1")
+        check("b1 list_filings: without form every form is kept",
+              code is None and [f["record"]["form"] for f in result["filings"]] == ["8-K", "10-K"]
+              and result["filters"]["form"] is None, code or str(result["filings"]))
+    finally:
+        filing_retrieval.get_json = real
+
+    eight_k = {**RECORD, "accessionNumber": "0000000001-26-000009", "form": "8-K"}
+    r, code = xbrl_call(filed(), records=[eight_k, RECORD])
+    check("b1 xbrl: without form or accession number the first row of any form is the filing",
+          code is None and r["filing"]["accessionNumber"] == "0000000001-26-000009", code or str(r["filing"]))
+    undated = {**RECORD, "accessionNumber": "0000000001-26-000005", "filingDate": ""}
+    r, code = xbrl_call(filed(), records=[undated, RECORD], form="10-K", as_of="2026-12-31")
+    check("b1 xbrl: a row with no filingDate never counts as on or before as_of; it is skipped and named",
+          code is None and r["filing"]["accessionNumber"] == "0000000001-26-000001"
+          and any("0000000001-26-000005" in w for w in r["warnings"]), code or str(r and r["warnings"]))
+    _, code = xbrl_call(filed(), records=[undated], accession_number="0000000001-26-000005", as_of="2026-12-31")
+    check("b1 xbrl: an accession number with no filingDate cannot be placed against as_of and is refused",
+          code == "NOT_FOUND", code)
+    r, code = xbrl_call(filed(), records=[undated], accession_number="0000000001-26-000005")
+    check("b1 xbrl: without as_of the same accession number is returned", code is None, code)
+
+
 if __name__ == "__main__":
+    no_implicit_filter_cases()
     search_cases()
     client_cases()
     lookup_cases()

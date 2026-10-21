@@ -455,7 +455,7 @@ def filings_checks(result, kwargs):
               f"CIK{CIK}-submissions-001.json": frozen_json(OLDER_URL)}
     rows = [(name, i, {k: v[i] for k, v in t.items()}) for name, t in tables.items()
             for i in range(len(t["accessionNumber"]))]
-    form, as_of = kwargs.get("form", "10-K"), kwargs.get("as_of")
+    form, as_of = kwargs.get("form"), kwargs.get("as_of")
     wanted = None if form is None else {form, form + "/A"} if kwargs.get("include_amendments") else {form}
     expected = [(n, i, r) for n, i, r in rows
                 if (wanted is None or r["form"] in wanted) and (as_of is None or r["filingDate"] <= as_of)]
@@ -532,11 +532,15 @@ def search_checks(result, kwargs):
           [h["record"] for h in result["hits"]] == raw["hits"][:kwargs.get("limit", 25)])
     check("search_filings: the total is the index's", result["total_hits"] == raw["total"]["value"]
           and result["total_relation"] == raw["total"]["relation"])
-    ok = all(h["url"] == "https://www.sec.gov/Archives/edgar/data/{}/{}/{}".format(
-        int(h["record"]["_source"]["ciks"][0]), *[p.replace("-", "") if i == 0 else p
-                                                   for i, p in enumerate(h["record"]["_id"].split(":", 1))])
-             for h in result["hits"])
-    check("search_filings: each url is built from the first CIK and the _id", ok)
+    def built(h):
+        accession, document = h["record"]["_id"].split(":", 1)
+        return [f"https://www.sec.gov/Archives/edgar/data/{int(c)}/{accession.replace('-', '')}/{document}"
+                for c in h["record"]["_source"]["ciks"]]
+    check("search_filings: `urls` has the address under every CIK of the hit, in order",
+          all(h["urls"] == built(h) for h in result["hits"]))
+    check("search_filings: `url` is the address only when the hit names one CIK, else null and unresolved",
+          all(h["url"] == (h["urls"][0] if len(h["urls"]) == 1 else None) for h in result["hits"])
+          and len(result["unresolved"]) == sum(len(h["urls"]) > 1 for h in result["hits"]))
 
 
 def xbrl_checks(result, kwargs):

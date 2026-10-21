@@ -112,7 +112,7 @@ as the SEC publishes them. With `include_older_files`, `older_files` lists each
 file named in `filings.files`, in the order listed, each as `{"name",
 "payload"}` with the file unchanged.
 
-### `list_filings(cik_or_ticker, form="10-K", as_of=None, limit=10, include_amendments=False)` — `source_records`
+### `list_filings(cik_or_ticker, form=None, as_of=None, limit=10, include_amendments=False)` — `source_records`
 
 Rows of the submissions filing tables, in the SEC's order (the recent table,
 then each older file in the order `filings.files` lists them); nothing is
@@ -125,8 +125,9 @@ when `primaryDocument` is a path such as `xslF345X06/form4.xml`: that names an
 SEC rendering, not a file of the filing folder; the record keeps it as
 published); and `source`, the file and row index the record came from.
 
-`form` is compared literally (`include_amendments` also keeps `<form>/A`;
-`form=None` keeps every row). `as_of` keeps rows whose `filingDate` is on or
+`form` is compared literally (`include_amendments` also keeps `<form>/A`).
+Without `form` (the default) every row is kept, whatever its form: no form is
+assumed. `as_of` keeps rows whose `filingDate` is on or
 before it; a row without a `filingDate` in YYYY-MM-DD form cannot be placed
 against `as_of`, so it is left out and named in `warnings`. Older files are read
 only as far as `limit` needs, and one that cannot be read is an error, never a
@@ -158,13 +159,19 @@ Plain text extracted from an HTML or text document by the rules listed in
 pointing at the file, its `sha256` and `get_filing_document`. Offsets count
 characters of the extracted text.
 
-### `search_filings(query, forms, filed_from, filed_to, offset, limit)` — `source_records`
+### `search_filings(query, forms=None, filed_from=None, filed_to=None, offset=0, limit=25)` — `source_records`
 
-Hits of the SEC full-text search, in the SEC's order. Each hit keeps the
-search index's own record (`_id`, `_source` and any other key it returns)
-verbatim in `record`, beside the document `url` built from the first CIK of
-`_source.ciks` and the accession number and file name in `_id` (null when those
-are missing). `total_hits` and `total_relation` are the index's `total.value`
+Hits of the SEC full-text search, in the SEC's order. `query` is sent exactly
+as given (whitespace included; it must not be empty or only whitespace).
+`forms` is one form type or several separated by commas, sent as given;
+without it (the default) every form is searched. Each hit keeps the search
+index's own record (`_id`, `_source` and any other key it returns) verbatim in
+`record`. Beside it, `urls` lists the document's address under each CIK of
+`_source.ciks`, in that order, built with the accession number and file name
+in `_id` (empty when those are missing). `url` is that address when the hit
+names exactly one CIK; a hit naming several CIKs (co-registrants file one
+document under each) has `url` null and is listed in `unresolved` with its
+CIKs: the server does not choose one. `total_hits` and `total_relation` are the index's `total.value`
 and `total.relation`; `offset`, `count` and `next_offset` page through the
 hits; `filters` echoes the arguments.
 
@@ -183,14 +190,18 @@ The companyconcept document unchanged: every unit and every observation.
 The frames document unchanged. `period` is `CY2023`, `CY2023Q4` or
 `CY2023Q4I`.
 
-### `get_filing_xbrl(cik_or_ticker, accession_number=None, form="10-K", as_of=None, part="summary", concepts=None, offset=0, limit=500)` — `parsed_source`
+### `get_filing_xbrl(cik_or_ticker, accession_number=None, form=None, as_of=None, part="summary", concepts=None, offset=0, limit=500)` — `parsed_source`
 
 The filing is `accession_number`, else the first row of the company's
 submissions, in the SEC's order (the recent table, then each older file in
-the order `filings.files` lists them), whose `form` equals `form` exactly.
+the order `filings.files` lists them), whose `form` equals `form` exactly;
+without `form` (the default) the first row of any form. No form is assumed.
 `as_of` is a date, YYYY-MM-DD, compared literally with the row's
 `filingDate`: rows filed after it are skipped, and an `accession_number`
-filed after it is not found. `filing` holds the `accessionNumber`, the
+filed after it is not found. A row whose `filingDate` is missing or not a
+YYYY-MM-DD date cannot be placed against `as_of`: it is skipped and named in
+`warnings`, and an `accession_number` naming such a row is refused with
+`NOT_FOUND` and that reason; it is never taken to be earlier. `filing` holds the `accessionNumber`, the
 submissions row as the SEC publishes it (`record`), where that row is
 (`source`: file and index) and the filing `folder`.
 

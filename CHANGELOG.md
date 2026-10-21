@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.0rc2
+
+A review of 1.0.0rc1 found places where the server still chose or guessed.
+**Breaking** against rc1:
+
+- **No implicit filter**: `list_filings`, `get_filing_xbrl` and
+  `search_filings` no longer default to form 10-K. Without a form every form is
+  kept (searched, for `search_filings`). The search query is sent exactly as
+  given, whitespace included. A search hit naming several CIKs no longer gets a
+  `url` built from the first one: `url` is null, `urls` lists the address under
+  every CIK, and the hit is in `unresolved`. In `get_filing_xbrl`, a row with no
+  `filingDate` never counts as on or before `as_of`: it is skipped and named in
+  `warnings`, and an accession number naming one is refused.
+
 ## 1.0.0rc1
 
 The server becomes a transport: it returns what the SEC and the filer

@@ -116,10 +116,12 @@
   },
   "search_filings": {
    "allOf": [{"$ref": "#/$defs/envelope"}, {
-    "required": ["filters", "hits", "total_hits", "total_relation", "offset", "count", "next_offset"],
+    "required": ["filters", "hits", "total_hits", "total_relation", "offset", "count", "next_offset", "unresolved"],
     "properties": {"representation": {"const": "source_records"},
-                   "hits": {"type": "array", "items": {"type": "object", "required": ["record", "url"],
-                            "properties": {"record": {"type": "object", "required": ["_id", "_source"]}}}}}
+                   "hits": {"type": "array", "items": {"type": "object", "required": ["record", "url", "urls"],
+                            "properties": {"record": {"type": "object", "required": ["_id", "_source"]},
+                                           "url": {"type": ["string", "null"]},
+                                           "urls": {"type": "array", "items": {"type": "string"}}}}}}
    }]
   },
   "get_companyfacts": {

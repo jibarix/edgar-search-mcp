@@ -261,7 +261,7 @@ def _primary_url(cik: str, record: dict) -> str | None:
 @_tool
 def list_filings(
     cik_or_ticker: str,
-    form: str | None = "10-K",
+    form: str | None = None,
     as_of: str | None = None,
     limit: int = 10,
     include_amendments: bool = False,
@@ -270,7 +270,8 @@ def list_filings(
 
     The order is the SEC's: the recent table, then each older file in the
     order `filings.files` lists them. Nothing is re-sorted or merged. `form`
-    is compared literally ("10-K" is not "10-k"); None keeps every form;
+    is compared literally ("10-K" is not "10-k"); None (the default) keeps
+    every form;
     `include_amendments` also keeps "<form>/A". `as_of` (YYYY-MM-DD) keeps rows
     whose `filingDate` is on or before it; a row with no such date is left
     out and named in `warnings`. Up to `limit` rows are returned.
@@ -473,30 +474,51 @@ def _archive(url: str, sources: list) -> bytes:
     return _archive_entry(url, sources)[0]
 
 
-def _find_filing(cik: str, accession_number: str | None, form: str, as_of: str | None, sources: list,
+def _find_filing(cik: str, accession_number: str | None, form: str | None, as_of: str | None, sources: list,
                  warnings: list) -> dict:
     """The first submissions row, in the SEC's order, with this accession
-    number (or, without one, whose `form` equals `form`) and a `filingDate`
-    on or before `as_of`. Every value is compared literally."""
+    number (or, without one, whose `form` equals `form`, or of any form when
+    `form` is None) and a `filingDate` on or before `as_of`. Every value is
+    compared literally. With `as_of`, a row without a filingDate in
+    YYYY-MM-DD form cannot be placed against it: it is skipped and named in
+    `warnings`, and an accession number given for such a row is refused."""
     metas = []
+
+    def dated(record):
+        filed = record.get("filingDate")
+        return filed if isinstance(filed, str) and _DATE.fullmatch(filed) else None
     try:
         for row in _filings.iter_filing_records(cik, metas, warnings):
             record = row["record"]
             if accession_number is not None:
                 if record.get("accessionNumber") != accession_number:
                     continue
-                if as_of and str(record.get("filingDate") or "") > as_of:
-                    raise ToolError(f"NOT_FOUND: {accession_number} has filingDate {record.get('filingDate')}, "
-                                    f"after {as_of}")
+                if as_of is not None:
+                    if dated(record) is None:
+                        raise ToolError(f"NOT_FOUND: {accession_number} has filingDate "
+                                        f"{record.get('filingDate')!r}, not a YYYY-MM-DD date, so it cannot be "
+                                        f"shown to be on or before {as_of}")
+                    if dated(record) > as_of:
+                        raise ToolError(f"NOT_FOUND: {accession_number} has filingDate {record.get('filingDate')}, "
+                                        f"after {as_of}")
                 return row
-            if record.get("form") == form and (as_of is None or str(record.get("filingDate") or "") <= as_of):
-                return row
+            if form is not None and record.get("form") != form:
+                continue
+            if as_of is not None:
+                if dated(record) is None:
+                    warnings.append(f"{row['source']['file']} row {row['source']['index']} "
+                                    f"({record.get('accessionNumber')}) has no filingDate in YYYY-MM-DD form, so "
+                                    "it cannot be placed against as_of and was skipped")
+                    continue
+                if dated(record) > as_of:
+                    continue
+            return row
     finally:
         sources.extend(source(m) for m in metas)
     if accession_number is not None:
         raise ToolError(f"NOT_FOUND: {accession_number} is not in the submissions of CIK {cik}")
-    raise ToolError(f"NOT_FOUND: no filing with form {form!r} in the submissions of CIK {cik}"
-                    + (f" with filingDate on or before {as_of}" if as_of else ""))
+    raise ToolError(f"NOT_FOUND: no filing{'' if form is None else f' with form {form!r}'} in the submissions "
+                    f"of CIK {cik}" + (f" with filingDate on or before {as_of}" if as_of else ""))
 
 
 def _header_acceptance(folder: str, accession: str, record: dict, sources: list) -> dict:
@@ -582,7 +604,7 @@ def _xbrl_files(folder: str, accession: str, sources: list, unresolved: list) ->
 def get_filing_xbrl(
     cik_or_ticker: str,
     accession_number: str | None = None,
-    form: str = "10-K",
+    form: str | None = None,
     as_of: str | None = None,
     part: Literal["summary", "schema", "presentation", "calculation", "definition", "label", "reference",
                   "instance"] = "summary",
@@ -593,8 +615,10 @@ def get_filing_xbrl(
     """The XBRL files of one filing as the filer wrote them, one `part` at a time.
 
     The filing is `accession_number`, else the first row of the company's
-    submissions, in the SEC's order, whose `form` equals `form` exactly; with
-    `as_of` (YYYY-MM-DD) only rows whose `filingDate` is on or before it.
+    submissions, in the SEC's order, whose `form` equals `form` exactly (of
+    any form when `form` is None, the default); with `as_of` (YYYY-MM-DD)
+    only rows whose `filingDate` is on or before it, and a row without such a
+    date is skipped and named in `warnings`, never taken as earlier.
 
     - "summary": the submissions row, the acceptance time as the filing header
       states it, the instance and schema files and how each was found, and the
@@ -631,7 +655,7 @@ def get_filing_xbrl(
         raise ValueError(f"as_of must be YYYY-MM-DD, got {as_of!r}")
     if as_of is not None:
         iso_date(as_of)
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 /.-]{0,19}", form):
+    if form is not None and not _FORM.fullmatch(form):
         raise ValueError(f"not an SEC form type: {form!r}")
     if part not in _XBRL_PARTS:
         raise ValueError(f"part must be one of {', '.join(_XBRL_PARTS)}, got {part!r}")
@@ -917,7 +941,7 @@ def _search_page(data, url: str) -> tuple[list, dict]:
 @_tool
 def search_filings(
     query: str,
-    forms: str = "10-K",
+    forms: str | None = None,
     filed_from: str | None = None,
     filed_to: str | None = None,
     offset: int = 0,
@@ -926,17 +950,19 @@ def search_filings(
     """Find filings whose text contains given words, with the SEC's full-text search.
 
     `query` uses the SEC's syntax: words must all be present, a phrase goes
-    in double quotes ("peer group"), OR joins alternatives. `forms` is one
-    form type or several separated by commas ("10-K", "DEF 14A"); amendments
-    of a form come with it. `filed_from` and `filed_to` (YYYY-MM-DD,
+    in double quotes ("peer group"), OR joins alternatives. The query is
+    sent exactly as given. `forms` is one form type or several separated by
+    commas ("10-K", "DEF 14A"); amendments of a form come with it; None (the
+    default) searches every form. `filed_from` and `filed_to` (YYYY-MM-DD,
     inclusive) bound the filing date; the search covers filings from 2001.
 
     Each hit keeps the search index's own record verbatim in `record`
     (`_id`, `_source` and whatever else the index returns: forms, dates,
-    `ciks`, `display_names`, `sics` as given). Beside it, `url` is the
-    document's address built from the first CIK of `_source.ciks` and the
-    accession number and file name in `_id` ("<accession>:<file>"), or null
-    when those are missing. A hit says the words are somewhere in the
+    `ciks`, `display_names`, `sics` as given). Beside it, `urls` lists the
+    document's address under each CIK of `_source.ciks`, in that order, built
+    with the accession number and file name in `_id` ("<accession>:<file>");
+    `url` is that address when the hit names exactly one CIK, else null, and a
+    hit naming several CIKs is listed in `unresolved`. A hit says the words are somewhere in the
     document, not that they are near each other or what they mean: read the
     passage before relying on it. Hits are in the SEC's order of relevance.
     When `next_offset` is not null there are more: call again with it as
@@ -945,12 +971,13 @@ def search_filings(
     """
     _bounded("limit", limit, 1, _SEARCH_PAGE)
     _bounded("offset", offset, 0, 9999)
-    query = " ".join(str(query).split())
-    if not 0 < len(query) <= 300:
-        raise ValueError(f"query must be 1 to 300 characters, got {len(query)}")
-    wanted = [f.strip() for f in forms.split(",") if f.strip()]
-    if not wanted or not all(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 /.-]{0,19}", f) for f in wanted):
-        raise ValueError(f"not SEC form types: {forms!r}")
+    if not isinstance(query, str) or not query.strip() or len(query) > 300:
+        raise ValueError("query must be 1 to 300 characters, not only whitespace")
+    wanted = None
+    if forms is not None:
+        wanted = [f.strip() for f in forms.split(",") if f.strip()]
+        if not wanted or not all(_FORM.fullmatch(f) for f in wanted):
+            raise ValueError(f"not SEC form types: {forms!r}")
     for bound in (filed_from, filed_to):
         if bound is not None:
             iso_date(bound)
@@ -959,22 +986,29 @@ def search_filings(
 
     # The SEC returns pages of 100 from a multiple of 100; a page is fetched and cut here.
     page_start = offset - offset % _SEARCH_PAGE
-    url = f"{_SEARCH_URL}?q={quote(query)}&forms={quote(','.join(wanted))}"
+    url = f"{_SEARCH_URL}?q={quote(query, safe='')}"
+    if wanted is not None:
+        url += f"&forms={quote(','.join(wanted), safe='')}"
     if filed_from:
         url += f"&dateRange=custom&startdt={filed_from}&enddt={filed_to}"
     if page_start:
         url += f"&from={page_start}"
     data, meta = get_json(url)
     found, total = _search_page(data, url)
-    hits = []
+    hits, unresolved = [], []
     for h in found[offset - page_start:offset - page_start + limit]:
         accession, _, document = h["_id"].partition(":")
         ciks = h["_source"].get("ciks") or []
-        url = (f"https://www.sec.gov/Archives/edgar/data/{int(ciks[0])}/{accession.replace('-', '')}/{document}"
-               if ciks and _ACCESSION.fullmatch(accession) and document and "/" not in document else None)
-        hits.append({"record": h, "url": url})
+        urls = ([f"https://www.sec.gov/Archives/edgar/data/{int(c)}/{accession.replace('-', '')}/{document}"
+                 for c in ciks] if _ACCESSION.fullmatch(accession) and document and "/" not in document else [])
+        if len(urls) > 1:
+            unresolved.append({"_id": h["_id"], "ciks": list(ciks),
+                               "reason": "the hit names several CIKs; the filing is under each one's folder, so "
+                                         "`url` is null and `urls` lists every address"})
+        hits.append({"record": h, "url": urls[0] if len(urls) == 1 else None, "urls": urls})
     end = offset + len(hits)
     return envelope("source_records", [source(meta)],
                     filters={"query": query, "forms": wanted, "filed_from": filed_from, "filed_to": filed_to},
                     total_hits=total["value"], total_relation=total["relation"], offset=offset, count=len(hits),
-                    next_offset=end if hits and end < min(total["value"], 10000) else None, hits=hits)
+                    next_offset=end if hits and end < min(total["value"], 10000) else None, hits=hits,
+                    unresolved=unresolved)

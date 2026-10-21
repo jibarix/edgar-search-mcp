@@ -203,10 +203,12 @@ Behaviour changes:
   1.0 does not promise it. A consumer that needs an order sorts the rows
   itself. The valuation app sorts by acceptance time in
   `valuation/statements.py:380`.
-- **Form.** `form` is compared literally. 0.8 upper-cased it, and `"ALL"` kept
-  every form. In 1.0 `form=None` keeps every form, and `"ALL"` is an ordinary
-  form name that matches nothing. The valuation app passes only literal forms
-  ("10-K", "10-Q", "8-K").
+- **Form.** `form` is compared literally. 0.8 upper-cased it, defaulted to
+  "10-K", and `"ALL"` kept every form. In 1.0 there is no default: without
+  `form` every form is kept, and `"ALL"` is an ordinary form name that matches
+  nothing. A call that relied on the 0.8 default must now pass `form="10-K"`.
+  The valuation app passes literal forms ("10-K", "10-Q", "8-K"); check each
+  call site above for one that omits `form`.
 - **Older files.** An older file that cannot be read is an error. 0.8 gave a
   warning and a shorter list unless the caller was strict.
 - **Limit.** `limit` runs to 1,000.
@@ -255,10 +257,12 @@ schema copy in `valuation/peer_search.py:133` still finds `url`. `text`,
 
 ### `search_filings` (changed)
 
-The arguments are unchanged, so the schema copy in
-`valuation/peer_search.py:246-255` still works. Each hit is
-`{"record", "url"}`, where `record` is the search index's hit verbatim (`_id`,
-`_source`, ...).
+The argument names are unchanged, so the schema copy in
+`valuation/peer_search.py:246-255` still works, but two behaviours changed:
+`forms` has no default (0.8 searched 10-K only; 1.0 searches every form unless
+`forms` is given), and `query` is sent exactly as given (0.8 collapsed runs of
+whitespace). Each hit is `{"record", "url", "urls"}`, where `record` is the
+search index's hit verbatim (`_id`, `_source`, ...).
 
 | 0.8 hit field | 1.0 |
 |---------------|-----|
@@ -270,7 +274,7 @@ The arguments are unchanged, so the schema copy in
 | `sic` | `record["_source"]["sics"]` (a list, as given) |
 | `companies[]` `{name, cik, tickers}` | `record["_source"]["ciks"]` (CIKs as given) and `["display_names"]` (as given, e.g. "Winmark Corp  (WINA)  (CIK 0000908315)"). 0.8 split the name and tickers out of that text with a regex. That parse is now the consumer's, and the CIK should come from `ciks` |
 | `readable` | removed; see `list_filing_documents` |
-| `url` | `url`, null when `_id` or `ciks` does not give a file of one filing folder |
+| `url` | `urls`, the address under every CIK in `_source.ciks`, in order; `url` is that address only when the hit names exactly one CIK. 0.8 built `url` from the first CIK; 1.0 sets it to null for a hit naming several and lists the hit in `unresolved` |
 | top-level `total_is_exact` | `total_relation` ("eq" or "gte"), as the index gives it |
 | top-level `query`, `forms`, `filed_from`, `filed_to` | `filters` |
 
