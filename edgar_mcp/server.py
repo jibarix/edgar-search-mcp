@@ -685,18 +685,20 @@ def get_filing_xbrl(
       states it, the instance and schema files and how each was found, and the
       SEC's FilingSummary.xml as an element tree (null, and named in
       `unresolved`, when the folder has none).
-    - "schema": the company schema's declarations in document order: imports,
-      linkbase references, role and arcrole types (definition and usedOn as
-      written) and elements with every attribute. Imported schemas outside
-      the filing are listed in `unresolved`.
+    - "schema": the declarations of the company schema and of every schema of
+      the filing it imports or includes, file by file, in document order:
+      imports, linkbase references, role and arcrole types (definition and
+      usedOn as written) and elements with every attribute. Imported schemas
+      outside the filing are listed in `unresolved`.
     - "presentation", "calculation", "definition", "label", "reference": the
-      extended links of that element in every linkbase the schema references
-      or contains, flattened in document order to locators, arcs and
-      resources. Every attribute is kept (order, weight, priority,
+      extended links of that element in every linkbase of the filing that the
+      schemas or the instance reference (link:linkbaseRef) or that a schema
+      contains, flattened in document order to locators, arcs and
+      resources. Every file is read once; one not read is in `unresolved`. Every attribute is kept (order, weight, priority,
       use="prohibited", preferredLabel, xml:lang, ...); no arc is combined,
       overridden or dropped, and no label or language is preferred. A
-      locator's `target` is the company-schema element its href names, or
-      unresolved with the reason (a schema outside the filing, say).
+      locator's `target` is the element of a filing schema its href names,
+      or unresolved with the reason (a schema outside the filing, say).
     - "instance": the instance in document order: contexts (entity identifier
       and scheme, period as written, explicit members, typed members as XML),
       units and facts (concept as namespace URI and local name, contextRef,
@@ -790,98 +792,203 @@ def get_filing_xbrl(
     if not schema_entry["resolved"]:
         raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: the company schema is unresolved: "
                         f"{schema_entry['reason']} (candidates: {schema_entry['candidates']})")
-    try:
-        schema = xs.read_schema(_archive(schema_entry["url"], sources), schema_entry["name"])
-    except SecNotFound:
-        raise ToolError(f"NOT_FOUND: {accession} has no file {schema_entry['name']!r}") from None
-    except xs.FilingDataError as e:
-        raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {e}") from e
-    unresolved += schema["unresolved"]
+    dts = _Dts(folder, accession, sources, unresolved)
+    dts.schema(schema_entry["url"], {"found_by": schema_entry["found_by"]}, entry=True)
 
     if part == "schema":
-        for item in schema["items"]:
-            if item["node"] == "import":
-                location = item["attributes"].get("schemaLocation") or ""
-                if not urljoin(schema_entry["url"], location).startswith(folder):
-                    unresolved.append({"seq": item["seq"], "namespace": item["attributes"].get("namespace"),
-                                       "schemaLocation": location or None,
-                                       "reason": "the imported schema is outside the filing; its declarations "
-                                                 "are not read"})
-        items = schema["items"]
+        items = [{**item, "file": record["name"]} for record in dts.schemas.values() if record["read"]
+                 for item in record["_result"]["items"]]
+        main = dts.schemas[schema_entry["url"]]["_result"]
         return envelope("parsed_source", sources, **common, file=schema_entry,
-                        target_namespace=schema["target_namespace"], namespaces=schema["namespaces"],
-                        **_page(items, offset, limit), unresolved=unresolved)
+                        target_namespace=main["target_namespace"], namespaces=main["namespaces"],
+                        schemas=dts.schema_records(), **_page(items, offset, limit), unresolved=unresolved)
 
-    # A linkbase part: every linkbase the schema references inside the filing, and every one written in it,
-    # in the schema's document order; the extended links of this part's element are returned.
-    linkbase_files, items, external = [], [], {}
+    # A linkbase part: every linkbase the filing's schemas reference or contain, then every one the instance
+    # references, in that order; the extended links of this part's element are returned.
+    entry = files["instance"]
+    if entry["resolved"]:
+        instance_doc = files["instance_doc"]
+        if instance_doc is None:
+            try:
+                instance_doc = xs.XmlDoc(_archive(entry["url"], sources), entry["name"])
+            except SecNotFound:
+                instance_doc = None
+                unresolved.append({"file": entry["name"], "reason": "the instance is not in the filing folder, so "
+                                   "the linkbases it references (link:linkbaseRef), if any, are not read"})
+            except xs.FilingDataError as e:
+                instance_doc = None
+                unresolved.append({"file": entry["name"], "reason": f"the instance cannot be read ({e}), so the "
+                                   "linkbases it references (link:linkbaseRef), if any, are not read"})
+        if instance_doc is not None:
+            for element in instance_doc.root:
+                if element.tag == f"{{{xs.LINK}}}linkbaseRef":
+                    href = element.get(f"{{{xs.XLINK}}}href")
+                    dts.linkbase_ref(instance_doc.resolve_href(href, element, entry["url"]) if href else None, href,
+                                     dict(element.attrib), {"file": entry["name"], "seq": instance_doc.seq(element),
+                                                            "node": "linkbaseRef"})
+    else:
+        unresolved.append({"file": "instance", "reason": "the instance is unresolved, so the linkbases it "
+                           "references (link:linkbaseRef), if any, are not read"})
+    linkbase_files, items = [], []
+    done = 0
+    while done < len(dts.linkbases):  # a schema found through a locator can add linkbases
+        ref = dts.linkbases[done]
+        done += 1
+        found, entry_out = dts.read_linkbase(ref, part)
+        items += found
+        linkbase_files.append(entry_out)
+    for url, count in dts.external.items():
+        unresolved.append({"schema": url, "locators": count,
+                           "reason": "the schema is outside the filing: these locators keep their href and "
+                                     "fragment as written, and their concept is not resolved here"})
+    return envelope("parsed_source", sources, **common, file=schema_entry, schemas=dts.schema_records(),
+                    linkbases=linkbase_files, extended_link_element=f"{{{xs.LINK}}}{xs.EXTENDED_LINKS[part]}",
+                    **_page(items, offset, limit), unresolved=unresolved)
 
-    def target_of(base_url):
+
+class _Dts:
+    """The files of one filing's XBRL schemas and linkbases read so far,
+    found by following what each file references: a schema's xs:import and
+    xs:include (schemaLocation), link:linkbaseRef and embedded linkbases, the
+    instance's link:linkbaseRef, and a locator's href into a schema of the
+    filing. Each file is read once (a reference back to a file already read
+    ends there). A reference to a file outside the filing, or to one that is
+    missing or unreadable, is not read and is named in `unresolved`."""
+
+    def __init__(self, folder: str, accession: str, sources: list, unresolved: list):
+        self.folder, self.accession, self.sources, self.unresolved = folder, accession, sources, unresolved
+        self.schemas: dict = {}       # url -> record, in discovery order
+        self.linkbases: list = []     # linkbase references, in discovery order
+        self.read_linkbases: dict = {}
+        self.external: dict = {}      # schema url outside the filing -> locators pointing to it
+
+    def local(self, url: str | None) -> str | None:
+        """The file name when `url` is one file of the filing folder."""
+        if not url or not url.startswith(self.folder) or "#" in url:
+            return None
+        name = url[len(self.folder):]
+        return name if name and "/" not in name else None
+
+    def schema_records(self) -> list:
+        return [{k: v for k, v in r.items() if not k.startswith("_")} for r in self.schemas.values()]
+
+    def schema(self, url: str, discovered_by: dict, entry: bool = False) -> dict:
+        if url in self.schemas:
+            return self.schemas[url]
+        name = self.local(url)
+        record = {"name": name, "url": url, "discovered_by": discovered_by}
+        self.schemas[url] = record
+        try:
+            result = xs.read_schema(_archive(url, self.sources), name, url)
+        except SecNotFound:
+            if entry:
+                raise ToolError(f"NOT_FOUND: {self.accession} has no file {name!r}") from None
+            record.update(read=False, reason="the filing has no file at this address; its declarations and the "
+                                             "linkbases it references are not read")
+            self.unresolved.append({"file": name, "url": url, "discovered_by": discovered_by,
+                                    "reason": record["reason"]})
+            return record
+        except xs.FilingDataError as e:
+            if entry:
+                raise ToolError(f"UNSUPPORTED_DOCUMENT: {self.accession}: {e}") from e
+            record.update(read=False, reason=f"{e}; its declarations and the linkbases it references are not read")
+            self.unresolved.append({"file": name, "url": url, "discovered_by": discovered_by,
+                                    "reason": record["reason"]})
+            return record
+        record.update(read=True, target_namespace=result["target_namespace"], _result=result)
+        self.unresolved += [{"file": name, **u} for u in result["unresolved"]]
+        embedded = iter(result["linkbases"])
+        for item in result["items"]:
+            where = {"file": name, "seq": item["seq"], "node": item["node"]}
+            if item["node"] in ("import", "include"):
+                location = item["attributes"].get("schemaLocation")
+                target = item.get("url")
+                if not location:
+                    self.unresolved.append({**where, "namespace": item["attributes"].get("namespace"),
+                                            "reason": f"the {item['node']} has no schemaLocation, so it names no "
+                                                      "file; its declarations are not read"})
+                elif self.local(target):
+                    self.schema(target, where)
+                else:
+                    self.unresolved.append({**where, "namespace": item["attributes"].get("namespace"),
+                                            "schemaLocation": location, "url": target,
+                                            "reason": "the imported schema is outside the filing; its declarations "
+                                                      "and the linkbases it references are not read"})
+            elif item["node"] == "linkbaseRef":
+                self.linkbase_ref(item.get("url"), item["href"], item["attributes"], where)
+            elif item["node"] == "linkbase":
+                self.linkbases.append({"embedded": next(embedded), "schema_url": url, "schema": name,
+                                       "discovered_by": where})
+        return record
+
+    def linkbase_ref(self, url: str | None, href: str | None, attributes: dict, discovered_by: dict):
+        self.linkbases.append({"url": url, "href": href, "attributes": attributes, "discovered_by": discovered_by})
+
+    def target_of(self, base_url: str):
         def resolve(href):
             if not href:
                 return {"resolved": False, "reason": "the locator has no href"}
             url, _, fragment = urljoin(base_url, href).partition("#")
-            if url != schema_entry["url"]:
-                if url.startswith(folder):
-                    return {"resolved": False, "schema": url, "fragment": fragment,
-                            "reason": "the href points to a file of the filing other than the company schema"}
-                external[url] = external.get(url, 0) + 1
+            if not url.startswith(self.folder):
+                self.external[url] = self.external.get(url, 0) + 1
                 return {"resolved": False, "schema": url, "fragment": fragment,
                         "reason": "the schema is outside the filing"}
-            concept = schema["ids"].get(fragment)
+            name = self.local(url)
+            if name is None:
+                return {"resolved": False, "schema": url, "fragment": fragment,
+                        "reason": "the href does not name one file of the filing folder"}
+            record = self.schemas.get(url) or self.schema(url, {"node": "loc", "href": href})
+            if not record["read"]:
+                return {"resolved": False, "schema": url, "fragment": fragment,
+                        "reason": f"the schema {name} was not read: {record['reason']}"}
+            concept = record["_result"]["ids"].get(fragment)
             if concept is None:
                 return {"resolved": False, "schema": url, "fragment": fragment,
-                        "reason": "no element of the company schema has this id"}
-            return {"resolved": True, "namespace": concept["namespace"], "local_name": concept["local_name"],
-                    "schema_seq": concept["seq"]}
+                        "reason": f"no element of {name} has this id"}
+            return {"resolved": True, "file": name, "namespace": concept["namespace"],
+                    "local_name": concept["local_name"], "schema_seq": concept["seq"]}
         return resolve
 
-    embedded = iter(schema["linkbases"])
-    for item in schema["items"]:
-        if item["node"] == "linkbase":
-            element = next(embedded)
-            found, missing = xs.read_linkbase(schema["doc"], element, schema_entry["name"], part,
-                                              target_of(schema_entry["url"]))
-            linkbase_files.append({"seq": item["seq"], "embedded_in": schema_entry["name"], "read": True,
-                                   "extended_links": sum(1 for i in found if i["node"] == "extendedLink")})
-            items += found
-            unresolved += missing
-            continue
-        if item["node"] != "linkbaseRef":
-            continue
-        href = item["href"] or ""
-        url = urljoin(schema_entry["url"], href)
-        entry = {"seq": item["seq"], "href": item["href"], "url": url, "attributes": item["attributes"]}
-        if not url.startswith(folder) or "#" in url:
-            entry.update(read=False, reason="the linkbase is outside the filing")
-            unresolved.append({"seq": item["seq"], "href": item["href"], "reason": entry["reason"]})
-        else:
-            name = url[len(folder):]
-            try:
-                doc = xs.XmlDoc(_archive(url, sources), name)
-            except SecNotFound:
-                entry.update(read=False, reason="the filing has no file at this address")
-                unresolved.append({"seq": item["seq"], "href": item["href"], "reason": entry["reason"]})
-                doc = None
-            except xs.FilingDataError as e:
-                raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {e}") from e
-            if doc is not None:
-                if xs.split(doc.root.tag) != (xs.LINK, "linkbase"):
-                    raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {name}: the document element is "
-                                    f"{doc.root.tag}, not link:linkbase")
-                found, missing = xs.read_linkbase(doc, doc.root, name, part, target_of(url))
-                unresolved += doc.conflicts() + missing
-                items += found
-                entry.update(read=True, name=name, namespaces=doc.namespaces(),
-                             extended_links=sum(1 for i in found if i["node"] == "extendedLink"))
-        linkbase_files.append(entry)
-    for url, count in external.items():
-        unresolved.append({"schema": url, "locators": count,
-                           "reason": "the schema is outside the filing: these locators keep their href and "
-                                     "fragment as written, and their concept is not resolved here"})
-    return envelope("parsed_source", sources, **common, file=schema_entry, linkbases=linkbase_files,
-                    extended_link_element=f"{{{xs.LINK}}}{xs.EXTENDED_LINKS[part]}",
-                    **_page(items, offset, limit), unresolved=unresolved)
+    def read_linkbase(self, ref: dict, part: str) -> tuple[list, dict]:
+        """The items of this part in one referenced or embedded linkbase, and its `linkbases` entry."""
+        where = ref["discovered_by"]
+        if "embedded" in ref:
+            record = self.schemas[ref["schema_url"]]
+            found, missing = xs.read_linkbase(record["_result"]["doc"], ref["embedded"], ref["schema"], part,
+                                              self.target_of(ref["schema_url"]))
+            self.unresolved += missing
+            return found, {"seq": where["seq"], "embedded_in": ref["schema"], "discovered_by": where, "read": True,
+                           "extended_links": sum(1 for i in found if i["node"] == "extendedLink")}
+        url, href = ref["url"], ref["href"]
+        entry = {"seq": where["seq"], "href": href, "url": url, "attributes": ref["attributes"],
+                 "discovered_by": where}
+        name = self.local(url)
+        if name is None:
+            entry.update(read=False, reason="the linkbase is outside the filing" if url and not url.startswith(
+                self.folder) else "the href does not name one file of the filing folder")
+            self.unresolved.append({**where, "href": href, "url": url, "reason": entry["reason"]})
+            return [], entry
+        if url in self.read_linkbases:
+            entry.update(read=True, name=name, repeat_of=self.read_linkbases[url],
+                         note="the same linkbase is referenced earlier; its items are returned once, there")
+            return [], entry
+        try:
+            doc = xs.XmlDoc(_archive(url, self.sources), name)
+        except SecNotFound:
+            entry.update(read=False, reason="the filing has no file at this address")
+            self.unresolved.append({**where, "href": href, "url": url, "reason": entry["reason"]})
+            return [], entry
+        except xs.FilingDataError as e:
+            raise ToolError(f"UNSUPPORTED_DOCUMENT: {self.accession}: {e}") from e
+        if xs.split(doc.root.tag) != (xs.LINK, "linkbase"):
+            raise ToolError(f"UNSUPPORTED_DOCUMENT: {self.accession}: {name}: the document element is "
+                            f"{doc.root.tag}, not link:linkbase")
+        self.read_linkbases[url] = where
+        found, missing = xs.read_linkbase(doc, doc.root, name, part, self.target_of(url))
+        self.unresolved += doc.conflicts() + missing
+        entry.update(read=True, name=name, namespaces=doc.namespaces(),
+                     extended_links=sum(1 for i in found if i["node"] == "extendedLink"))
+        return found, entry
 
 
 def _page(items: list, offset: int, limit: int) -> dict:

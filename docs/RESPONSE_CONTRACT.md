@@ -239,6 +239,22 @@ folder (no path); one that is not there is `NOT_FOUND`. A filing without
 what is missing with it (its report list and `InputFiles`). An index page
 that is missing is named in `unresolved` the same way.
 
+The schema and linkbase parts read every file the filing's own files lead
+to (its discoverable taxonomy set, as far as it lies inside the filing): from
+each schema read, the schemas its `xs:import` and `xs:include` name
+(`schemaLocation`), the linkbases its `link:linkbaseRef` names and those
+written inside it; the linkbases the instance names with `link:linkbaseRef`;
+and a schema of the filing that a locator points to. Every href and
+`schemaLocation` is resolved against the base URI in effect where it is
+written (the file's URL, changed by any inherited `xml:base`). Each file is
+read once; a reference back to a file already read stops there. `schemas`
+lists every schema reached, with `name`, `url`, `read`, `target_namespace`
+and `discovered_by` (the file, `seq` and element of the reference). A file
+that is not read (outside the filing, missing, unreadable, or referenced by
+an instance that is itself unresolved) is named in `unresolved` with the
+reason, so an empty `items` with an empty `unresolved` means every dependency
+was read and none held anything of that part.
+
 The XBRL files of one filing, one `part` at a time:
 
 - `summary`: the filing's submissions record, its acceptance time as the
@@ -247,24 +263,31 @@ The XBRL files of one filing, one `part` at a time:
   `files.instance`, `files.schema`), and the SEC's `FilingSummary.xml` as an
   element tree (every report with its `Role`, `LongName`, `MenuCategory`,
   `HtmlFileName` and `Position` as written), or null when there is none.
-- `schema`: the company schema's declarations in document order, each by its
-  XML construct (`import`, `include`, `linkbaseRef`, `roleType`,
+- `schema`: the declarations of the company schema and of every schema of the
+  filing it imports or includes, file by file in discovery order and in
+  document order within a file (each item has `file`), each by its XML
+  construct (`import`, `include`, `linkbaseRef`, `roleType`,
   `arcroleType`, `element`, `linkbase` for one written inside the schema,
   `other` as XML): elements with every attribute (`name`, `id`, `type`,
   `substitutionGroup`, `abstract`, `nillable`, `xbrli:periodType`,
   `xbrli:balance`, ...) and `type` and `substitutionGroup` resolved as QNames;
   role and arcrole types with their `definition` as written and `usedOn`.
-  `target_namespace` and `namespaces` are the schema's. Imported schemas
-  outside the filing, a QName that does not resolve and an id two elements
-  share are listed in `unresolved`.
+  An `import`, `include` or `linkbaseRef` also has `url`, its
+  `schemaLocation` or `href` resolved. `target_namespace` and `namespaces` are
+  the company schema's; each schema's own `target_namespace` is in `schemas`.
+  Imported schemas outside the filing, a QName that does not resolve and an
+  id two elements share are listed in `unresolved`.
 - `presentation`, `calculation`, `definition`, `label`, `reference`: every
   extended link of that element (`extended_link_element`, for instance
-  `{http://www.xbrl.org/2003/linkbase}calculationLink`) in every linkbase the
-  schema references inside the filing or contains, in the schema's order.
-  `linkbases` lists each with `seq`, `href`, `url`, `name`, `read`, its
-  namespaces and how many extended links of this kind it holds (or, for one
-  inside the schema, `embedded_in`); one the filing lacks is `read: false`
-  and unresolved. Items are flattened in document order: the linkbase's
+  `{http://www.xbrl.org/2003/linkbase}calculationLink`) in every linkbase
+  reached as described above: those of the schemas in discovery order, then
+  those the instance references. `linkbases` lists each reference with
+  `seq`, `href`, `url`, `name`, `read`, `discovered_by`, its namespaces and how
+  many extended links of this kind it holds (or, for one inside a schema,
+  `embedded_in`); one the filing lacks or outside the filing is `read: false`
+  and unresolved, and a second reference to a linkbase already read has
+  `repeat_of` and no items of its own. `schemas` is as for `schema`, and
+  imported schemas outside the filing are listed in `unresolved` here too. Items are flattened in document order: the linkbase's
   `roleRef` and `arcroleRef` (only from a linkbase holding a link of this
   kind), each `extendedLink`, then its children by `xlink:type`: `loc` (with
   `href` as written), `arc`, `resource` (with `text`, and `xml` when it holds
@@ -275,8 +298,9 @@ The XBRL files of one filing, one `part` at a time:
   orders and several parents of one concept are all returned as written;
   nothing is applied, combined or sorted. Label resources keep their
   language, role and text; no language is preferred and no label is
-  invented. A locator's `target` is the company-schema element whose `id`
-  its href fragment names (`namespace`, `local_name`, `schema_seq`); a
+  invented. A locator's `target` is the element of the filing's schema
+  (`file`) whose `id` its href fragment names (`namespace`, `local_name`,
+  `schema_seq`); a
   locator into a schema outside the filing (the US GAAP taxonomy, say) is
   `resolved: false` with `schema` and `fragment`, and each such schema is
   listed once in `unresolved` with its count of locators. The fragment is

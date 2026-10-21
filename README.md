@@ -267,7 +267,9 @@ The instance is the one file the filing index page lists as type `EX-101.INS`
 or as the `EXTRACTED XBRL INSTANCE DOCUMENT`; the schema is the one the
 instance's `link:schemaRef` names. No file name is guessed: zero or several
 candidates leave the file unresolved with the candidates listed, and
-`instance_file` or `schema_file` names it. A filing without `FilingSummary.xml`
+`instance_file` or `schema_file` names it. The schema and linkbase parts follow
+every local `xs:import`, `xs:include` and `link:linkbaseRef` (the instance's
+too), reading each file once; whatever is not read is named in `unresolved`. A filing without `FilingSummary.xml`
 still answers, with `filing_summary` null and the missing file named in
 `unresolved`.
 

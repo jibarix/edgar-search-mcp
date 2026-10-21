@@ -761,7 +761,7 @@ def xbrl_link_cases():
           and total[0]["attributes"]["preferredLabel"] == "http://www.xbrl.org/2003/role/totalLabel", str(total))
     own = [l for l in nodes(r, "loc") if l["href"] == "t-20251231.xsd#t_FulfillmentExpense"]
     check("xbrl presentation: a locator into the company schema resolves to its element",
-          own and own[0]["target"] == {"resolved": True, "namespace": "http://t.example/2025",
+          own and own[0]["target"] == {"resolved": True, "file": "t-20251231.xsd", "namespace": "http://t.example/2025",
                                        "local_name": "FulfillmentExpense", "schema_seq": own[0]["target"]["schema_seq"]},
           str(own))
     gaap = [l for l in nodes(r, "loc") if l["href"].endswith("#us-gaap_Revenues")]
@@ -1053,9 +1053,103 @@ def discovery_cases():
           and r["file"]["name"] == "t-20251231_htm.xml", code)
 
 
+# ── Round 2, blocker 3: every dependency followed, or named ──────────────────
+
+LB_NS = ('xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xlink="http://www.w3.org/1999/xlink"')
+SCHEMA_OPEN = b'targetNamespace="http://t.example/2025">'
+
+
+def label_linkbase(href, text):
+    """A label linkbase with one label for the element at `href`."""
+    return (f'<link:linkbase {LB_NS}><link:labelLink xlink:type="extended" '
+            'xlink:role="http://www.xbrl.org/2003/role/link">'
+            f'<link:loc xlink:type="locator" xlink:href="{href}" xlink:label="c"/>'
+            '<link:label xlink:type="resource" xlink:label="r" xml:lang="en-US" '
+            f'xlink:role="http://www.xbrl.org/2003/role/label">{text}</link:label>'
+            '<link:labelArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-label" '
+            'xlink:from="c" xlink:to="r"/></link:labelLink></link:linkbase>').encode()
+
+
+def with_include(folder, name="t-extra.xsd"):
+    folder["t-20251231.xsd"] = folder["t-20251231.xsd"].replace(
+        SCHEMA_OPEN, SCHEMA_OPEN + f'<xs:include schemaLocation="{name}"/>'.encode(), 1)
+    return folder
+
+
+def dependency_cases():
+    folder = with_include(filed())
+    folder["t-extra.xsd"] = (
+        f'<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" {LB_NS} '
+        'xmlns:xbrli="http://www.xbrl.org/2003/instance" targetNamespace="http://t.example/2025">'
+        '<xs:include schemaLocation="t-20251231.xsd"/>'
+        '<xs:annotation><xs:appinfo><link:linkbaseRef xlink:type="simple" xlink:href="t-extra_lab.xml" '
+        'xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/></xs:appinfo></xs:annotation>'
+        '<xs:element id="t_Extra" name="Extra" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" '
+        'xbrli:periodType="instant"/></xs:schema>').encode()
+    folder["t-extra_lab.xml"] = label_linkbase("t-extra.xsd#t_Extra", "Extra line")
+    r, code = xbrl_call(folder, part="schema")
+    extra = [i for i in (r["items"] if r else []) if i.get("file") == "t-extra.xsd" and i["node"] == "element"]
+    check("b3: the schema part follows a local xs:include and returns its declarations, by file",
+          code is None and [i["name"] for i in extra] == ["Extra"], code or str(r and r["items"][-3:]))
+    check("b3: each schema is read once though they include each other",
+          r is not None and [x["name"] for x in r.get("schemas", [])] == ["t-20251231.xsd", "t-extra.xsd"],
+          str(r and r.get("schemas")))
+    r, code = xbrl_call(folder, part="label")
+    mine = [i for i in (r["items"] if r else []) if i.get("file") == "t-extra_lab.xml"]
+    loc = [i for i in mine if i["node"] == "loc"]
+    check("b3: a label part reads the linkbase an included schema references",
+          code is None and loc and loc[0]["target"].get("resolved") is True
+          and loc[0]["target"].get("local_name") == "Extra" and loc[0]["target"].get("file") == "t-extra.xsd"
+          and any(i["node"] == "resource" and i["text"] == "Extra line" for i in mine), code or str(mine))
+    check("b3: and says which file referenced it",
+          r is not None and any(f.get("name") == "t-extra_lab.xml" and f["discovered_by"]["file"] == "t-extra.xsd"
+                                for f in r["linkbases"]), str(r and r["linkbases"]))
+
+    folder = filed()
+    ref = b'<link:schemaRef xlink:type="simple" xlink:href="t-20251231.xsd"/>'
+    folder["t-20251231_htm.xml"] = folder["t-20251231_htm.xml"].replace(
+        ref, ref + b'<link:linkbaseRef xlink:type="simple" xlink:href="t-inst_lab.xml" '
+                   b'xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>')
+    folder["t-inst_lab.xml"] = label_linkbase("t-20251231.xsd#t_LeasedAssetsNet", "Vehicles (instance linkbase)")
+    r, code = xbrl_call(folder, part="label")
+    check("b3: a linkbase the instance references (link:linkbaseRef) is read",
+          code is None and any(i.get("file") == "t-inst_lab.xml" and i.get("text") == "Vehicles (instance linkbase)"
+                               for i in r["items"]), code)
+
+    folder = with_include(filed(), "t-gone.xsd")
+    for part in ("schema", "label"):
+        r, code = xbrl_call(folder, part=part)
+        check(f"b3: a local schema that is missing is named in unresolved ({part})",
+              code is None and any(str(u.get("url", "")).endswith("/t-gone.xsd") for u in r["unresolved"]),
+              code or str(r and r["unresolved"]))
+
+    folder = filed()
+    folder["t-20251231.xsd"] = folder["t-20251231.xsd"].replace(SCHEMA_OPEN, SCHEMA_OPEN + (
+        b'<xs:import namespace="http://fasb.org/us-gaap/2024" '
+        b'schemaLocation="https://xbrl.fasb.org/us-gaap/2024/elts/us-gaap-2024.xsd"/>'), 1)
+    r, code = xbrl_call(folder, part="presentation")
+    check("b3: a linkbase part names the imported schemas it did not read",
+          code is None and any(u.get("schemaLocation") == "https://xbrl.fasb.org/us-gaap/2024/elts/us-gaap-2024.xsd"
+                               for u in r["unresolved"]), code or str(r and r["unresolved"]))
+
+    folder = filed()
+    folder["0000000001-26-000001-index.htm"] = index_page([("1", "10-K", "t-20251231.htm", "10-K")])
+    r, code = xbrl_call(folder, part="definition", schema_file="t-20251231.xsd")
+    check("b3: with the instance unresolved, its linkbase references are named as not read",
+          code is None and any("linkbaseRef" in u.get("reason", "") for u in r["unresolved"]),
+          code or str(r and r["unresolved"]))
+
+    folder = filed()
+    folder["t-20251231.xsd"] = folder["t-20251231.xsd"].replace(b't-20251231_lab.xml', b't-missing_lab.xml')
+    r, code = xbrl_call(folder, part="label")
+    check("b3: a label part whose only label linkbase is missing returns no items, and never an empty unresolved",
+          code is None and r["items"] == [] and r["unresolved"], code or str(r and r["unresolved"]))
+
+
 if __name__ == "__main__":
     no_implicit_filter_cases()
     discovery_cases()
+    dependency_cases()
     search_cases()
     client_cases()
     lookup_cases()

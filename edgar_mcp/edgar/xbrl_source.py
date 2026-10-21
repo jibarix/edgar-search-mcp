@@ -369,7 +369,7 @@ def _definition_and_used_on(doc: XmlDoc, element) -> dict:
             "usedOn": [doc.qname(u.text, u) for u in element.findall(f"{{{LINK}}}usedOn")]}
 
 
-def read_schema(raw: bytes, name: str = "schema") -> dict:
+def read_schema(raw: bytes, name: str = "schema", url: str | None = None) -> dict:
     """The declarations of a company schema, in document order.
 
     `node` names the XML construct: "import", "include", "linkbaseRef",
@@ -378,9 +378,14 @@ def read_schema(raw: bytes, name: str = "schema") -> dict:
     schema component, as XML). Each keeps every attribute; QNames in `type`
     and `substitutionGroup` are resolved where they are written. `ids` maps
     each element id to the element's namespace and local name, which is how
-    a locator's href finds its concept.
+    a locator's href finds its concept. With the schema's `url`, each import,
+    include and linkbaseRef also has `url`, its schemaLocation or href
+    resolved against the base URI in effect where it is written.
     """
     doc = XmlDoc(raw, name)
+
+    def located(element, written):
+        return {"url": doc.resolve_href(written, element, url) if written else None} if url is not None else {}
     if split(doc.root.tag) != (XS, "schema"):
         raise FilingDataError(f"{name}: the document element is {doc.root.tag}, not xs:schema")
     target = doc.root.get("targetNamespace")
@@ -389,9 +394,10 @@ def read_schema(raw: bytes, name: str = "schema") -> dict:
         ns, local = split(element.tag)
         base = {"seq": doc.seq(element), "attributes": dict(element.attrib)}
         if (ns, local) in ((XS, "import"), (XS, "include")):
-            items.append({**base, "node": local})
+            items.append({**base, "node": local, **located(element, element.get("schemaLocation"))})
         elif (ns, local) == (LINK, "linkbaseRef"):
-            items.append({**base, "node": "linkbaseRef", "href": element.get(f"{{{XLINK}}}href")})
+            href = element.get(f"{{{XLINK}}}href")
+            items.append({**base, "node": "linkbaseRef", "href": href, **located(element, href)})
         elif (ns, local) in ((LINK, "roleType"), (LINK, "arcroleType")):
             items.append({**base, "node": local, **_definition_and_used_on(doc, element)})
         elif (ns, local) == (LINK, "linkbase"):

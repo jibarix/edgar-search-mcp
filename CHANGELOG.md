@@ -24,6 +24,15 @@ A review of 1.0.0rc1 found places where the server still chose or guessed.
   with `filing_summary` null and the missing file in `unresolved`, instead of
   `UNSUPPORTED_DOCUMENT` "no XBRL financial data". The summary's `files` adds
   `filing_summary` and `index` with their read status.
+- **Every dependency followed or named**: the schema and linkbase parts
+  follow local `xs:import` and `xs:include`, every schema's
+  `link:linkbaseRef` and embedded linkbases, the instance's
+  `link:linkbaseRef`, and locators into other schemas of the filing,
+  recursively, reading each file once. Hrefs are resolved against the
+  effective base URI (inherited `xml:base`). Anything not read is in
+  `unresolved`, including imported schemas outside the filing in the linkbase
+  parts. New `schemas` list; schema items carry `file`; locator targets carry
+  `file`; `linkbases` entries carry `discovered_by`.
 
 ## 1.0.0rc1
 
