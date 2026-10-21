@@ -1,0 +1,7 @@
+{
+ "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/FilingSummary.xml",
+ "status": 200,
+ "content_type": "text/xml",
+ "sha256": "66191798ed1962f21f316cefbbe77eaaccf1cdf7db3f317f1c5ed228afeb91e7",
+ "retrieved_at": "2026-10-21T19:26:59Z"
+}

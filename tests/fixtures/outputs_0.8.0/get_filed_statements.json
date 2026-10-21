@@ -1,0 +1,4241 @@
+{
+ "arguments": {
+  "accession_number": "0000908315-26-000007",
+  "cik_or_ticker": "908315",
+  "facts": [
+   "us-gaap:Revenues",
+   "dei:EntityCommonStockSharesOutstanding"
+  ],
+  "form": "10-K"
+ },
+ "result": {
+  "as_of": null,
+  "calculation_versions": [
+   "1.1"
+  ],
+  "cik": "0000908315",
+  "company_namespace": "http://www.winmarkcorporation.com/20251227",
+  "conflicts": [],
+  "cover_shares": [
+   {
+    "date": "2026-02-23",
+    "dimensions": {},
+    "registrant": null,
+    "registrant_cik": null,
+    "share_class": null,
+    "value": 3571861
+   }
+  ],
+  "data_kind": "filer data: the company's statements as filed, not mapped to any standard layout",
+  "document_facts": {
+   "AmendmentFlag": "false",
+   "CurrentFiscalYearEndDate": "--12-27",
+   "DocumentFiscalPeriodFocus": "FY",
+   "DocumentFiscalYearFocus": "2025",
+   "DocumentPeriodEndDate": "2025-12-27",
+   "DocumentType": "10-K",
+   "EntityCentralIndexKey": "0000908315",
+   "EntityRegistrantName": "WINMARK CORPORATION"
+  },
+  "entities": [
+   "0000908315"
+  ],
+  "filing": {
+   "acceptance": {
+    "agree": false,
+    "header_eastern": "20260225125026",
+    "submissions_feed": "2026-02-25T22:50:26.000Z",
+    "utc": "2026-02-25T17:50:26Z"
+   },
+   "accession_number": "0000908315-26-000007",
+   "document": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227x10k.htm",
+   "filing_date": "2026-02-25",
+   "form": "10-K",
+   "inline_xbrl": true,
+   "reporting_date": "2025-12-27"
+  },
+  "matched_on": "cik",
+  "registered_securities": [
+   {
+    "dimensions": {},
+    "exchange": "NASDAQ",
+    "registrant": null,
+    "registrant_cik": null,
+    "title": "Common Stock, no par value per share",
+    "trading_symbol": "WINA"
+   }
+  ],
+  "requested_facts": {
+   "dei:EntityCommonStockSharesOutstanding": {
+    "by_member": [],
+    "element": "dei:EntityCommonStockSharesOutstanding",
+    "tagged_by_member": 0,
+    "values": [
+     {
+      "decimals": "INF",
+      "period": "2026-02-23",
+      "unit": ":shares",
+      "value": 3571861
+     }
+    ]
+   },
+   "us-gaap:Revenues": {
+    "by_member": [
+     {
+      "decimals": "-5",
+      "dimensions": {
+       "srt:StatementGeographicalAxis": "country:CA",
+       "us-gaap:StatementBusinessSegmentsAxis": "wina:FranchisingMember"
+      },
+      "period": "2024-12-29/2025-12-27",
+      "unit": "iso4217:USD",
+      "value": 7800000
+     },
+     {
+      "decimals": "-5",
+      "dimensions": {
+       "srt:StatementGeographicalAxis": "country:CA",
+       "us-gaap:StatementBusinessSegmentsAxis": "wina:FranchisingMember"
+      },
+      "period": "2023-12-31/2024-12-28",
+      "unit": "iso4217:USD",
+      "value": 7300000
+     },
+     {
+      "decimals": "-5",
+      "dimensions": {
+       "srt:StatementGeographicalAxis": "country:CA",
+       "us-gaap:StatementBusinessSegmentsAxis": "wina:FranchisingMember"
+      },
+      "period": "2023-01-01/2023-12-30",
+      "unit": "iso4217:USD",
+      "value": 6800000
+     }
+    ],
+    "element": "us-gaap:Revenues",
+    "tagged_by_member": 3,
+    "values": [
+     {
+      "decimals": "0",
+      "period": "2024-12-29/2025-12-27",
+      "unit": "iso4217:USD",
+      "value": 86055700
+     },
+     {
+      "decimals": "0",
+      "period": "2023-12-31/2024-12-28",
+      "unit": "iso4217:USD",
+      "value": 81289100
+     },
+     {
+      "decimals": "0",
+      "period": "2023-01-01/2023-12-30",
+      "unit": "iso4217:USD",
+      "value": 83243500
+     }
+    ]
+   }
+  },
+  "returned_at": "2026-10-21T19:27:00Z",
+  "sources": [
+   {
+    "file": "FilingSummary.xml",
+    "frozen": false,
+    "retrieved_at": "2026-10-21T19:26:59Z",
+    "sha256": "66191798ed1962f21f316cefbbe77eaaccf1cdf7db3f317f1c5ed228afeb91e7",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/FilingSummary.xml"
+   },
+   {
+    "file": "wina-20251227.xsd",
+    "frozen": false,
+    "retrieved_at": "2026-10-21T19:26:59Z",
+    "sha256": "e6530e51c18850cf697f0956a7c31e5301b41772f7ac7f40b7288da3fd70a227",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227.xsd"
+   },
+   {
+    "file": "wina-20251227_pre.xml",
+    "frozen": false,
+    "retrieved_at": "2026-10-21T19:26:59Z",
+    "sha256": "2d91ff6dbf4bfc8944239ce4bc768045b355d5f014ac4596421ef57ca7dec8e8",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227_pre.xml"
+   },
+   {
+    "file": "wina-20251227_cal.xml",
+    "frozen": false,
+    "retrieved_at": "2026-10-21T19:27:00Z",
+    "sha256": "6c2db228adc3e148ba7a4903465e3884db6253130598b160e1db0014dc127620",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227_cal.xml"
+   },
+   {
+    "file": "wina-20251227_lab.xml",
+    "frozen": false,
+    "retrieved_at": "2026-10-21T19:27:00Z",
+    "sha256": "f753c59ac6723c5339e7f396d4383eb87be3f7c83009a0bb01f0aff8d4ba3c51",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227_lab.xml"
+   },
+   {
+    "file": "wina-20251227_def.xml",
+    "frozen": false,
+    "retrieved_at": "2026-10-21T19:27:00Z",
+    "sha256": "1ad195ad9d4e7cf5794182d6dd529d1f800c0c35748b693bf4dc93d3588d8bd4",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227_def.xml"
+   },
+   {
+    "file": "wina-20251227x10k_htm.xml",
+    "frozen": false,
+    "retrieved_at": "2026-10-21T19:27:00Z",
+    "sha256": "290c866af4eed432872411a8354c75d3af672cd47dabd4d9b4c69a0e9c4c2253",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227x10k_htm.xml"
+   }
+  ],
+  "statements": [
+   {
+    "calculation_checks": [
+     {
+      "complete": true,
+      "computed": 24884100.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2025-12-27",
+      "reported": 24884100,
+      "total": "us-gaap:Assets",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 26844500.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-28",
+      "reported": 26844500,
+      "total": "us-gaap:Assets",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 14096000.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2025-12-27",
+      "reported": 14096000,
+      "total": "us-gaap:AssetsCurrent",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 15365600.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-28",
+      "reported": 15365600,
+      "total": "us-gaap:AssetsCurrent",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 1219000.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2025-12-27",
+      "reported": 1219000,
+      "total": "us-gaap:PropertyPlantAndEquipmentNet",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 1419400.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-28",
+      "reported": 1419400,
+      "total": "us-gaap:PropertyPlantAndEquipmentNet",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 24884100.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2025-12-27",
+      "reported": 24884100,
+      "total": "us-gaap:LiabilitiesAndStockholdersEquity",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 26844500.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-28",
+      "reported": 26844500,
+      "total": "us-gaap:LiabilitiesAndStockholdersEquity",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 5666000.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2025-12-27",
+      "reported": 5666000,
+      "total": "us-gaap:LiabilitiesCurrent",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 5087900.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-28",
+      "reported": 5087900,
+      "total": "us-gaap:LiabilitiesCurrent",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 72900500.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2025-12-27",
+      "reported": 72900500,
+      "total": "us-gaap:LiabilitiesNoncurrent",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 72802700.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-28",
+      "reported": 72802700,
+      "total": "us-gaap:LiabilitiesNoncurrent",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": -53682400.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2025-12-27",
+      "reported": -53682400,
+      "total": "us-gaap:StockholdersEquity",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": -51046100.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-28",
+      "reported": -51046100,
+      "total": "us-gaap:StockholdersEquity",
+      "unit": "iso4217:USD"
+     }
+    ],
+    "columns": [
+     "2025-12-27",
+     "2024-12-28"
+    ],
+    "kind": "balance_sheet",
+    "lines": [
+     {
+      "depth": 0,
+      "element": "us-gaap:StatementOfFinancialPositionAbstract",
+      "extension": false,
+      "label": "CONSOLIDATED CONDENSED BALANCE SHEETS",
+      "label_role": "label",
+      "structure": "abstract"
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:AssetsAbstract",
+      "extension": false,
+      "label": "ASSETS",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:AssetsCurrentAbstract",
+      "extension": false,
+      "label": "Current Assets:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "calculation_parent": "us-gaap:AssetsCurrent",
+      "depth": 3,
+      "element": "us-gaap:CashAndCashEquivalentsAtCarryingValue",
+      "extension": false,
+      "label": "Cash and cash equivalents",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 10295700
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 12189800
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:AssetsCurrent",
+      "depth": 3,
+      "element": "us-gaap:RestrictedCashAndCashEquivalentsAtCarryingValue",
+      "extension": false,
+      "label": "Restricted cash",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 165000
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 140000
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:AssetsCurrent",
+      "depth": 3,
+      "element": "us-gaap:AccountsReceivableNetCurrent",
+      "extension": false,
+      "label": "Receivables, less allowance for credit losses of $500 and $500",
+      "label_role": "verboseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 1483500
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1336400
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:AssetsCurrent",
+      "depth": 3,
+      "element": "us-gaap:IncomeTaxesReceivable",
+      "extension": false,
+      "label": "Income tax receivable",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 463600
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 96400
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:AssetsCurrent",
+      "depth": 3,
+      "element": "us-gaap:InventoryNet",
+      "extension": false,
+      "label": "Inventories",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 362500
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 397600
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:AssetsCurrent",
+      "depth": 3,
+      "element": "us-gaap:PrepaidExpenseCurrent",
+      "extension": false,
+      "label": "Prepaid expenses",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 1325700
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1205400
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:Assets",
+      "depth": 3,
+      "element": "us-gaap:AssetsCurrent",
+      "extension": false,
+      "label": "Total current assets",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 14096000
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 15365600
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:PropertyPlantAndEquipmentNetAbstract",
+      "extension": false,
+      "label": "Property and equipment:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "calculation_parent": "us-gaap:PropertyPlantAndEquipmentNet",
+      "depth": 3,
+      "element": "us-gaap:FixturesAndEquipmentGross",
+      "extension": false,
+      "label": "Furniture and equipment",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2837600
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 2679400
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:PropertyPlantAndEquipmentNet",
+      "depth": 3,
+      "element": "us-gaap:BuildingsAndImprovementsGross",
+      "extension": false,
+      "label": "Building and building improvements",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2984100
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 2952100
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:PropertyPlantAndEquipmentNet",
+      "depth": 3,
+      "element": "us-gaap:AccumulatedDepreciationDepletionAndAmortizationPropertyPlantAndEquipment",
+      "extension": false,
+      "label": "Less - accumulated depreciation and amortization",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 4602700
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 4212100
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:Assets",
+      "depth": 3,
+      "element": "us-gaap:PropertyPlantAndEquipmentNet",
+      "extension": false,
+      "label": "Property and equipment, net",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 1219000
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1419400
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:Assets",
+      "depth": 2,
+      "element": "us-gaap:OperatingLeaseRightOfUseAsset",
+      "extension": false,
+      "label": "Operating lease right of use asset",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 1761500
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 2108700
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:Assets",
+      "depth": 2,
+      "element": "us-gaap:FiniteLivedIntangibleAssetsNet",
+      "extension": false,
+      "label": "Intangible assets, net",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2286300
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 2640300
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:Assets",
+      "depth": 2,
+      "element": "us-gaap:Goodwill",
+      "extension": false,
+      "label": "Goodwill",
+      "label_role": "label",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 607500
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 607500
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:Assets",
+      "depth": 2,
+      "element": "us-gaap:OtherAssetsNoncurrent",
+      "extension": false,
+      "label": "Other assets",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 506400
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 491200
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:Assets",
+      "depth": 2,
+      "element": "us-gaap:DeferredIncomeTaxAssetsNet",
+      "extension": false,
+      "label": "Deferred income taxes",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 4407400
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 4211800
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:Assets",
+      "extension": false,
+      "label": "Total assets",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 24884100
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 26844500
+       }
+      ]
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:LiabilitiesAndStockholdersEquityAbstract",
+      "extension": false,
+      "label": "LIABILITIES AND SHAREHOLDERS' EQUITY (DEFICIT)",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:LiabilitiesCurrentAbstract",
+      "extension": false,
+      "label": "Current Liabilities:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesCurrent",
+      "depth": 3,
+      "element": "us-gaap:AccountsPayableCurrent",
+      "extension": false,
+      "label": "Accounts payable",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 1673900
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1562000
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesCurrent",
+      "depth": 3,
+      "element": "us-gaap:AccruedLiabilitiesCurrent",
+      "extension": false,
+      "label": "Accrued liabilities",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2324800
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1866200
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesCurrent",
+      "depth": 3,
+      "element": "us-gaap:ContractWithCustomerLiabilityCurrent",
+      "extension": false,
+      "label": "Deferred revenue",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 1667300
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1659700
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesAndStockholdersEquity",
+      "depth": 3,
+      "element": "us-gaap:LiabilitiesCurrent",
+      "extension": false,
+      "label": "Total current liabilities",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 5666000
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 5087900
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:LiabilitiesNoncurrentAbstract",
+      "extension": false,
+      "label": "Long-term Liabilities:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesNoncurrent",
+      "depth": 3,
+      "element": "us-gaap:LongTermLineOfCredit",
+      "extension": false,
+      "label": "Line of credit/Term loan",
+      "label_role": "verboseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 30000000
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 30000000
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesNoncurrent",
+      "depth": 3,
+      "element": "us-gaap:LongTermNotesPayable",
+      "extension": false,
+      "label": "Notes payable, net of unamortized debt issuance costs of $39,000 and $57,200",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 29961000
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 29942800
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesNoncurrent",
+      "depth": 3,
+      "element": "us-gaap:ContractWithCustomerLiabilityNoncurrent",
+      "extension": false,
+      "label": "Deferred revenue",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 8350100
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 8027600
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesNoncurrent",
+      "depth": 3,
+      "element": "us-gaap:OperatingLeaseLiabilityNoncurrent",
+      "extension": false,
+      "label": "Operating lease liabilities",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2414200
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 3092800
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesNoncurrent",
+      "depth": 3,
+      "element": "us-gaap:OtherLiabilitiesNoncurrent",
+      "extension": false,
+      "label": "Other liabilities",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2175200
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1739500
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesAndStockholdersEquity",
+      "depth": 3,
+      "element": "us-gaap:LiabilitiesNoncurrent",
+      "extension": false,
+      "label": "Total long-term liabilities",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 72900500
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 72802700
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:StockholdersEquityAbstract",
+      "extension": false,
+      "label": "Shareholders' Equity (Deficit):",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "calculation_parent": "us-gaap:StockholdersEquity",
+      "depth": 3,
+      "element": "us-gaap:CommonStockValue",
+      "extension": false,
+      "label": "Common stock, no par value, 10,000,000 shares authorized, 3,571,861 and 3,539,744 shares issued and outstanding",
+      "label_role": "verboseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 19612800
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 14790500
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:StockholdersEquity",
+      "depth": 3,
+      "element": "us-gaap:RetainedEarningsAccumulatedDeficit",
+      "extension": false,
+      "label": "Retained earnings (accumulated deficit)",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -73295200
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -65836600
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:LiabilitiesAndStockholdersEquity",
+      "depth": 3,
+      "element": "us-gaap:StockholdersEquity",
+      "extension": false,
+      "label": "Total shareholders' equity (deficit)",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -53682400
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -51046100
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:LiabilitiesAndStockholdersEquity",
+      "extension": false,
+      "label": "Total liabilities and shareholders' equity (deficit)",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 24884100
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 26844500
+       }
+      ]
+     }
+    ],
+    "parenthetical": false,
+    "report_page": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/R2.htm",
+    "role": "http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedBalanceSheets",
+    "roll_forward_checks": [],
+    "sort_code": "995200100",
+    "title": "CONSOLIDATED CONDENSED BALANCE SHEETS"
+   },
+   {
+    "calculation_checks": [
+     {
+      "complete": true,
+      "computed": 41654100.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-29/2025-12-27",
+      "reported": 41654100,
+      "total": "us-gaap:NetIncomeLoss",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 39954200.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-12-31/2024-12-28",
+      "reported": 39954200,
+      "total": "us-gaap:NetIncomeLoss",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 40178100.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-01-01/2023-12-30",
+      "reported": 40178100,
+      "total": "us-gaap:NetIncomeLoss",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 53135600.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-29/2025-12-27",
+      "reported": 53135600,
+      "total": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 51224000.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-12-31/2024-12-28",
+      "reported": 51224000,
+      "total": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 51361300.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-01-01/2023-12-30",
+      "reported": 51361300,
+      "total": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": false,
+      "computed": 54593900.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [
+       "us-gaap:NetInvestmentInLeaseCreditLossExpenseReversal",
+       "wina:LeasingExpense"
+      ],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-29/2025-12-27",
+      "reported": 54593900,
+      "total": "us-gaap:OperatingIncomeLoss",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 52930600.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-12-31/2024-12-28",
+      "reported": 52930600,
+      "total": "us-gaap:OperatingIncomeLoss",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 53280600.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-01-01/2023-12-30",
+      "reported": 53280600,
+      "total": "us-gaap:OperatingIncomeLoss",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": false,
+      "computed": 2631800.0,
+      "consistent": null,
+      "difference": 83423900.0,
+      "missing": [
+       "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+      ],
+      "missing_in_every_column": [
+       "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+      ],
+      "missing_tagged_only_by_member": [
+       "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+      ],
+      "period": "2024-12-29/2025-12-27",
+      "reported": 86055700,
+      "total": "us-gaap:Revenues",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": false,
+      "computed": 1811800.0,
+      "consistent": null,
+      "difference": 79477300.0,
+      "missing": [
+       "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+      ],
+      "missing_in_every_column": [
+       "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+      ],
+      "missing_tagged_only_by_member": [
+       "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+      ],
+      "period": "2023-12-31/2024-12-28",
+      "reported": 81289100,
+      "total": "us-gaap:Revenues",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": false,
+      "computed": 4766200.0,
+      "consistent": null,
+      "difference": 78477300.0,
+      "missing": [
+       "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+      ],
+      "missing_in_every_column": [
+       "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+      ],
+      "missing_tagged_only_by_member": [
+       "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+      ],
+      "period": "2023-01-01/2023-12-30",
+      "reported": 83243500,
+      "total": "us-gaap:Revenues",
+      "unit": "iso4217:USD"
+     }
+    ],
+    "columns": [
+     "2024-12-29/2025-12-27",
+     "2023-12-31/2024-12-28",
+     "2023-01-01/2023-12-30"
+    ],
+    "kind": "income_statement",
+    "lines": [
+     {
+      "depth": 0,
+      "element": "us-gaap:IncomeStatementAbstract",
+      "extension": false,
+      "label": "CONSOLIDATED CONDENSED STATEMENTS OF OPERATIONS",
+      "label_role": "label",
+      "structure": "abstract"
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:StatementTable",
+      "extension": false,
+      "label": "Statement [Table]",
+      "label_role": "label",
+      "structure": "table"
+     },
+     {
+      "depth": 2,
+      "element": "srt:ProductOrServiceAxis",
+      "extension": false,
+      "label": "Product and Service [Axis]",
+      "label_role": "label",
+      "structure": "axis"
+     },
+     {
+      "depth": 3,
+      "element": "srt:ProductsAndServicesDomain",
+      "extension": false,
+      "label": "Product and Service [Domain]",
+      "label_role": "label",
+      "structure": "member"
+     },
+     {
+      "depth": 4,
+      "element": "us-gaap:RoyaltyMember",
+      "extension": false,
+      "label": "Royalties",
+      "label_role": "terseLabel",
+      "structure": "member"
+     },
+     {
+      "depth": 4,
+      "element": "us-gaap:ProductMember",
+      "extension": false,
+      "label": "Merchandise sales",
+      "label_role": "terseLabel",
+      "structure": "member"
+     },
+     {
+      "depth": 4,
+      "element": "us-gaap:FranchiseMember",
+      "extension": false,
+      "label": "Franchise fees",
+      "label_role": "terseLabel",
+      "structure": "member"
+     },
+     {
+      "depth": 4,
+      "element": "us-gaap:ProductAndServiceOtherMember",
+      "extension": false,
+      "label": "Other",
+      "label_role": "terseLabel",
+      "structure": "member"
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:StatementLineItems",
+      "extension": false,
+      "label": "Statement",
+      "label_role": "terseLabel",
+      "structure": "line_items"
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:RevenuesAbstract",
+      "extension": false,
+      "label": "Revenue:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:RoyaltyMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 76352800
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:RoyaltyMember"
+        },
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 72198500
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:RoyaltyMember"
+        },
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 70230700
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:ProductMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 3282800
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:ProductMember"
+        },
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 3601300
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:ProductMember"
+        },
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 4761100
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:FranchiseMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 1525800
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:FranchiseMember"
+        },
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1545600
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:FranchiseMember"
+        },
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 1512000
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:ProductAndServiceOtherMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2262500
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:ProductAndServiceOtherMember"
+        },
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 2131900
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "srt:ProductOrServiceAxis": "us-gaap:ProductAndServiceOtherMember"
+        },
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 1973500
+       }
+      ],
+      "calculation_parent": "us-gaap:Revenues",
+      "depth": 4,
+      "element": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+      "extension": false,
+      "label": "Revenue",
+      "label_role": "terseLabel",
+      "values": [],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:Revenues",
+      "depth": 4,
+      "element": "us-gaap:LeaseIncome",
+      "extension": false,
+      "label": "Leasing income",
+      "label_role": "verboseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2631800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1811800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 4766200
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:OperatingIncomeLoss",
+      "depth": 4,
+      "element": "us-gaap:Revenues",
+      "extension": false,
+      "label": "Total revenue",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 86055700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 81289100
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 83243500
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:OperatingIncomeLoss",
+      "depth": 3,
+      "element": "us-gaap:CostOfGoodsAndServicesSold",
+      "extension": false,
+      "label": "Cost of merchandise sold",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 3104400
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 3379200
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 4461500
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:OperatingIncomeLoss",
+      "definition": {
+       "abstract": false,
+       "balance": "debit",
+       "period_type": "duration",
+       "type": "xbrli:monetaryItemType"
+      },
+      "depth": 3,
+      "documentation": "Costs incurred directly related to sales-type leases and leased equipment sales, which also includes the financing charge for leasing arrangements meeting the criteria for capitalization, depreciation on operating leases and other leasing expenses.",
+      "element": "wina:LeasingExpense",
+      "extension": true,
+      "label": "Leasing expense",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 36600
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 398300
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:OperatingIncomeLoss",
+      "depth": 3,
+      "element": "us-gaap:NetInvestmentInLeaseCreditLossExpenseReversal",
+      "extension": false,
+      "label": "Provisions for credit losses",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -1500
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -5600
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:OperatingIncomeLoss",
+      "depth": 3,
+      "element": "us-gaap:SellingGeneralAndAdministrativeExpense",
+      "extension": false,
+      "label": "Selling, general and administrative expenses",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 28357400
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 24944200
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 25108700
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+      "depth": 3,
+      "element": "us-gaap:OperatingIncomeLoss",
+      "extension": false,
+      "label": "Income from operations",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 54593900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 52930600
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 53280600
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+      "depth": 3,
+      "element": "us-gaap:InterestExpenseNonoperating",
+      "extension": false,
+      "label": "Interest expense",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2446800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 2856900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 3091000
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+      "definition": {
+       "abstract": false,
+       "balance": "credit",
+       "period_type": "duration",
+       "type": "xbrli:monetaryItemType"
+      },
+      "depth": 3,
+      "documentation": "The amount of interest income and other income recognized during the period. Included in this element is interest derived from investments in debt securities, cash and cash equivalents, and other investments which reflect the time value of money or transactions in which the payments are for the use or forbearance of money and other income from ancillary business-related activities (that is, excluding major activities considered part of the normal operations of the business). Also includes gross realized gains (losses) reclassified out of accumulated other comprehensive income (loss) into earnings.",
+      "element": "wina:InterestAndOtherIncomeExpense",
+      "extension": true,
+      "label": "Interest and other income",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 988500
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1150300
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 1171700
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetIncomeLoss",
+      "depth": 3,
+      "element": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+      "extension": false,
+      "label": "Income before income taxes",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 53135600
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 51224000
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 51361300
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetIncomeLoss",
+      "depth": 3,
+      "element": "us-gaap:IncomeTaxExpenseBenefit",
+      "extension": false,
+      "label": "Provision for income taxes",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 11481500
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 11269800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 11183200
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:NetIncomeLoss",
+      "extension": false,
+      "label": "Net income",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 41654100
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 39954200
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 40178100
+       }
+      ]
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:EarningsPerShareBasic",
+      "extension": false,
+      "label": "Earnings per share - basic (in dollars per share)",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "2",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD/:shares",
+        "value": 11.73
+       },
+       {
+        "decimals": "2",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD/:shares",
+        "value": 11.36
+       },
+       {
+        "decimals": "2",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD/:shares",
+        "value": 11.55
+       }
+      ]
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:EarningsPerShareDiluted",
+      "extension": false,
+      "label": "Earnings per share - diluted (in dollars per share)",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "2",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD/:shares",
+        "value": 11.3
+       },
+       {
+        "decimals": "2",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD/:shares",
+        "value": 10.89
+       },
+       {
+        "decimals": "2",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD/:shares",
+        "value": 11.04
+       }
+      ]
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:WeightedAverageNumberOfSharesOutstandingBasic",
+      "extension": false,
+      "label": "Weighted average shares outstanding - basic",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "INF",
+        "period": "2024-12-29/2025-12-27",
+        "unit": ":shares",
+        "value": 3549753
+       },
+       {
+        "decimals": "INF",
+        "period": "2023-12-31/2024-12-28",
+        "unit": ":shares",
+        "value": 3516122
+       },
+       {
+        "decimals": "INF",
+        "period": "2023-01-01/2023-12-30",
+        "unit": ":shares",
+        "value": 3479936
+       }
+      ]
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding",
+      "extension": false,
+      "label": "Weighted average shares outstanding - diluted",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "INF",
+        "period": "2024-12-29/2025-12-27",
+        "unit": ":shares",
+        "value": 3685457
+       },
+       {
+        "decimals": "INF",
+        "period": "2023-12-31/2024-12-28",
+        "unit": ":shares",
+        "value": 3667479
+       },
+       {
+        "decimals": "INF",
+        "period": "2023-01-01/2023-12-30",
+        "unit": ":shares",
+        "value": 3640524
+       }
+      ]
+     }
+    ],
+    "parenthetical": false,
+    "report_page": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/R4.htm",
+    "role": "http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfOperations",
+    "roll_forward_checks": [],
+    "sort_code": "995200200",
+    "title": "CONSOLIDATED CONDENSED STATEMENTS OF OPERATIONS"
+   },
+   {
+    "calculation_checks": [
+     {
+      "complete": true,
+      "computed": -1869100.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-29/2025-12-27",
+      "reported": -1869100,
+      "total": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": -1056700.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-12-31/2024-12-28",
+      "reported": -1056700,
+      "total": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": -294100.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-01-01/2023-12-30",
+      "reported": -294100,
+      "total": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": false,
+      "computed": 44896800.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [
+       "us-gaap:NetInvestmentInLeaseCreditLossExpenseReversal",
+       "us-gaap:ProceedsFromLeasePayments",
+       "wina:AdditionsToAdvanceAndSecurityDeposits"
+      ],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-29/2025-12-27",
+      "reported": 44896800,
+      "total": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 42157900.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-12-31/2024-12-28",
+      "reported": 42157900,
+      "total": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": 43994300.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-01-01/2023-12-30",
+      "reported": 43994300,
+      "total": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": -192300.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-29/2025-12-27",
+      "reported": -192300,
+      "total": "us-gaap:NetCashProvidedByUsedInInvestingActivities",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": -194900.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-12-31/2024-12-28",
+      "reported": -194900,
+      "total": "us-gaap:NetCashProvidedByUsedInInvestingActivities",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": true,
+      "computed": -383900.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [],
+      "missing_in_every_column": [],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-01-01/2023-12-30",
+      "reported": -383900,
+      "total": "us-gaap:NetCashProvidedByUsedInInvestingActivities",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": false,
+      "computed": -46573600.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [
+       "us-gaap:ProceedsFromNotesPayable",
+       "us-gaap:RepaymentsOfNotesPayable"
+      ],
+      "missing_in_every_column": [
+       "us-gaap:ProceedsFromNotesPayable"
+      ],
+      "missing_tagged_only_by_member": [],
+      "period": "2024-12-29/2025-12-27",
+      "reported": -46573600,
+      "total": "us-gaap:NetCashProvidedByUsedInFinancingActivities",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": false,
+      "computed": -43019700.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [
+       "us-gaap:PaymentsForRepurchaseOfCommonStock",
+       "us-gaap:ProceedsFromNotesPayable"
+      ],
+      "missing_in_every_column": [
+       "us-gaap:ProceedsFromNotesPayable"
+      ],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-12-31/2024-12-28",
+      "reported": -43019700,
+      "total": "us-gaap:NetCashProvidedByUsedInFinancingActivities",
+      "unit": "iso4217:USD"
+     },
+     {
+      "complete": false,
+      "computed": -43904500.0,
+      "consistent": true,
+      "difference": 0.0,
+      "missing": [
+       "us-gaap:PaymentsForRepurchaseOfCommonStock",
+       "us-gaap:ProceedsFromNotesPayable"
+      ],
+      "missing_in_every_column": [
+       "us-gaap:ProceedsFromNotesPayable"
+      ],
+      "missing_tagged_only_by_member": [],
+      "period": "2023-01-01/2023-12-30",
+      "reported": -43904500,
+      "total": "us-gaap:NetCashProvidedByUsedInFinancingActivities",
+      "unit": "iso4217:USD"
+     }
+    ],
+    "columns": [
+     "2024-12-29/2025-12-27",
+     "2023-12-31/2024-12-28",
+     "2023-01-01/2023-12-30"
+    ],
+    "kind": "cash_flow",
+    "lines": [
+     {
+      "depth": 0,
+      "element": "us-gaap:StatementOfCashFlowsAbstract",
+      "extension": false,
+      "label": "CONSOLIDATED CONDENSED STATEMENTS OF CASH FLOWS",
+      "label_role": "label",
+      "structure": "abstract"
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:NetCashProvidedByUsedInOperatingActivitiesContinuingOperationsAbstract",
+      "extension": false,
+      "label": "OPERATING ACTIVITIES:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 2,
+      "element": "us-gaap:NetIncomeLoss",
+      "extension": false,
+      "label": "Net Income",
+      "label_role": "verboseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 41654100
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 39954200
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 40178100
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:AdjustmentsToReconcileNetIncomeLossToCashProvidedByUsedInOperatingActivitiesAbstract",
+      "extension": false,
+      "label": "Adjustments to reconcile net income to net cash provided by operating activities:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 3,
+      "element": "us-gaap:Depreciation",
+      "extension": false,
+      "label": "Depreciation of property and equipment",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 392700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 445300
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 418700
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 3,
+      "element": "us-gaap:AmortizationOfIntangibleAssets",
+      "extension": false,
+      "label": "Amortization of intangible assets",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 354000
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 354000
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 354000
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 3,
+      "element": "us-gaap:NetInvestmentInLeaseCreditLossExpenseReversal",
+      "extension": false,
+      "label": "Provisions for credit losses",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -1500
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -5600
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 3,
+      "element": "us-gaap:ShareBasedCompensation",
+      "extension": false,
+      "label": "Compensation expense related to stock options",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2283200
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1988000
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 1952400
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 3,
+      "element": "us-gaap:DeferredIncomeTaxesAndTaxCredits",
+      "extension": false,
+      "label": "Deferred income taxes",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -195600
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -159400
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -512000
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 3,
+      "element": "us-gaap:OperatingLeaseRightOfUseAssetAmortizationExpense",
+      "extension": false,
+      "label": "Operating lease right of use asset amortization",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 347300
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 317100
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 290100
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "definition": {
+       "abstract": false,
+       "balance": "debit",
+       "period_type": "duration",
+       "type": "xbrli:monetaryItemType"
+      },
+      "depth": 3,
+      "documentation": "The cash flow impact of the of tax benefit from exercise of stock options granted under share-based compensation arrangement.",
+      "element": "wina:EmployeeServiceShareBasedCompensationTaxBenefitFromExerciseOfStockOptionsCashFlowImpact",
+      "extension": true,
+      "label": "Tax benefits on exercised stock options",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 1619000
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1307700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 1138500
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:IncreaseDecreaseInOperatingCapitalAbstract",
+      "extension": false,
+      "label": "Change in operating assets and liabilities:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 4,
+      "element": "us-gaap:IncreaseDecreaseInAccountsReceivable",
+      "extension": false,
+      "label": "Receivables",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 147100
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -138900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 36700
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 4,
+      "element": "us-gaap:ProceedsFromLeasePayments",
+      "extension": false,
+      "label": "Principal collections on lease receivables",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 104700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 556000
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 4,
+      "element": "us-gaap:IncreaseDecreaseInIncomeTaxesPayableNetOfIncomeTaxesReceivable",
+      "extension": false,
+      "label": "Income tax receivable/payable",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -1986200
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -1372800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -611200
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 4,
+      "element": "us-gaap:IncreaseDecreaseInInventories",
+      "extension": false,
+      "label": "Inventories",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -35100
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 11500
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -384500
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 4,
+      "element": "us-gaap:IncreaseDecreaseInPrepaidExpense",
+      "extension": false,
+      "label": "Prepaid expenses",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 120300
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -186700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 81700
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 4,
+      "element": "us-gaap:IncreaseDecreaseInOtherCurrentAssets",
+      "extension": false,
+      "label": "Other assets",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 15200
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 19900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 41600
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 4,
+      "element": "us-gaap:IncreaseDecreaseInAccountsPayable",
+      "extension": false,
+      "label": "Accounts payable",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 111800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -157400
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -402600
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 4,
+      "element": "us-gaap:IncreaseDecreaseInOtherAccruedLiabilities",
+      "extension": false,
+      "label": "Accrued and other liabilities",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 233900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -1251900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -16900
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "definition": {
+       "abstract": false,
+       "balance": "debit",
+       "period_type": "duration",
+       "type": "xbrli:monetaryItemType"
+      },
+      "depth": 4,
+      "documentation": "The aggregate net change during the reporting period in lease customer advance payments and security deposits.",
+      "element": "wina:AdditionsToAdvanceAndSecurityDeposits",
+      "extension": true,
+      "label": "Rents received in advance and security deposits",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -28000
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -275200
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "depth": 4,
+      "element": "us-gaap:IncreaseDecreaseInContractWithCustomerLiability",
+      "extension": false,
+      "label": "Deferred revenue",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 330100
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 363700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 705500
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+      "depth": 2,
+      "element": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+      "extension": false,
+      "label": "Net cash provided by operating activities",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 44896800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 42157900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 43994300
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:NetCashProvidedByUsedInInvestingActivitiesContinuingOperationsAbstract",
+      "extension": false,
+      "label": "INVESTING ACTIVITIES:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInInvestingActivities",
+      "depth": 2,
+      "element": "us-gaap:PaymentsToAcquirePropertyPlantAndEquipment",
+      "extension": false,
+      "label": "Purchase of property and equipment",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 192300
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 194900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 383900
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+      "depth": 2,
+      "element": "us-gaap:NetCashProvidedByUsedInInvestingActivities",
+      "extension": false,
+      "label": "Net cash used for investing activities",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -192300
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -194900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -383900
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:NetCashProvidedByUsedInFinancingActivitiesContinuingOperationsAbstract",
+      "extension": false,
+      "label": "FINANCING ACTIVITIES:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInFinancingActivities",
+      "depth": 2,
+      "element": "us-gaap:ProceedsFromNotesPayable",
+      "extension": false,
+      "label": "Proceeds from borrowings on notes payable",
+      "label_role": "terseLabel",
+      "values": [],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInFinancingActivities",
+      "depth": 2,
+      "element": "us-gaap:RepaymentsOfNotesPayable",
+      "extension": false,
+      "label": "Payments on notes payable",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 9187500
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 4250000
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInFinancingActivities",
+      "depth": 2,
+      "element": "us-gaap:PaymentsForRepurchaseOfCommonStock",
+      "extension": false,
+      "label": "Repurchases of common stock",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2418700
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInFinancingActivities",
+      "depth": 2,
+      "element": "us-gaap:ProceedsFromStockOptionsExercised",
+      "extension": false,
+      "label": "Proceeds from exercises of stock options",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 4957800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 5033700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 4009700
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "calculation_parent": "us-gaap:NetCashProvidedByUsedInFinancingActivities",
+      "depth": 2,
+      "element": "us-gaap:PaymentsOfDividends",
+      "extension": false,
+      "label": "Dividends paid",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 49112700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 38865900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 43664200
+       }
+      ],
+      "weight": -1.0
+     },
+     {
+      "calculation_parent": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+      "depth": 2,
+      "element": "us-gaap:NetCashProvidedByUsedInFinancingActivities",
+      "extension": false,
+      "label": "Net cash used for financing activities",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -46573600
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -43019700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -43904500
+       }
+      ],
+      "weight": 1.0
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+      "extension": false,
+      "label": "NET INCREASE IN CASH, CASH EQUIVALENTS AND RESTRICTED CASH",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -1869100
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -1056700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -294100
+       }
+      ]
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+      "extension": false,
+      "label": "Cash, cash equivalents and restricted cash, beginning of period",
+      "label_role": "periodStartLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "instant": "2024-12-28",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 12329800
+       },
+       {
+        "decimals": "0",
+        "instant": "2023-12-30",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 13386500
+       },
+       {
+        "decimals": "0",
+        "instant": "2022-12-31",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 13680600
+       }
+      ]
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+      "extension": false,
+      "label": "Cash, cash equivalents and restricted cash, end of period",
+      "label_role": "periodEndLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "instant": "2025-12-27",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 10460700
+       },
+       {
+        "decimals": "0",
+        "instant": "2024-12-28",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 12329800
+       },
+       {
+        "decimals": "0",
+        "instant": "2023-12-30",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 13386500
+       }
+      ]
+     }
+    ],
+    "parenthetical": false,
+    "report_page": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/R6.htm",
+    "role": "http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfCashFlows",
+    "roll_forward_checks": [
+     {
+      "balance": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+      "change": -1869100,
+      "change_element": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+      "closing": 10460700,
+      "closing_instant": "2025-12-27",
+      "closing_on_balance_sheet": null,
+      "computed": 10460700,
+      "consistent": true,
+      "difference": 0,
+      "exchange_rate_effect": null,
+      "exchange_rate_element": null,
+      "missing": [],
+      "opening": 12329800,
+      "opening_instant": "2024-12-28",
+      "period": "2024-12-29/2025-12-27"
+     },
+     {
+      "balance": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+      "change": -1056700,
+      "change_element": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+      "closing": 12329800,
+      "closing_instant": "2024-12-28",
+      "closing_on_balance_sheet": null,
+      "computed": 12329800,
+      "consistent": true,
+      "difference": 0,
+      "exchange_rate_effect": null,
+      "exchange_rate_element": null,
+      "missing": [],
+      "opening": 13386500,
+      "opening_instant": "2023-12-30",
+      "period": "2023-12-31/2024-12-28"
+     },
+     {
+      "balance": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+      "change": -294100,
+      "change_element": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+      "closing": 13386500,
+      "closing_instant": "2023-12-30",
+      "closing_on_balance_sheet": null,
+      "computed": 13386500,
+      "consistent": true,
+      "difference": 0,
+      "exchange_rate_effect": null,
+      "exchange_rate_element": null,
+      "missing": [],
+      "opening": 13680600,
+      "opening_instant": "2022-12-31",
+      "period": "2023-01-01/2023-12-30"
+     }
+    ],
+    "sort_code": "995200500",
+    "title": "CONSOLIDATED CONDENSED STATEMENTS OF CASH FLOWS"
+   },
+   {
+    "calculation_checks": [],
+    "columns": [
+     "2025-12-27",
+     "2024-12-28"
+    ],
+    "kind": "balance_sheet",
+    "lines": [
+     {
+      "depth": 0,
+      "element": "us-gaap:StatementOfFinancialPositionAbstract",
+      "extension": false,
+      "label": "CONSOLIDATED CONDENSED BALANCE SHEETS",
+      "label_role": "label",
+      "structure": "abstract"
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:AllowanceForDoubtfulAccountsReceivableCurrent",
+      "extension": false,
+      "label": "Receivables, allowance for credit losses",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 500
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 500
+       }
+      ]
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:DeferredFinanceCostsNoncurrentNet",
+      "extension": false,
+      "label": "Unamortized debt issuance costs - Noncurrent",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 39000
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 57200
+       }
+      ]
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:CommonStockNoParValue",
+      "extension": false,
+      "label": "Common stock, par value (in dollars per share)",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "INF",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD/:shares",
+        "value": 0
+       },
+       {
+        "decimals": "INF",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD/:shares",
+        "value": 0
+       }
+      ]
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:CommonStockSharesAuthorized",
+      "extension": false,
+      "label": "Common stock, shares authorized",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "INF",
+        "period": "2025-12-27",
+        "unit": ":shares",
+        "value": 10000000
+       },
+       {
+        "decimals": "INF",
+        "period": "2024-12-28",
+        "unit": ":shares",
+        "value": 10000000
+       }
+      ]
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:CommonStockSharesIssued",
+      "extension": false,
+      "label": "Common stock, shares issued",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "INF",
+        "period": "2025-12-27",
+        "unit": ":shares",
+        "value": 3571861
+       },
+       {
+        "decimals": "INF",
+        "period": "2024-12-28",
+        "unit": ":shares",
+        "value": 3539744
+       }
+      ]
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:CommonStockSharesOutstanding",
+      "extension": false,
+      "label": "Common stock, shares outstanding",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "INF",
+        "period": "2025-12-27",
+        "unit": ":shares",
+        "value": 3571861
+       },
+       {
+        "decimals": "INF",
+        "period": "2024-12-28",
+        "unit": ":shares",
+        "value": 3539744
+       }
+      ]
+     }
+    ],
+    "parenthetical": true,
+    "report_page": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/R3.htm",
+    "role": "http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedBalanceSheetsParenthetical",
+    "roll_forward_checks": [],
+    "sort_code": "995200105",
+    "title": "CONSOLIDATED CONDENSED BALANCE SHEETS (Parenthetical)"
+   },
+   {
+    "calculation_checks": [],
+    "columns": [
+     "2024-12-29/2025-12-27",
+     "2023-12-31/2024-12-28",
+     "2023-01-01/2023-12-30"
+    ],
+    "kind": "equity",
+    "lines": [
+     {
+      "depth": 0,
+      "element": "us-gaap:StatementOfStockholdersEquityAbstract",
+      "extension": false,
+      "label": "CONSOLIDATED CONDENSED STATEMENTS OF SHAREHOLDERS' EQUITY (DEFICIT)",
+      "label_role": "label",
+      "structure": "abstract"
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:StatementTable",
+      "extension": false,
+      "label": "Statement [Table]",
+      "label_role": "label",
+      "structure": "table"
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:StatementEquityComponentsAxis",
+      "extension": false,
+      "label": "Equity Components [Axis]",
+      "label_role": "label",
+      "structure": "axis"
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:CommonStockMember",
+      "extension": false,
+      "label": "Common Stock",
+      "label_role": "terseLabel",
+      "structure": "member"
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:RetainedEarningsMember",
+      "extension": false,
+      "label": "Retained Earnings (Accumulated Deficit)",
+      "label_role": "terseLabel",
+      "structure": "member"
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:EquityComponentDomain",
+      "extension": false,
+      "label": "Equity Component [Domain]",
+      "label_role": "label",
+      "structure": "member"
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:StatementLineItems",
+      "extension": false,
+      "label": "Statement",
+      "label_role": "terseLabel",
+      "structure": "line_items"
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:IncreaseDecreaseInStockholdersEquityRollForward",
+      "extension": false,
+      "label": "Shareholders' Equity (Deficit)",
+      "label_role": "terseLabel",
+      "values": []
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2024-12-28",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 14790500
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "instant": "2024-12-28",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -65836600
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2023-12-30",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 7768800
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "instant": "2023-12-30",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -66924900
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2022-12-31",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 1806700
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "instant": "2022-12-31",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -63438800
+       }
+      ],
+      "depth": 4,
+      "element": "us-gaap:StockholdersEquity",
+      "extension": false,
+      "label": "BALANCE",
+      "label_role": "periodStartLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "instant": "2024-12-28",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -51046100
+       },
+       {
+        "decimals": "0",
+        "instant": "2023-12-30",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -59156100
+       },
+       {
+        "decimals": "0",
+        "instant": "2022-12-31",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -61632100
+       }
+      ]
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "INF",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2024-12-28",
+        "period": "2024-12-29/2025-12-27",
+        "unit": ":shares",
+        "value": 3539744
+       },
+       {
+        "decimals": "INF",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2023-12-30",
+        "period": "2023-12-31/2024-12-28",
+        "unit": ":shares",
+        "value": 3496977
+       },
+       {
+        "decimals": "INF",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2022-12-31",
+        "period": "2023-01-01/2023-12-30",
+        "unit": ":shares",
+        "value": 3459673
+       }
+      ],
+      "depth": 4,
+      "element": "us-gaap:CommonStockSharesIssued",
+      "extension": false,
+      "label": "BALANCE (in shares)",
+      "label_role": "periodStartLabel",
+      "values": [
+       {
+        "decimals": "INF",
+        "instant": "2024-12-28",
+        "period": "2024-12-29/2025-12-27",
+        "unit": ":shares",
+        "value": 3539744
+       }
+      ]
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2418700
+       }
+      ],
+      "depth": 4,
+      "element": "us-gaap:StockRepurchasedAndRetiredDuringPeriodValue",
+      "extension": false,
+      "label": "Repurchase of common stock",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2418700
+       }
+      ]
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "INF",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": ":shares",
+        "value": 7944
+       }
+      ],
+      "depth": 5,
+      "element": "us-gaap:StockRepurchasedAndRetiredDuringPeriodShares",
+      "extension": false,
+      "label": "Repurchase of common stock (in shares)",
+      "label_role": "negatedLabel",
+      "values": []
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 4009700
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 5033700
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 4957800
+       }
+      ],
+      "depth": 4,
+      "element": "us-gaap:StockIssuedDuringPeriodValueStockOptionsExercised",
+      "extension": false,
+      "label": "Stock options exercised",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 4957800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 5033700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 4009700
+       }
+      ]
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "INF",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2023-01-01/2023-12-30",
+        "unit": ":shares",
+        "value": 37304
+       },
+       {
+        "decimals": "INF",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2023-12-31/2024-12-28",
+        "unit": ":shares",
+        "value": 42767
+       },
+       {
+        "decimals": "INF",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": ":shares",
+        "value": 40061
+       }
+      ],
+      "depth": 5,
+      "element": "us-gaap:StockIssuedDuringPeriodSharesStockOptionsExercised",
+      "extension": false,
+      "label": "Stock options exercised (in shares)",
+      "label_role": "terseLabel",
+      "values": []
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 1952400
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1988000
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2283200
+       }
+      ],
+      "depth": 4,
+      "element": "us-gaap:StockIssuedDuringPeriodValueShareBasedCompensation",
+      "extension": false,
+      "label": "Compensation expense relating to stock options",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2283200
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 1988000
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 1952400
+       }
+      ]
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 43664200
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 38865900
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 49112700
+       }
+      ],
+      "depth": 4,
+      "element": "us-gaap:DividendsCommonStockCash",
+      "extension": false,
+      "label": "Cash dividends",
+      "label_role": "negatedLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 49112700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 38865900
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 43664200
+       }
+      ]
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 40178100
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 39954200
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 41654100
+       }
+      ],
+      "depth": 4,
+      "element": "us-gaap:ComprehensiveIncomeNetOfTax",
+      "extension": false,
+      "label": "Comprehensive income (Net income)",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 41654100
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 39954200
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 40178100
+       }
+      ]
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2025-12-27",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 19612800
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "instant": "2025-12-27",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -73295200
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2024-12-28",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 14790500
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "instant": "2024-12-28",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -65836600
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2023-12-30",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 7768800
+       },
+       {
+        "decimals": "0",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:RetainedEarningsMember"
+        },
+        "instant": "2023-12-30",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -66924900
+       }
+      ],
+      "depth": 4,
+      "element": "us-gaap:StockholdersEquity",
+      "extension": false,
+      "label": "BALANCE",
+      "label_role": "periodEndLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "instant": "2025-12-27",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": -53682400
+       },
+       {
+        "decimals": "0",
+        "instant": "2024-12-28",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": -51046100
+       },
+       {
+        "decimals": "0",
+        "instant": "2023-12-30",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": -59156100
+       }
+      ]
+     },
+     {
+      "by_member": [
+       {
+        "decimals": "INF",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2025-12-27",
+        "period": "2024-12-29/2025-12-27",
+        "unit": ":shares",
+        "value": 3571861
+       },
+       {
+        "decimals": "INF",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2024-12-28",
+        "period": "2023-12-31/2024-12-28",
+        "unit": ":shares",
+        "value": 3539744
+       },
+       {
+        "decimals": "INF",
+        "dimensions": {
+         "us-gaap:StatementEquityComponentsAxis": "us-gaap:CommonStockMember"
+        },
+        "instant": "2023-12-30",
+        "period": "2023-01-01/2023-12-30",
+        "unit": ":shares",
+        "value": 3496977
+       }
+      ],
+      "depth": 4,
+      "element": "us-gaap:CommonStockSharesIssued",
+      "extension": false,
+      "label": "BALANCE (in shares)",
+      "label_role": "periodEndLabel",
+      "values": [
+       {
+        "decimals": "INF",
+        "instant": "2025-12-27",
+        "period": "2024-12-29/2025-12-27",
+        "unit": ":shares",
+        "value": 3571861
+       },
+       {
+        "decimals": "INF",
+        "instant": "2024-12-28",
+        "period": "2023-12-31/2024-12-28",
+        "unit": ":shares",
+        "value": 3539744
+       }
+      ]
+     }
+    ],
+    "parenthetical": false,
+    "report_page": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/R5.htm",
+    "role": "http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfShareholdersEquityDeficit",
+    "roll_forward_checks": [
+     {
+      "balance": "us-gaap:CommonStockSharesIssued",
+      "change_element": null,
+      "closing": 3571861,
+      "closing_instant": "2025-12-27",
+      "closing_on_balance_sheet": null,
+      "computed": null,
+      "consistent": null,
+      "difference": null,
+      "exchange_rate_element": null,
+      "missing": [
+       "change"
+      ],
+      "opening": 3539744,
+      "opening_instant": "2024-12-28",
+      "period": "2024-12-29/2025-12-27"
+     },
+     {
+      "balance": "us-gaap:StockholdersEquity",
+      "change_element": null,
+      "closing": -53682400,
+      "closing_instant": "2025-12-27",
+      "closing_on_balance_sheet": true,
+      "computed": null,
+      "consistent": null,
+      "difference": null,
+      "exchange_rate_element": null,
+      "missing": [
+       "change"
+      ],
+      "opening": -51046100,
+      "opening_instant": "2024-12-28",
+      "period": "2024-12-29/2025-12-27"
+     },
+     {
+      "balance": "us-gaap:StockholdersEquity",
+      "change_element": null,
+      "closing": -51046100,
+      "closing_instant": "2024-12-28",
+      "closing_on_balance_sheet": true,
+      "computed": null,
+      "consistent": null,
+      "difference": null,
+      "exchange_rate_element": null,
+      "missing": [
+       "change"
+      ],
+      "opening": -59156100,
+      "opening_instant": "2023-12-30",
+      "period": "2023-12-31/2024-12-28"
+     },
+     {
+      "balance": "us-gaap:StockholdersEquity",
+      "change_element": null,
+      "closing": -59156100,
+      "closing_instant": "2023-12-30",
+      "closing_on_balance_sheet": null,
+      "computed": null,
+      "consistent": null,
+      "difference": null,
+      "exchange_rate_element": null,
+      "missing": [
+       "change"
+      ],
+      "opening": -61632100,
+      "opening_instant": "2022-12-31",
+      "period": "2023-01-01/2023-12-30"
+     }
+    ],
+    "sort_code": "995200400",
+    "title": "CONSOLIDATED CONDENSED STATEMENTS OF SHAREHOLDERS' EQUITY (DEFICIT)"
+   },
+   {
+    "calculation_checks": [],
+    "columns": [],
+    "kind": "equity",
+    "lines": [
+     {
+      "depth": 0,
+      "element": "us-gaap:StatementOfStockholdersEquityAbstract",
+      "extension": false,
+      "label": "CONSOLIDATED CONDENSED STATEMENTS OF SHAREHOLDERS' EQUITY (DEFICIT)",
+      "label_role": "label",
+      "structure": "abstract"
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:CommonStockDividendsPerShareDeclared",
+      "extension": false,
+      "label": "Cash dividends (in dollars per share)",
+      "label_role": "verboseLabel",
+      "values": []
+     }
+    ],
+    "parenthetical": true,
+    "report_page": null,
+    "role": "http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfShareholdersEquityDeficitParenthetical",
+    "roll_forward_checks": [],
+    "sort_code": "995200405",
+    "title": "CONSOLIDATED CONDENSED STATEMENTS OF SHAREHOLDERS' EQUITY (DEFICIT) (Parenthetical)"
+   },
+   {
+    "calculation_checks": [],
+    "columns": [
+     "2024-12-29/2025-12-27",
+     "2025-12-27",
+     "2023-12-31/2024-12-28",
+     "2024-12-28",
+     "2023-01-01/2023-12-30",
+     "2023-12-30"
+    ],
+    "kind": "cash_flow",
+    "lines": [
+     {
+      "depth": 0,
+      "element": "us-gaap:StatementOfCashFlowsAbstract",
+      "extension": false,
+      "label": "CONSOLIDATED CONDENSED STATEMENTS OF CASH FLOWS",
+      "label_role": "label",
+      "structure": "abstract"
+     },
+     {
+      "depth": 1,
+      "element": "us-gaap:SupplementalCashFlowInformationAbstract",
+      "extension": false,
+      "label": "SUPPLEMENTAL DISCLOSURES:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:InterestPaidNet",
+      "extension": false,
+      "label": "Cash paid for interest",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 2415700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 2851000
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 3049400
+       }
+      ]
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:IncomeTaxesPaidNet",
+      "extension": false,
+      "label": "Cash paid for income taxes",
+      "label_role": "verboseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2024-12-29/2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 11814700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-31/2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 11168700
+       },
+       {
+        "decimals": "0",
+        "period": "2023-01-01/2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 10874300
+       }
+      ]
+     },
+     {
+      "depth": 2,
+      "element": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsAbstract",
+      "extension": false,
+      "label": "Reconciliation of cash, cash equivalents and restricted cash:",
+      "label_role": "terseLabel",
+      "structure": "abstract"
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:CashAndCashEquivalentsAtCarryingValue",
+      "extension": false,
+      "label": "Cash and cash equivalents",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 10295700
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 12189800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 13361500
+       }
+      ]
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:RestrictedCashAndCashEquivalentsAtCarryingValue",
+      "extension": false,
+      "label": "Restricted cash",
+      "label_role": "terseLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 165000
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 140000
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 25000
+       }
+      ]
+     },
+     {
+      "depth": 3,
+      "element": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+      "extension": false,
+      "label": "Total cash, cash equivalents and restricted cash",
+      "label_role": "totalLabel",
+      "values": [
+       {
+        "decimals": "0",
+        "period": "2025-12-27",
+        "unit": "iso4217:USD",
+        "value": 10460700
+       },
+       {
+        "decimals": "0",
+        "period": "2024-12-28",
+        "unit": "iso4217:USD",
+        "value": 12329800
+       },
+       {
+        "decimals": "0",
+        "period": "2023-12-30",
+        "unit": "iso4217:USD",
+        "value": 13386500
+       }
+      ]
+     }
+    ],
+    "parenthetical": false,
+    "report_page": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/R7.htm",
+    "role": "http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfCashFlowsSupplementalDisclosures",
+    "roll_forward_checks": [],
+    "sort_code": "995200505",
+    "title": "CONSOLIDATED CONDENSED STATEMENTS OF CASH FLOWS - Supplemental Disclosures"
+   }
+  ]
+ },
+ "tool": "get_filed_statements"
+}

@@ -1,0 +1,62 @@
+{
+ "arguments": {
+  "limit": 5,
+  "sic": "6794"
+ },
+ "result": {
+  "count": 5,
+  "index_built": "unknown",
+  "index_latest_period": "2025-10-31",
+  "index_origin": "snapshot in the package",
+  "results": [
+   {
+    "cik": "0001308547",
+    "country_inc": "US",
+    "industry": "Finance, Insurance & Real Estate",
+    "name": "DOLBY LABORATORIES, INC.",
+    "sic": "6794",
+    "state_inc": "DE",
+    "subindustry": "Patent Owners & Lessors"
+   },
+   {
+    "cik": "0001605331",
+    "country_inc": "US",
+    "industry": "Finance, Insurance & Real Estate",
+    "name": "AB INTERNATIONAL GROUP CORP.",
+    "sic": "6794",
+    "state_inc": "NV",
+    "subindustry": "Patent Owners & Lessors"
+   },
+   {
+    "cik": "0001612630",
+    "country_inc": "US",
+    "industry": "Finance, Insurance & Real Estate",
+    "name": "JOINT CORP",
+    "sic": "6794",
+    "state_inc": "DE",
+    "subindustry": "Patent Owners & Lessors"
+   },
+   {
+    "cik": "0001862463",
+    "country_inc": "US",
+    "industry": "Finance, Insurance & Real Estate",
+    "name": "ALPHA MODUS HOLDINGS, INC.",
+    "sic": "6794",
+    "state_inc": "DE",
+    "subindustry": "Patent Owners & Lessors"
+   },
+   {
+    "cik": "0001083220",
+    "country_inc": "US",
+    "industry": "Finance, Insurance & Real Estate",
+    "name": "XCEL BRANDS, INC.",
+    "sic": "6794",
+    "state_inc": "DE",
+    "subindustry": "Patent Owners & Lessors"
+   }
+  ],
+  "truncated": true,
+  "use": "candidate discovery only"
+ },
+ "tool": "search_companies"
+}

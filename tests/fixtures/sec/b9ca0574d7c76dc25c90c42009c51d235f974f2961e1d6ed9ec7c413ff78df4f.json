@@ -1,0 +1,7 @@
+{
+ "url": "https://data.sec.gov/api/xbrl/frames/us-gaap/SalesTypeLeaseSellingProfitLoss/USD/CY2023.json",
+ "status": 200,
+ "content_type": "application/json",
+ "sha256": "5a453d99c9db403d36386fe2d7aefb68f55e044182c7d5e822f0764dd015edb3",
+ "retrieved_at": "2026-10-21T19:27:40Z"
+}

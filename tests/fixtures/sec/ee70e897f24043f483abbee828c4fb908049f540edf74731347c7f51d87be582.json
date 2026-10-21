@@ -1,0 +1,7 @@
+{
+ "url": "https://efts.sec.gov/LATEST/search-index?q=%22Winmark%22&forms=10-K&dateRange=custom&startdt=2024-01-01&enddt=2024-12-31",
+ "status": 200,
+ "content_type": "application/json",
+ "sha256": "b2cf2f3afad67c4862408c2c5f3b768d4b86378b6a14d0ef82642e381c51f611",
+ "retrieved_at": "2026-10-21T19:27:01Z"
+}

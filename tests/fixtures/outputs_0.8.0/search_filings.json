@@ -1,0 +1,140 @@
+{
+ "arguments": {
+  "filed_from": "2024-01-01",
+  "filed_to": "2024-12-31",
+  "forms": "10-K",
+  "limit": 5,
+  "query": "\"Winmark\""
+ },
+ "result": {
+  "cache_hit": false,
+  "count": 5,
+  "filed_from": "2024-01-01",
+  "filed_to": "2024-12-31",
+  "forms": [
+   "10-K"
+  ],
+  "frozen": false,
+  "hits": [
+   {
+    "accession_number": "0000908315-24-000010",
+    "companies": [
+     {
+      "cik": "0000908315",
+      "name": "WINMARK CORP",
+      "tickers": [
+       "WINA"
+      ]
+     }
+    ],
+    "document": "wina-20231230x10k.htm",
+    "document_type": "10-K",
+    "filing_date": "2024-02-28",
+    "form": "10-K",
+    "period_of_report": "2023-12-30",
+    "readable": true,
+    "sic": [
+     "5900"
+    ],
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831524000010/wina-20231230x10k.htm"
+   },
+   {
+    "accession_number": "0000908315-24-000010",
+    "companies": [
+     {
+      "cik": "0000908315",
+      "name": "WINMARK CORP",
+      "tickers": [
+       "WINA"
+      ]
+     }
+    ],
+    "document": "wina-20231230xex32d2.htm",
+    "document_type": "EX-32.2",
+    "filing_date": "2024-02-28",
+    "form": "10-K",
+    "period_of_report": "2023-12-30",
+    "readable": true,
+    "sic": [
+     "5900"
+    ],
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831524000010/wina-20231230xex32d2.htm"
+   },
+   {
+    "accession_number": "0000908315-24-000010",
+    "companies": [
+     {
+      "cik": "0000908315",
+      "name": "WINMARK CORP",
+      "tickers": [
+       "WINA"
+      ]
+     }
+    ],
+    "document": "wina-20231230xex32d1.htm",
+    "document_type": "EX-32.1",
+    "filing_date": "2024-02-28",
+    "form": "10-K",
+    "period_of_report": "2023-12-30",
+    "readable": true,
+    "sic": [
+     "5900"
+    ],
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831524000010/wina-20231230xex32d1.htm"
+   },
+   {
+    "accession_number": "0000908315-24-000010",
+    "companies": [
+     {
+      "cik": "0000908315",
+      "name": "WINMARK CORP",
+      "tickers": [
+       "WINA"
+      ]
+     }
+    ],
+    "document": "wina-20231230xex23d1.htm",
+    "document_type": "EX-23.1",
+    "filing_date": "2024-02-28",
+    "form": "10-K",
+    "period_of_report": "2023-12-30",
+    "readable": true,
+    "sic": [
+     "5900"
+    ],
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831524000010/wina-20231230xex23d1.htm"
+   },
+   {
+    "accession_number": "0000908315-24-000010",
+    "companies": [
+     {
+      "cik": "0000908315",
+      "name": "WINMARK CORP",
+      "tickers": [
+       "WINA"
+      ]
+     }
+    ],
+    "document": "wina-20231230xex97.htm",
+    "document_type": "EX-97",
+    "filing_date": "2024-02-28",
+    "form": "10-K",
+    "period_of_report": "2023-12-30",
+    "readable": true,
+    "sic": [
+     "5900"
+    ],
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831524000010/wina-20231230xex97.htm"
+   }
+  ],
+  "meaning": "the words are in the document; proximity and meaning are not checked",
+  "next_offset": 5,
+  "offset": 0,
+  "query": "\"Winmark\"",
+  "retrieved_at": "2026-10-21T19:27:01Z",
+  "source_url": "https://efts.sec.gov/LATEST/search-index?q=%22Winmark%22&forms=10-K&dateRange=custom&startdt=2024-01-01&enddt=2024-12-31",
+  "total_hits": 7,
+  "total_is_exact": true
+ },
+ "tool": "search_filings"
+}

@@ -1,0 +1,62 @@
+{
+ "arguments": {
+  "cik_or_ticker": "908315",
+  "form": "10-K",
+  "limit": 3
+ },
+ "result": {
+  "as_of": null,
+  "cache_hit": false,
+  "cik": "0000908315",
+  "complete": true,
+  "count": 3,
+  "filings": [
+   {
+    "acceptance_datetime": "2026-02-25T22:50:26.000Z",
+    "accession_number": "0000908315-26-000007",
+    "description": "wina-20251227x10k.htm",
+    "filing_date": "2026-02-25",
+    "form": "10-K",
+    "items": [],
+    "reporting_date": "2025-12-27",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227x10k.htm"
+   },
+   {
+    "acceptance_datetime": "2025-02-27T01:47:54.000Z",
+    "accession_number": "0000908315-25-000010",
+    "description": "wina-20241228x10k.htm",
+    "filing_date": "2025-02-26",
+    "form": "10-K",
+    "items": [],
+    "reporting_date": "2024-12-28",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831525000010/wina-20241228x10k.htm"
+   },
+   {
+    "acceptance_datetime": "2024-02-28T21:14:26.000Z",
+    "accession_number": "0000908315-24-000010",
+    "description": "wina-20231230x10k.htm",
+    "filing_date": "2024-02-28",
+    "form": "10-K",
+    "items": [],
+    "reporting_date": "2023-12-30",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831524000010/wina-20231230x10k.htm"
+   }
+  ],
+  "form": "10-K",
+  "frozen": false,
+  "include_amendments": false,
+  "matched_on": "cik",
+  "retrieved_at": "2026-10-21T19:26:58Z",
+  "source_url": "https://data.sec.gov/submissions/CIK0000908315.json",
+  "sources": [
+   {
+    "cache_hit": false,
+    "frozen": false,
+    "retrieved_at": "2026-10-21T19:26:58Z",
+    "source_url": "https://data.sec.gov/submissions/CIK0000908315.json"
+   }
+  ],
+  "warnings": []
+ },
+ "tool": "list_filings"
+}

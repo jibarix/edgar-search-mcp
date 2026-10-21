@@ -1,0 +1,7 @@
+{
+ "url": "https://www.sec.gov/files/company_tickers.json",
+ "status": 200,
+ "content_type": "application/json",
+ "sha256": "bbffa40adbea620bba590da9a193ea14b21bfc04992f102549a2688d4e7d32df",
+ "retrieved_at": "2026-10-21T19:26:57Z"
+}

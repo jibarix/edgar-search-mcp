@@ -1,0 +1,9 @@
+{
+ "version": "0.8.0",
+ "cik": "908315",
+ "accession_number": "0000908315-26-000007",
+ "main_document": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227x10k.htm",
+ "exhibit": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227xex23d1.htm",
+ "frame": "https://data.sec.gov/api/xbrl/frames/us-gaap/SalesTypeLeaseSellingProfitLoss/USD/CY2023.json",
+ "missing_frame": "https://data.sec.gov/api/xbrl/frames/us-gaap/FranchiseRevenue/USD/CY2023.json"
+}

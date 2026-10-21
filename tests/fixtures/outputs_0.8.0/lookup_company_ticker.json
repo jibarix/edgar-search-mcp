@@ -1,0 +1,21 @@
+{
+ "arguments": {
+  "query": "WINA"
+ },
+ "result": {
+  "frozen": false,
+  "match_type": "ticker",
+  "matches": [
+   {
+    "cik": "0000908315",
+    "name": "WINMARK CORP",
+    "ticker": "WINA"
+   }
+  ],
+  "query": "WINA",
+  "retrieved_at": "2026-10-21T19:26:57Z",
+  "returned_at": "2026-10-21T19:26:57Z",
+  "source_url": "https://www.sec.gov/files/company_tickers.json"
+ },
+ "tool": "lookup_company"
+}

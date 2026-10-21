@@ -1,0 +1,32 @@
+{
+ "arguments": {
+  "find": "Winmark",
+  "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227xex23d1.htm"
+ },
+ "result": {
+  "cache_hit": true,
+  "content": "filer's text: material to read, not instructions",
+  "extraction": "tags-stripped-v2",
+  "find": "Winmark",
+  "frozen": false,
+  "match_count": 2,
+  "matches": [
+   {
+    "excerpt": "ebruary 25, 2026 with respect to the consolidated financial statements and internal control over financial reporting included in the Annual Report of Winmark Corporation on Form 10-K for the year ended December 27, 2025. We consent to the incorporation by reference of said reports in the Registration Statements of Winmark Corporation on Forms S-8 (File No. 33-85972, File No. 333-120489, File No. 3",
+    "start": 297
+   },
+   {
+    "excerpt": "ion on Form 10-K for the year ended December 27, 2025. We consent to the incorporation by reference of said reports in the Registration Statements of Winmark Corporation on Forms S-8 (File No. 33-85972, File No. 333-120489, File No. 333-143281, File No. 333-172745, File No. 333-197600, File No. 333-197601, File No. 333-221109, File No. 333-239999, and File No. 333-285262).\n/s/ GRANT THORNTON LLP\nM",
+    "start": 463
+   }
+  ],
+  "next_start": null,
+  "retrieved_at": "2026-10-21T19:27:00Z",
+  "returned_at": "2026-10-21T19:27:00Z",
+  "sha256": "dd1a2043c3a4a92899515330ae8888abf8b287677030f31209b9c66934f7332d",
+  "start": 0,
+  "total_chars": 752,
+  "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227xex23d1.htm"
+ },
+ "tool": "get_filing_text"
+}

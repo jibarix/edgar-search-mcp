@@ -1,0 +1,845 @@
+<?xml version='1.0' encoding='utf-8'?>
+<FilingSummary>
+  <Version>3.25.4</Version>
+  <ProcessingTime/>
+  <ReportFormat>html</ReportFormat>
+  <ContextCount>123</ContextCount>
+  <ElementCount>373</ElementCount>
+  <EntityCount>1</EntityCount>
+  <FootnotesReported>false</FootnotesReported>
+  <SegmentCount>44</SegmentCount>
+  <ScenarioCount>0</ScenarioCount>
+  <TuplesReported>false</TuplesReported>
+  <UnitCount>8</UnitCount>
+  <MyReports>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R1.htm</HtmlFileName>
+      <LongName>995200090 - Document - Document and Entity Information</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DocumentDocumentAndEntityInformation</Role>
+      <ShortName>Document and Entity Information</ShortName>
+      <MenuCategory>Cover</MenuCategory>
+      <Position>1</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R2.htm</HtmlFileName>
+      <LongName>995200100 - Statement - CONSOLIDATED CONDENSED BALANCE SHEETS</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedBalanceSheets</Role>
+      <ShortName>CONSOLIDATED CONDENSED BALANCE SHEETS</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>2</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R3.htm</HtmlFileName>
+      <LongName>995200105 - Statement - CONSOLIDATED CONDENSED BALANCE SHEETS (Parenthetical)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedBalanceSheetsParenthetical</Role>
+      <ShortName>CONSOLIDATED CONDENSED BALANCE SHEETS (Parenthetical)</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>3</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R4.htm</HtmlFileName>
+      <LongName>995200200 - Statement - CONSOLIDATED CONDENSED STATEMENTS OF OPERATIONS</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfOperations</Role>
+      <ShortName>CONSOLIDATED CONDENSED STATEMENTS OF OPERATIONS</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>4</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R5.htm</HtmlFileName>
+      <LongName>995200400 - Statement - CONSOLIDATED CONDENSED STATEMENTS OF SHAREHOLDERS' EQUITY (DEFICIT)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfShareholdersEquityDeficit</Role>
+      <ShortName>CONSOLIDATED CONDENSED STATEMENTS OF SHAREHOLDERS' EQUITY (DEFICIT)</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>5</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R6.htm</HtmlFileName>
+      <LongName>995200500 - Statement - CONSOLIDATED CONDENSED STATEMENTS OF CASH FLOWS</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfCashFlows</Role>
+      <ShortName>CONSOLIDATED CONDENSED STATEMENTS OF CASH FLOWS</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>6</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R7.htm</HtmlFileName>
+      <LongName>995200505 - Statement - CONSOLIDATED CONDENSED STATEMENTS OF CASH FLOWS - Supplemental Disclosures</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfCashFlowsSupplementalDisclosures</Role>
+      <ShortName>CONSOLIDATED CONDENSED STATEMENTS OF CASH FLOWS - Supplemental Disclosures</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>7</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R8.htm</HtmlFileName>
+      <LongName>995210101 - Disclosure - Organization and Business:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureOrganizationAndBusiness</Role>
+      <ShortName>Organization and Business:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>8</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R9.htm</HtmlFileName>
+      <LongName>995210201 - Disclosure - Significant Accounting Policies:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPolicies</Role>
+      <ShortName>Significant Accounting Policies:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>9</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R10.htm</HtmlFileName>
+      <LongName>995210301 - Disclosure - Leasing Operations:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureLeasingOperations</Role>
+      <ShortName>Leasing Operations:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>10</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R11.htm</HtmlFileName>
+      <LongName>995210401 - Disclosure - Receivables:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureReceivables</Role>
+      <ShortName>Receivables:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>11</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R12.htm</HtmlFileName>
+      <LongName>995210501 - Disclosure - Intangible Assets:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIntangibleAssets</Role>
+      <ShortName>Intangible Assets:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>12</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R13.htm</HtmlFileName>
+      <LongName>995210601 - Disclosure - Shareholders' Equity (Deficit):</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficit</Role>
+      <ShortName>Shareholders' Equity (Deficit):</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>13</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R14.htm</HtmlFileName>
+      <LongName>995210701 - Disclosure - Debt:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureDebt</Role>
+      <ShortName>Debt:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>14</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R15.htm</HtmlFileName>
+      <LongName>995210801 - Disclosure - Accrued Liabilities:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureAccruedLiabilities</Role>
+      <ShortName>Accrued Liabilities:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>15</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R16.htm</HtmlFileName>
+      <LongName>995210901 - Disclosure - Contract Liabilities:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureContractLiabilities</Role>
+      <ShortName>Contract Liabilities:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>16</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R17.htm</HtmlFileName>
+      <LongName>995211001 - Disclosure - Operating Leases:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureOperatingLeases</Role>
+      <ShortName>Operating Leases:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>17</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R18.htm</HtmlFileName>
+      <LongName>995211101 - Disclosure - Income Taxes:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIncomeTaxes</Role>
+      <ShortName>Income Taxes:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>18</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R19.htm</HtmlFileName>
+      <LongName>995211201 - Disclosure - Commitments and Contingencies:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureCommitmentsAndContingencies</Role>
+      <ShortName>Commitments and Contingencies:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>19</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R20.htm</HtmlFileName>
+      <LongName>995211301 - Disclosure - Segment Reporting:</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSegmentReporting</Role>
+      <ShortName>Segment Reporting:</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>20</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R21.htm</HtmlFileName>
+      <LongName>995410 - Disclosure - Pay vs Performance Disclosure</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://xbrl.sec.gov/ecd/role/PvpDisclosure</Role>
+      <ShortName>Pay vs Performance Disclosure</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>21</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R22.htm</HtmlFileName>
+      <LongName>995445 - Disclosure - Insider Trading Arrangements</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://xbrl.sec.gov/ecd/role/InsiderTradingArrangements</Role>
+      <ShortName>Insider Trading Arrangements</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>22</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R23.htm</HtmlFileName>
+      <LongName>995447 - Disclosure - Insider Trading Policies and Procedures</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://xbrl.sec.gov/ecd/role/InsiderTradingPoliciesProc</Role>
+      <ShortName>Insider Trading Policies and Procedures</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>23</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R24.htm</HtmlFileName>
+      <LongName>995550 - Disclosure - Cybersecurity Risk Management and Strategy Disclosure</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://xbrl.sec.gov/cyd/role/CybersecurityRiskManagementAndStrategyDisclosure</Role>
+      <ShortName>Cybersecurity Risk Management and Strategy Disclosure</ShortName>
+      <MenuCategory>Notes</MenuCategory>
+      <Position>24</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R25.htm</HtmlFileName>
+      <LongName>99920202 - Disclosure - Significant Accounting Policies: (Policies)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesPolicies</Role>
+      <ShortName>Significant Accounting Policies: (Policies)</ShortName>
+      <MenuCategory>Policies</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPolicies</ParentRole>
+      <Position>25</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R26.htm</HtmlFileName>
+      <LongName>99930203 - Disclosure - Significant Accounting Policies: (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesTables</Role>
+      <ShortName>Significant Accounting Policies: (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPolicies</ParentRole>
+      <Position>26</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R27.htm</HtmlFileName>
+      <LongName>99930303 - Disclosure - Leasing Operations: (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureLeasingOperationsTables</Role>
+      <ShortName>Leasing Operations: (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureLeasingOperations</ParentRole>
+      <Position>27</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R28.htm</HtmlFileName>
+      <LongName>99930403 - Disclosure - Receivables: (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureReceivablesTables</Role>
+      <ShortName>Receivables: (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureReceivables</ParentRole>
+      <Position>28</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R29.htm</HtmlFileName>
+      <LongName>99930503 - Disclosure - Intangible Assets: (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIntangibleAssetsTables</Role>
+      <ShortName>Intangible Assets: (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureIntangibleAssets</ParentRole>
+      <Position>29</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R30.htm</HtmlFileName>
+      <LongName>99930603 - Disclosure - Shareholders' Equity (Deficit): (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitTables</Role>
+      <ShortName>Shareholders' Equity (Deficit): (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficit</ParentRole>
+      <Position>30</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R31.htm</HtmlFileName>
+      <LongName>99930703 - Disclosure - Debt (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureDebtTables</Role>
+      <ShortName>Debt (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureDebt</ParentRole>
+      <Position>31</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R32.htm</HtmlFileName>
+      <LongName>99930803 - Disclosure - Accrued Liabilities (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureAccruedLiabilitiesTables</Role>
+      <ShortName>Accrued Liabilities (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureAccruedLiabilities</ParentRole>
+      <Position>32</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R33.htm</HtmlFileName>
+      <LongName>99930903 - Disclosure - Contract Liabilities: (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureContractLiabilitiesTables</Role>
+      <ShortName>Contract Liabilities: (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureContractLiabilities</ParentRole>
+      <Position>33</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R34.htm</HtmlFileName>
+      <LongName>99931003 - Disclosure - Operating Leases: (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureOperatingLeasesTables</Role>
+      <ShortName>Operating Leases: (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureOperatingLeases</ParentRole>
+      <Position>34</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R35.htm</HtmlFileName>
+      <LongName>99931103 - Disclosure - Income Taxes: (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesTables</Role>
+      <ShortName>Income Taxes: (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureIncomeTaxes</ParentRole>
+      <Position>35</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R36.htm</HtmlFileName>
+      <LongName>99931303 - Disclosure - Segment Reporting: (Tables)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSegmentReportingTables</Role>
+      <ShortName>Segment Reporting: (Tables)</ShortName>
+      <MenuCategory>Tables</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureSegmentReporting</ParentRole>
+      <Position>36</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R37.htm</HtmlFileName>
+      <LongName>99940101 - Disclosure - Organization and Business: (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureOrganizationAndBusinessDetails</Role>
+      <ShortName>Organization and Business: (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureOrganizationAndBusiness</ParentRole>
+      <Position>37</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R38.htm</HtmlFileName>
+      <LongName>99940201 - Disclosure - Significant Accounting Policies: Balance Sheet Disclosures (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesBalanceSheetDisclosuresDetails</Role>
+      <ShortName>Significant Accounting Policies: Balance Sheet Disclosures (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>38</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R39.htm</HtmlFileName>
+      <LongName>99940202 - Disclosure - Significant Accounting Policies: PPE, Intangible Assets, Goodwill, Advertising, Stock-Based Comp (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesPpeIntangibleAssetsGoodwillAdvertisingStockBasedCompDetails</Role>
+      <ShortName>Significant Accounting Policies: PPE, Intangible Assets, Goodwill, Advertising, Stock-Based Comp (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>39</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R40.htm</HtmlFileName>
+      <LongName>99940203 - Disclosure - Significant Accounting Policies: Marketing Fees and Software License Fees (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesMarketingFeesAndSoftwareLicenseFeesDetails</Role>
+      <ShortName>Significant Accounting Policies: Marketing Fees and Software License Fees (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>40</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R41.htm</HtmlFileName>
+      <LongName>99940204 - Disclosure - Significant Accounting Policies: Commission Fees (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesCommissionFeesDetails</Role>
+      <ShortName>Significant Accounting Policies: Commission Fees (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>41</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R42.htm</HtmlFileName>
+      <LongName>99940205 - Disclosure - Significant Accounting Policies: Earnings Per Share (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesEarningsPerShareDetails</Role>
+      <ShortName>Significant Accounting Policies: Earnings Per Share (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>42</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R43.htm</HtmlFileName>
+      <LongName>99940301 - Disclosure - Leasing Operations: Summary of Leasing Operations (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureLeasingOperationsSummaryOfLeasingOperationsDetails</Role>
+      <ShortName>Leasing Operations: Summary of Leasing Operations (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>43</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R44.htm</HtmlFileName>
+      <LongName>99940302 - Disclosure - Leasing Operations: Risk Concentration (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureLeasingOperationsRiskConcentrationDetails</Role>
+      <ShortName>Leasing Operations: Risk Concentration (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>44</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R45.htm</HtmlFileName>
+      <LongName>99940303 - Disclosure - Leasing Operations: Other (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureLeasingOperationsOtherDetails</Role>
+      <ShortName>Leasing Operations: Other (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>45</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R46.htm</HtmlFileName>
+      <LongName>99940304 - Disclosure - Leasing Operations: Leasing Income (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureLeasingOperationsLeasingIncomeDetails</Role>
+      <ShortName>Leasing Operations: Leasing Income (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>46</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R47.htm</HtmlFileName>
+      <LongName>99940401 - Disclosure - Receivables: (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureReceivablesDetails</Role>
+      <ShortName>Receivables: (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureReceivablesTables</ParentRole>
+      <Position>47</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R48.htm</HtmlFileName>
+      <LongName>99940501 - Disclosure - Intangible Assets: Franchise rights (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIntangibleAssetsFranchiseRightsDetails</Role>
+      <ShortName>Intangible Assets: Franchise rights (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>48</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R49.htm</HtmlFileName>
+      <LongName>99940502 - Disclosure - Intangible Assets: Net of Amortization (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIntangibleAssetsNetOfAmortizationDetails</Role>
+      <ShortName>Intangible Assets: Net of Amortization (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>49</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R50.htm</HtmlFileName>
+      <LongName>99940503 - Disclosure - Intangible Assets: Amortization (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIntangibleAssetsAmortizationDetails</Role>
+      <ShortName>Intangible Assets: Amortization (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>50</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R51.htm</HtmlFileName>
+      <LongName>99940601 - Disclosure - Shareholders' Equity (Deficit): Dividends (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitDividendsDetails</Role>
+      <ShortName>Shareholders' Equity (Deficit): Dividends (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitTables</ParentRole>
+      <Position>51</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R52.htm</HtmlFileName>
+      <LongName>99940602 - Disclosure - Shareholders' Equity (Deficit): Repurchase of Common Stock (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitRepurchaseOfCommonStockDetails</Role>
+      <ShortName>Shareholders' Equity (Deficit): Repurchase of Common Stock (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitTables</ParentRole>
+      <Position>52</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R53.htm</HtmlFileName>
+      <LongName>99940603 - Disclosure - Shareholders' Equity (Deficit): Stock Options (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitStockOptionsDetails</Role>
+      <ShortName>Shareholders' Equity (Deficit): Stock Options (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitTables</ParentRole>
+      <Position>53</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R54.htm</HtmlFileName>
+      <LongName>99940604 - Disclosure - Shareholders' Equity (Deficit): Stock Options Activity (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitStockOptionsActivityDetails</Role>
+      <ShortName>Shareholders' Equity (Deficit): Stock Options Activity (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitTables</ParentRole>
+      <Position>54</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R55.htm</HtmlFileName>
+      <LongName>99940605 - Disclosure - Shareholders' Equity (Deficit): Additional Information (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitAdditionalInformationDetails</Role>
+      <ShortName>Shareholders' Equity (Deficit): Additional Information (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitTables</ParentRole>
+      <Position>55</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R56.htm</HtmlFileName>
+      <LongName>99940701 - Disclosure - Debt: Line of Credit (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureDebtLineOfCreditDetails</Role>
+      <ShortName>Debt: Line of Credit (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>56</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R57.htm</HtmlFileName>
+      <LongName>99940702 - Disclosure - Debt: Notes Payable (Details)</LongName>
+      <ReportType>Notes</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureDebtNotesPayableDetails</Role>
+      <ShortName>Debt: Notes Payable (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>57</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R58.htm</HtmlFileName>
+      <LongName>99940703 - Disclosure - Debt: Maturities (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureDebtMaturitiesDetails</Role>
+      <ShortName>Debt: Maturities (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>58</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R59.htm</HtmlFileName>
+      <LongName>99940801 - Disclosure - Accrued Liabilities: (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureAccruedLiabilitiesDetails</Role>
+      <ShortName>Accrued Liabilities: (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureAccruedLiabilitiesTables</ParentRole>
+      <Position>59</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R60.htm</HtmlFileName>
+      <LongName>99940901 - Disclosure - Contract Liabilities: Activity (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureContractLiabilitiesActivityDetails</Role>
+      <ShortName>Contract Liabilities: Activity (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>60</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R61.htm</HtmlFileName>
+      <LongName>99940902 - Disclosure - Contract Liabilities: Performance Obligations (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureContractLiabilitiesPerformanceObligationsDetails</Role>
+      <ShortName>Contract Liabilities: Performance Obligations (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>61</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R62.htm</HtmlFileName>
+      <LongName>99941001 - Disclosure - Operating Leases: Summary (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureOperatingLeasesSummaryDetails</Role>
+      <ShortName>Operating Leases: Summary (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>62</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R63.htm</HtmlFileName>
+      <LongName>99941002 - Disclosure - Operating Leases: Maturities and other (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureOperatingLeasesMaturitiesAndOtherDetails</Role>
+      <ShortName>Operating Leases: Maturities and other (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>63</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R64.htm</HtmlFileName>
+      <LongName>99941101 - Disclosure - Income Taxes: Income from continuing operations (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesIncomeFromContinuingOperationsDetails</Role>
+      <ShortName>Income Taxes: Income from continuing operations (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>64</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R65.htm</HtmlFileName>
+      <LongName>99941102 - Disclosure - Income Taxes: Reconciliation (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesReconciliationDetails</Role>
+      <ShortName>Income Taxes: Reconciliation (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>65</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R66.htm</HtmlFileName>
+      <LongName>99941103 - Disclosure - Income Taxes: Income Taxes Paid (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesIncomeTaxesPaidDetails</Role>
+      <ShortName>Income Taxes: Income Taxes Paid (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>66</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R67.htm</HtmlFileName>
+      <LongName>99941104 - Disclosure - Income Taxes: Components of Provision for Income Taxes (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesComponentsOfProvisionForIncomeTaxesDetails</Role>
+      <ShortName>Income Taxes: Components of Provision for Income Taxes (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>67</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R68.htm</HtmlFileName>
+      <LongName>99941105 - Disclosure - Income Taxes: Deferred Taxes (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesDeferredTaxesDetails</Role>
+      <ShortName>Income Taxes: Deferred Taxes (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>68</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R69.htm</HtmlFileName>
+      <LongName>99941106 - Disclosure - Income Taxes: Other (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesOtherDetails</Role>
+      <ShortName>Income Taxes: Other (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <Position>69</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R70.htm</HtmlFileName>
+      <LongName>99941201 - Disclosure - Commitments and Contingencies: (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureCommitmentsAndContingenciesDetails</Role>
+      <ShortName>Commitments and Contingencies: (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureCommitmentsAndContingencies</ParentRole>
+      <Position>70</Position>
+    </Report>
+    <Report instance="wina-20251227x10k.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R71.htm</HtmlFileName>
+      <LongName>99941301 - Disclosure - Segment Reporting: (Details)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.winmarkcorporation.com/role/DisclosureSegmentReportingDetails</Role>
+      <ShortName>Segment Reporting: (Details)</ShortName>
+      <MenuCategory>Details</MenuCategory>
+      <ParentRole>http://www.winmarkcorporation.com/role/DisclosureSegmentReportingTables</ParentRole>
+      <Position>71</Position>
+    </Report>
+    <Report>
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <LongName>All Reports</LongName>
+      <ReportType>Book</ReportType>
+      <ShortName>All Reports</ShortName>
+    </Report>
+  </MyReports>
+  <InputFiles>
+    <File>wina-20251227.xsd</File>
+    <File>wina-20251227_cal.xml</File>
+    <File>wina-20251227_def.xml</File>
+    <File>wina-20251227_lab.xml</File>
+    <File>wina-20251227_pre.xml</File>
+    <File doctype="10-K" isDefinitelyFs="true" isUsgaap="true" original="wina-20251227x10k.htm">wina-20251227x10k.htm</File>
+  </InputFiles>
+  <SupplementalFiles>
+    <File>wina-20251227x10k003.jpg</File>
+  </SupplementalFiles>
+  <BaseTaxonomies>
+    <BaseTaxonomy items="735">http://fasb.org/us-gaap/2024</BaseTaxonomy>
+    <BaseTaxonomy items="14">http://xbrl.sec.gov/cyd/2024</BaseTaxonomy>
+    <BaseTaxonomy items="37">http://xbrl.sec.gov/dei/2024</BaseTaxonomy>
+    <BaseTaxonomy items="5">http://xbrl.sec.gov/ecd/2024</BaseTaxonomy>
+  </BaseTaxonomies>
+  <HasPresentationLinkbase>true</HasPresentationLinkbase>
+  <HasCalculationLinkbase>true</HasCalculationLinkbase>
+</FilingSummary>

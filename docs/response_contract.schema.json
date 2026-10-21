@@ -1,0 +1,151 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://github.com/edgar-search-mcp/response_contract/1.0",
+ "title": "edgar-search-mcp response contract 1.0",
+ "description": "Every tool answer is an envelope plus the tool's own fields. See RESPONSE_CONTRACT.md.",
+ "x-contract-version": "1.0",
+ "x-tools": ["lookup_company", "get_submissions", "list_filings", "list_filing_documents", "get_filing_document",
+             "get_filing_text", "search_filings", "get_companyfacts", "get_companyconcept", "get_frames",
+             "get_filing_xbrl"],
+ "x-removed-tools": ["get_financial_statement", "get_concept", "get_filed_statements", "get_segment_revenue",
+                     "search_companies"],
+ "x-forbidden-keys": ["kind", "parenthetical", "structure", "columns", "values_from_member", "calculation_checks",
+                      "roll_forward_checks", "document_facts", "registered_securities", "cover_shares",
+                      "industry", "subindustry", "match_type", "statement_type", "share_of_members_listed"],
+ "$defs": {
+  "source": {
+   "type": "object",
+   "required": ["url", "retrieved_at", "frozen", "cache_hit"],
+   "properties": {
+    "url": {"type": "string", "pattern": "^https://(www|data|efts)\\.sec\\.gov/"},
+    "retrieved_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "frozen": {"type": "boolean"},
+    "cache_hit": {"type": "boolean"},
+    "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+   }
+  },
+  "envelope": {
+   "type": "object",
+   "required": ["contract_version", "representation", "sources", "returned_at"],
+   "properties": {
+    "contract_version": {"const": "1.0"},
+    "representation": {"enum": ["source", "source_records", "parsed_source", "transformed"]},
+    "sources": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/source"}},
+    "returned_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "unresolved": {"type": "array", "items": {"$ref": "#/$defs/unresolved"}}
+   }
+  },
+  "unresolved": {
+   "type": "object",
+   "required": ["reason"],
+   "properties": {"reason": {"type": "string", "minLength": 1}}
+  },
+  "page": {
+   "type": "object",
+   "required": ["total", "offset", "count", "next_offset"],
+   "properties": {
+    "total": {"type": "integer", "minimum": 0},
+    "offset": {"type": "integer", "minimum": 0},
+    "count": {"type": "integer", "minimum": 0},
+    "next_offset": {"type": ["integer", "null"]}
+   }
+  },
+  "concept_ref": {
+   "type": "object",
+   "required": ["resolved"],
+   "if": {"properties": {"resolved": {"const": true}}},
+   "then": {"required": ["namespace", "local_name"],
+            "properties": {"namespace": {"type": "string", "minLength": 1}, "local_name": {"type": "string", "minLength": 1}}},
+   "else": {"required": ["reason"]}
+  },
+  "lookup_company": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["query", "status", "matches"],
+    "properties": {
+     "representation": {"const": "source_records"},
+     "status": {"enum": ["resolved", "ambiguous", "not_found"]},
+     "matches": {"type": "array", "items": {
+      "type": "object", "required": ["cik", "matched_on", "record"],
+      "properties": {"cik": {"type": "string", "pattern": "^\\d{10}$"},
+                     "matched_on": {"enum": ["cik", "ticker", "title"]},
+                     "record": {"type": "object", "required": ["cik_str", "ticker", "title"]}}}}
+    }}]
+  },
+  "get_submissions": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["cik", "payload"],
+    "properties": {"representation": {"const": "source"}, "payload": {"type": "object"},
+                   "older_files": {"type": "array", "items": {"type": "object", "required": ["name", "payload"]}}}
+   }]
+  },
+  "list_filings": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["cik", "filters", "filings", "complete", "warnings"],
+    "properties": {
+     "representation": {"const": "source_records"},
+     "filters": {"type": "object"},
+     "filings": {"type": "array", "items": {
+      "type": "object", "required": ["record", "url", "source"],
+      "properties": {"record": {"type": "object", "required": ["accessionNumber", "form", "filingDate"]},
+                     "source": {"type": "object", "required": ["file", "index"]}}}}
+    }}]
+  },
+  "list_filing_documents": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["transformation", "documents"],
+    "properties": {"representation": {"const": "transformed"}, "documents": {"type": "array"}}
+   }]
+  },
+  "get_filing_document": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["url", "content_type", "sha256", "total_bytes", "offset", "length", "next_offset", "data_base64", "text"],
+    "properties": {"representation": {"const": "source"}, "data_base64": {"type": "string"},
+                   "text": {"type": ["string", "null"]}}
+   }]
+  },
+  "get_filing_text": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["transformation", "original"],
+    "properties": {"representation": {"const": "transformed"},
+                   "transformation": {"type": "object", "required": ["name", "rules"]},
+                   "original": {"type": "object", "required": ["url", "sha256", "tool"]}}
+   }]
+  },
+  "search_filings": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["hits", "total_hits"],
+    "properties": {"representation": {"const": "source_records"},
+                   "hits": {"type": "array", "items": {"type": "object", "required": ["record", "url"],
+                            "properties": {"record": {"type": "object", "required": ["_id", "_source"]}}}}}
+   }]
+  },
+  "get_companyfacts": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["cik", "filters", "payload"],
+    "properties": {"representation": {"enum": ["source", "source_records"]}, "payload": {"type": "object"}}
+   }]
+  },
+  "get_companyconcept": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["cik", "payload"],
+    "properties": {"representation": {"const": "source"}, "payload": {"type": "object"}}
+   }]
+  },
+  "get_frames": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["payload"],
+    "properties": {"representation": {"const": "source"}, "payload": {"type": "object"}}
+   }]
+  },
+  "get_filing_xbrl": {
+   "allOf": [{"$ref": "#/$defs/envelope"}, {
+    "required": ["cik", "filing", "part", "unresolved"],
+    "properties": {
+     "representation": {"const": "parsed_source"},
+     "part": {"enum": ["summary", "schema", "presentation", "calculation", "definition", "label", "reference", "instance"]},
+     "items": {"type": "array", "items": {"type": "object", "required": ["seq", "kind"],
+                                          "properties": {"seq": {"type": "integer", "minimum": 0}}}}
+    }}]
+  }
+ }
+}

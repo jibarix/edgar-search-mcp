@@ -1,0 +1,1326 @@
+{
+ "arguments": {
+  "cik_or_ticker": "908315",
+  "num_periods": 3,
+  "period_type": "annual",
+  "statement_type": "IS"
+ },
+ "result": {
+  "cache_hit": false,
+  "cik": "0000908315",
+  "entity_name": "WINMARK CORPORATION",
+  "frozen": false,
+  "matched_on": "cik",
+  "metadata": {
+   "as_of": null,
+   "fiscal_month": "12",
+   "period_type": "annual",
+   "scope": "whole-entity facts in standard taxonomies; no share-class, segment or geographic detail",
+   "selection": "latest periodic report (10-K, 10-Q, 20-F, 40-F, 6-K) for each period",
+   "unclassified": {
+    "excluded": {},
+    "other_statements": 162,
+    "unmapped": 142
+   },
+   "vintage": "latest filed: every figure, and both sides of a derived quarter, is the most recently filed value, so later restatements replace the figures first reported",
+   "warnings": []
+  },
+  "metrics": {
+   "EPS_AntidilutiveSecuritiesExcludedFromComputationOfEarningsPerShareAmount": {
+    "category": "EPS",
+    "display_name": "Antidilutive shares (in shares)",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 50,
+    "other_units": [],
+    "section": "",
+    "source": "sec",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:AntidilutiveSecuritiesExcludedFromComputationOfEarningsPerShareAmount",
+    "unit": "shares",
+    "values": {
+     "2023-12-30": 2913,
+     "2024-12-28": 7578,
+     "2025-12-27": 14789
+    }
+   },
+   "EPS_CommonStockDividendsPerShareDeclared": {
+    "category": "EPS",
+    "display_name": "Dividends declared per share",
+    "indent": 1,
+    "is_subtotal": false,
+    "order": 65,
+    "other_units": [],
+    "section": "Dividends:",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-24-000010",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2024-02-28",
+      "form": "10-K",
+      "start": "2023-01-01"
+     }
+    },
+    "tag": "us-gaap:CommonStockDividendsPerShareDeclared",
+    "unit": "USD/shares",
+    "values": {
+     "2023-12-30": 3.1,
+     "2024-12-28": null,
+     "2025-12-27": null
+    }
+   },
+   "EPS_EarningsPerShareBasic": {
+    "category": "EPS",
+    "display_name": "Basic",
+    "indent": 1,
+    "is_subtotal": false,
+    "order": 60,
+    "other_units": [],
+    "section": "Earnings per share:",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:EarningsPerShareBasic",
+    "unit": "USD/shares",
+    "values": {
+     "2023-12-30": 11.55,
+     "2024-12-28": 11.36,
+     "2025-12-27": 11.73
+    }
+   },
+   "EPS_EarningsPerShareDiluted": {
+    "category": "EPS",
+    "display_name": "Diluted",
+    "indent": 1,
+    "is_subtotal": false,
+    "order": 61,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:EarningsPerShareDiluted",
+    "unit": "USD/shares",
+    "values": {
+     "2023-12-30": 11.04,
+     "2024-12-28": 10.89,
+     "2025-12-27": 11.3
+    }
+   },
+   "EPS_IncrementalCommonSharesAttributableToShareBasedPaymentArrangements": {
+    "category": "EPS",
+    "display_name": "Dilutive effect of share-based awards",
+    "indent": 2,
+    "is_subtotal": false,
+    "order": 73,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:IncrementalCommonSharesAttributableToShareBasedPaymentArrangements",
+    "unit": "shares",
+    "values": {
+     "2023-12-30": 160588,
+     "2024-12-28": 151357,
+     "2025-12-27": 135704
+    }
+   },
+   "EPS_WeightedAverageNumberOfDilutedSharesOutstanding": {
+    "category": "EPS",
+    "display_name": "Diluted",
+    "indent": 1,
+    "is_subtotal": false,
+    "order": 71,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding",
+    "unit": "shares",
+    "values": {
+     "2023-12-30": 3640524,
+     "2024-12-28": 3667479,
+     "2025-12-27": 3685457
+    }
+   },
+   "EPS_WeightedAverageNumberOfSharesOutstandingBasic": {
+    "category": "EPS",
+    "display_name": "Basic",
+    "indent": 1,
+    "is_subtotal": false,
+    "order": 70,
+    "other_units": [],
+    "section": "Shares used in computing earnings per share:",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:WeightedAverageNumberOfSharesOutstandingBasic",
+    "unit": "shares",
+    "values": {
+     "2023-12-30": 3479936,
+     "2024-12-28": 3516122,
+     "2025-12-27": 3549753
+    }
+   },
+   "Income_AdvertisingExpense": {
+    "category": "Income",
+    "display_name": "Advertising",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 50,
+    "other_units": [],
+    "section": "",
+    "source": "sec",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:AdvertisingExpense",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 700000,
+     "2024-12-28": 600000,
+     "2025-12-27": 800000
+    }
+   },
+   "Income_ComprehensiveIncomeNetOfTax": {
+    "category": "Income",
+    "display_name": "Comprehensive income",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 55,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:ComprehensiveIncomeNetOfTax",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 40178100,
+     "2024-12-28": 39954200,
+     "2025-12-27": 41654100
+    }
+   },
+   "Income_CostOfGoodsAndServicesSold": {
+    "category": "Income",
+    "display_name": "Cost of goods and services sold",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 11,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:CostOfGoodsAndServicesSold",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 4461500,
+     "2024-12-28": 3379200,
+     "2025-12-27": 3104400
+    }
+   },
+   "Income_CurrentFederalTaxExpenseBenefit": {
+    "category": "Income",
+    "display_name": "Federal current tax",
+    "indent": 2,
+    "is_subtotal": false,
+    "order": 46.1,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:CurrentFederalTaxExpenseBenefit",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 9237600,
+     "2024-12-28": 8840600,
+     "2025-12-27": 9382500
+    }
+   },
+   "Income_CurrentForeignTaxExpenseBenefit": {
+    "category": "Income",
+    "display_name": "Foreign current tax",
+    "indent": 2,
+    "is_subtotal": false,
+    "order": 47.1,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:CurrentForeignTaxExpenseBenefit",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 573800,
+     "2024-12-28": 563000,
+     "2025-12-27": 560300
+    }
+   },
+   "Income_CurrentIncomeTaxExpenseBenefit": {
+    "category": "Income",
+    "display_name": "Current tax expense",
+    "indent": 1,
+    "is_subtotal": false,
+    "order": 48.5,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:CurrentIncomeTaxExpenseBenefit",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 11695300,
+     "2024-12-28": 11429100,
+     "2025-12-27": 11677100
+    }
+   },
+   "Income_CurrentStateAndLocalTaxExpenseBenefit": {
+    "category": "Income",
+    "display_name": "State and local current tax",
+    "indent": 2,
+    "is_subtotal": false,
+    "order": 48.1,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:CurrentStateAndLocalTaxExpenseBenefit",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 1883900,
+     "2024-12-28": 2025500,
+     "2025-12-27": 1734300
+    }
+   },
+   "Income_EffectiveIncomeTaxRateContinuingOperations": {
+    "category": "Income",
+    "display_name": "Effective tax rate",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 49,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:EffectiveIncomeTaxRateContinuingOperations",
+    "unit": "pure",
+    "values": {
+     "2023-12-30": 0.22,
+     "2024-12-28": 0.22,
+     "2025-12-27": 0.216
+    }
+   },
+   "Income_IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic": {
+    "category": "Income",
+    "display_name": "Domestic pre-tax income",
+    "indent": 1,
+    "is_subtotal": false,
+    "order": 41,
+    "other_units": [],
+    "section": "Pre-tax income by jurisdiction:",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 44672200,
+     "2024-12-28": 43982300,
+     "2025-12-27": 45313700
+    }
+   },
+   "Income_IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest": {
+    "category": "Income",
+    "display_name": "Income before provision for income taxes",
+    "indent": 0,
+    "is_subtotal": true,
+    "order": 40,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 51361300,
+     "2024-12-28": 51224000,
+     "2025-12-27": 53135600
+    }
+   },
+   "Income_IncomeLossFromContinuingOperationsBeforeIncomeTaxesForeign": {
+    "category": "Income",
+    "display_name": "Foreign pre-tax income",
+    "indent": 1,
+    "is_subtotal": false,
+    "order": 42,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesForeign",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 6689100,
+     "2024-12-28": 7241700,
+     "2025-12-27": 7821900
+    }
+   },
+   "Income_IncomeTaxExpenseBenefit": {
+    "category": "Income",
+    "display_name": "Provision for income taxes",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 45,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:IncomeTaxExpenseBenefit",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 11183200,
+     "2024-12-28": 11269800,
+     "2025-12-27": 11481500
+    }
+   },
+   "Income_IncomeTaxReconciliationChangeInDeferredTaxAssetsValuationAllowance": {
+    "category": "Income",
+    "display_name": "Change in valuation allowance",
+    "indent": 2,
+    "is_subtotal": false,
+    "order": 48.7,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:IncomeTaxReconciliationChangeInDeferredTaxAssetsValuationAllowance",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": -485700,
+     "2024-12-28": 180000,
+     "2025-12-27": 374500
+    }
+   },
+   "Income_InterestExpense": {
+    "category": "Income",
+    "display_name": "Interest expense",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 8,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-24-000010",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2024-02-28",
+      "form": "10-K",
+      "start": "2023-01-01"
+     }
+    },
+    "tag": "us-gaap:InterestExpense",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 3091000,
+     "2024-12-28": null,
+     "2025-12-27": null
+    }
+   },
+   "Income_InterestExpenseNonoperating": {
+    "category": "Income",
+    "display_name": "Interest expense",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 50,
+    "other_units": [],
+    "section": "",
+    "source": "sec",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:InterestExpenseNonoperating",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 3091000,
+     "2024-12-28": 2856900,
+     "2025-12-27": 2446800
+    }
+   },
+   "Income_LeaseIncome": {
+    "category": "Income",
+    "display_name": "Rental income",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 50,
+    "other_units": [],
+    "section": "",
+    "source": "sec",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:LeaseIncome",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 4766200,
+     "2024-12-28": 1811800,
+     "2025-12-27": 2631800
+    }
+   },
+   "Income_NetIncomeLoss": {
+    "category": "Income",
+    "display_name": "Net income",
+    "indent": 0,
+    "is_subtotal": true,
+    "order": 50,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:NetIncomeLoss",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 40178100,
+     "2024-12-28": 39954200,
+     "2025-12-27": 41654100
+    }
+   },
+   "Income_NetInvestmentInLeaseCreditLossExpenseReversal": {
+    "category": "Income",
+    "display_name": "Provisions for credit losses",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 50,
+    "other_units": [],
+    "section": "",
+    "source": "sec",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     }
+    },
+    "tag": "us-gaap:NetInvestmentInLeaseCreditLossExpenseReversal",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": -5600,
+     "2024-12-28": -1500,
+     "2025-12-27": null
+    }
+   },
+   "Income_OperatingIncomeLoss": {
+    "category": "Income",
+    "display_name": "Operating income",
+    "indent": 0,
+    "is_subtotal": true,
+    "order": 30,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:OperatingIncomeLoss",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 53280600,
+     "2024-12-28": 52930600,
+     "2025-12-27": 54593900
+    }
+   },
+   "Income_OperatingLeaseExpense": {
+    "category": "Income",
+    "display_name": "Operating lease expense",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 50,
+    "other_units": [],
+    "section": "",
+    "source": "sec",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:OperatingLeaseExpense",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 1171100,
+     "2024-12-28": 1067400,
+     "2025-12-27": 1038300
+    }
+   },
+   "Income_OperatingLeaseLeaseIncome": {
+    "category": "Income",
+    "display_name": "Rental income",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 50,
+    "other_units": [],
+    "section": "",
+    "source": "sec",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:OperatingLeaseLeaseIncome",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 2999400,
+     "2024-12-28": 1023400,
+     "2025-12-27": 171000
+    }
+   },
+   "Income_SellingGeneralAndAdministrativeExpense": {
+    "category": "Income",
+    "display_name": "Selling, general and administrative",
+    "indent": 1,
+    "is_subtotal": false,
+    "order": 21,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:SellingGeneralAndAdministrativeExpense",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 25108700,
+     "2024-12-28": 24944200,
+     "2025-12-27": 28357400
+    }
+   },
+   "Revenue_Revenues": {
+    "category": "Revenue",
+    "display_name": "Net revenue",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 0,
+    "other_units": [],
+    "section": "",
+    "source": "builtin",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     },
+     "2025-12-27": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2025-12-27",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2024-12-29"
+     }
+    },
+    "tag": "us-gaap:Revenues",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 83243500,
+     "2024-12-28": 81289100,
+     "2025-12-27": 86055700
+    }
+   },
+   "Revenue_SalesTypeAndDirectFinancingLeasesInterestIncome": {
+    "category": "Revenue",
+    "display_name": "Income from investments in leases - Financing receivables",
+    "indent": 0,
+    "is_subtotal": false,
+    "order": 50,
+    "other_units": [],
+    "section": "",
+    "source": "sec",
+    "sources": {
+     "2023-12-30": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2023-12-30",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-01-01"
+     },
+     "2024-12-28": {
+      "accn": "0000908315-26-000007",
+      "derived": false,
+      "end": "2024-12-28",
+      "filed": "2026-02-25",
+      "form": "10-K",
+      "start": "2023-12-31"
+     }
+    },
+    "tag": "us-gaap:SalesTypeAndDirectFinancingLeasesInterestIncome",
+    "unit": "USD",
+    "values": {
+     "2023-12-30": 246200,
+     "2024-12-28": 6700,
+     "2025-12-27": null
+    }
+   }
+  },
+  "period_type": "annual",
+  "periods": [
+   "2025-12-27",
+   "2024-12-28",
+   "2023-12-30"
+  ],
+  "retrieved_at": "2026-10-21T19:26:58Z",
+  "source_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000908315.json",
+  "statement_type": "IS"
+ },
+ "tool": "get_financial_statement"
+}

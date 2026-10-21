@@ -1,0 +1,558 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--XBRL document created with Toppan Merrill Bridge  11.2.0.5 -->
+<!--Based on XBRL 2.1-->
+<!--Created on: 2/25/2026 1:45:13 PM-->
+<!--Modified on: 2/25/2026 1:45:13 PM-->
+<xsd:schema targetNamespace="http://www.winmarkcorporation.com/20251227" attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ref="http://www.xbrl.org/2006/ref" xmlns:xbrldt="http://xbrl.org/2005/xbrldt" xmlns:xl="http://www.xbrl.org/2003/XLink" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:attributeFormDefault="unqualified" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:country="http://xbrl.sec.gov/country/2024" xmlns:us-gaap="http://fasb.org/us-gaap/2024" xmlns:negated="http://www.xbrl.org/2009/role/negated" xmlns:dtr-types="http://www.xbrl.org/dtr/type/2022-03-31" xmlns:wina="http://www.winmarkcorporation.com/20251227" xmlns:enum2="http://xbrl.org/2020/extensible-enumerations-2.0" xmlns:us-roles="http://fasb.org/us-roles/2024" xmlns:stpr="http://xbrl.sec.gov/stpr/2024" xmlns:utr="http://www.xbrl.org/2009/utr" xmlns:srt="http://fasb.org/srt/2024" xmlns:deprecated="http://www.xbrl.org/2009/role/deprecated" xmlns:net="http://www.xbrl.org/2009/role/net" xmlns:dei="http://xbrl.sec.gov/dei/2024" xmlns:dtr="http://www.xbrl.org/2009/dtr" xmlns:xbrldi="http://xbrl.org/2006/xbrldi" xmlns:ecd="http://xbrl.sec.gov/ecd/2024" xmlns:ecd-sub="http://xbrl.sec.gov/ecd-sub/2024" xmlns:cyd-af-sub="http://xbrl.sec.gov/cyd-af-sub/2024" xmlns:cyd="http://xbrl.sec.gov/cyd/2024">
+  <xsd:annotation>
+    <xsd:appinfo>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureStandardAndCustomAxisDomainDefaults" id="DisclosureStandardAndCustomAxisDomainDefaults">
+        <link:definition>99900 - Disclosure - Standard And Custom Axis Domain Defaults</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedBalanceSheets" id="StatementConsolidatedCondensedBalanceSheets">
+        <link:definition>995200100 - Statement - CONSOLIDATED CONDENSED BALANCE SHEETS</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfOperations" id="StatementConsolidatedCondensedStatementsOfOperations">
+        <link:definition>995200200 - Statement - CONSOLIDATED CONDENSED STATEMENTS OF OPERATIONS</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfCashFlows" id="StatementConsolidatedCondensedStatementsOfCashFlows">
+        <link:definition>995200500 - Statement - CONSOLIDATED CONDENSED STATEMENTS OF CASH FLOWS</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/StatementConsolidatedStatementsOfCashFlowsCalc2" id="StatementConsolidatedStatementsOfCashFlowsCalc2">
+        <link:definition>00505 - Statement - CONSOLIDATED STATEMENTS OF CASH FLOWS (Calc 2)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesEarningsPerShareDetails" id="DisclosureSignificantAccountingPoliciesEarningsPerShareDetails">
+        <link:definition>99940205 - Disclosure - Significant Accounting Policies: Earnings Per Share (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureLeasingOperationsSummaryOfLeasingOperationsDetails" id="DisclosureLeasingOperationsSummaryOfLeasingOperationsDetails">
+        <link:definition>99940301 - Disclosure - Leasing Operations: Summary of Leasing Operations (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureLeasingOperationsLeasingIncomeDetails" id="DisclosureLeasingOperationsLeasingIncomeDetails">
+        <link:definition>99940304 - Disclosure - Leasing Operations: Leasing Income (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureReceivablesDetails" id="DisclosureReceivablesDetails">
+        <link:definition>99940401 - Disclosure - Receivables: (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIntangibleAssetsNetOfAmortizationDetails" id="DisclosureIntangibleAssetsNetOfAmortizationDetails">
+        <link:definition>99940502 - Disclosure - Intangible Assets: Net of Amortization (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIntangibleAssetsAmortizationDetails" id="DisclosureIntangibleAssetsAmortizationDetails">
+        <link:definition>99940503 - Disclosure - Intangible Assets: Amortization (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureDebtMaturitiesDetails" id="DisclosureDebtMaturitiesDetails">
+        <link:definition>99940703 - Disclosure - Debt: Maturities (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureAccruedLiabilitiesDetails" id="DisclosureAccruedLiabilitiesDetails">
+        <link:definition>99940801 - Disclosure - Accrued Liabilities: (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureOperatingLeasesMaturitiesAndOtherDetailss" id="DisclosureOperatingLeasesMaturitiesAndOtherDetailss">
+        <link:definition>41002 - Disclosure - Operating Leases: Maturities and other (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureOperatingLeasesMaturitiesAndOtherDetailsCalc2" id="DisclosureOperatingLeasesMaturitiesAndOtherDetailsCalc2">
+        <link:definition>410021 - Disclosure - Operating Leases: Maturities and other (Details) Calc 2</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesIncomeFromContinuingOperationsDetails" id="DisclosureIncomeTaxesIncomeFromContinuingOperationsDetails">
+        <link:definition>99941101 - Disclosure - Income Taxes: Income from continuing operations (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesReconciliationDetails" id="DisclosureIncomeTaxesReconciliationDetails">
+        <link:definition>99941102 - Disclosure - Income Taxes: Reconciliation (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesIncomeTaxesPaidDetails" id="DisclosureIncomeTaxesIncomeTaxesPaidDetails">
+        <link:definition>99941103 - Disclosure - Income Taxes: Income Taxes Paid (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesComponentsOfProvisionForIncomeTaxesDetails" id="DisclosureIncomeTaxesComponentsOfProvisionForIncomeTaxesDetails">
+        <link:definition>99941104 - Disclosure - Income Taxes: Components of Provision for Income Taxes (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesDeferredTaxesDetails" id="DisclosureIncomeTaxesDeferredTaxesDetails">
+        <link:definition>99941105 - Disclosure - Income Taxes: Deferred Taxes (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureDisclosureSegmentReportingDetails" id="DisclosureDisclosureSegmentReportingDetails">
+        <link:definition>41301 - Disclosure - Disclosure - Segment Reporting: (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DocumentDocumentAndEntityInformation" id="DocumentDocumentAndEntityInformation">
+        <link:definition>995200090 - Document - Document and Entity Information</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedBalanceSheetsParenthetical" id="StatementConsolidatedCondensedBalanceSheetsParenthetical">
+        <link:definition>995200105 - Statement - CONSOLIDATED CONDENSED BALANCE SHEETS (Parenthetical)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfShareholdersEquityDeficit" id="StatementConsolidatedCondensedStatementsOfShareholdersEquityDeficit">
+        <link:definition>995200400 - Statement - CONSOLIDATED CONDENSED STATEMENTS OF SHAREHOLDERS' EQUITY (DEFICIT)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureOrganizationAndBusiness" id="DisclosureOrganizationAndBusiness">
+        <link:definition>995210101 - Disclosure - Organization and Business:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPolicies" id="DisclosureSignificantAccountingPolicies">
+        <link:definition>995210201 - Disclosure - Significant Accounting Policies:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureLeasingOperations" id="DisclosureLeasingOperations">
+        <link:definition>995210301 - Disclosure - Leasing Operations:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureReceivables" id="DisclosureReceivables">
+        <link:definition>995210401 - Disclosure - Receivables:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficit" id="DisclosureShareholdersEquityDeficit">
+        <link:definition>995210601 - Disclosure - Shareholders' Equity (Deficit):</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureAccruedLiabilities" id="DisclosureAccruedLiabilities">
+        <link:definition>995210801 - Disclosure - Accrued Liabilities:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIncomeTaxes" id="DisclosureIncomeTaxes">
+        <link:definition>995211101 - Disclosure - Income Taxes:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureCommitmentsAndContingencies" id="DisclosureCommitmentsAndContingencies">
+        <link:definition>995211201 - Disclosure - Commitments and Contingencies:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSegmentReporting" id="DisclosureSegmentReporting">
+        <link:definition>995211301 - Disclosure - Segment Reporting:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesPolicies" id="DisclosureSignificantAccountingPoliciesPolicies">
+        <link:definition>99920202 - Disclosure - Significant Accounting Policies: (Policies)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesTables" id="DisclosureSignificantAccountingPoliciesTables">
+        <link:definition>99930203 - Disclosure - Significant Accounting Policies: (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureLeasingOperationsTables" id="DisclosureLeasingOperationsTables">
+        <link:definition>99930303 - Disclosure - Leasing Operations: (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureReceivablesTables" id="DisclosureReceivablesTables">
+        <link:definition>99930403 - Disclosure - Receivables: (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitTables" id="DisclosureShareholdersEquityDeficitTables">
+        <link:definition>99930603 - Disclosure - Shareholders' Equity (Deficit): (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureAccruedLiabilitiesTables" id="DisclosureAccruedLiabilitiesTables">
+        <link:definition>99930803 - Disclosure - Accrued Liabilities (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesTables" id="DisclosureIncomeTaxesTables">
+        <link:definition>99931103 - Disclosure - Income Taxes: (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSegmentReportingTables" id="DisclosureSegmentReportingTables">
+        <link:definition>99931303 - Disclosure - Segment Reporting: (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureOrganizationAndBusinessDetails" id="DisclosureOrganizationAndBusinessDetails">
+        <link:definition>99940101 - Disclosure - Organization and Business: (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesBalanceSheetDisclosuresDetails" id="DisclosureSignificantAccountingPoliciesBalanceSheetDisclosuresDetails">
+        <link:definition>99940201 - Disclosure - Significant Accounting Policies: Balance Sheet Disclosures (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesPpeIntangibleAssetsGoodwillAdvertisingStockBasedCompDetails" id="DisclosureSignificantAccountingPoliciesPpeIntangibleAssetsGoodwillAdvertisingStockBasedCompDetails">
+        <link:definition>99940202 - Disclosure - Significant Accounting Policies: PPE, Intangible Assets, Goodwill, Advertising, Stock-Based Comp (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesMarketingFeesAndSoftwareLicenseFeesDetails" id="DisclosureSignificantAccountingPoliciesMarketingFeesAndSoftwareLicenseFeesDetails">
+        <link:definition>99940203 - Disclosure - Significant Accounting Policies: Marketing Fees and Software License Fees (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSignificantAccountingPoliciesCommissionFeesDetails" id="DisclosureSignificantAccountingPoliciesCommissionFeesDetails">
+        <link:definition>99940204 - Disclosure - Significant Accounting Policies: Commission Fees (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureLeasingOperationsRiskConcentrationDetails" id="DisclosureLeasingOperationsRiskConcentrationDetails">
+        <link:definition>99940302 - Disclosure - Leasing Operations: Risk Concentration (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureLeasingOperationsOtherDetails" id="DisclosureLeasingOperationsOtherDetails">
+        <link:definition>99940303 - Disclosure - Leasing Operations: Other (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIntangibleAssetsFranchiseRightsDetails" id="DisclosureIntangibleAssetsFranchiseRightsDetails">
+        <link:definition>99940501 - Disclosure - Intangible Assets: Franchise rights (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitDividendsDetails" id="DisclosureShareholdersEquityDeficitDividendsDetails">
+        <link:definition>99940601 - Disclosure - Shareholders' Equity (Deficit): Dividends (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitRepurchaseOfCommonStockDetails" id="DisclosureShareholdersEquityDeficitRepurchaseOfCommonStockDetails">
+        <link:definition>99940602 - Disclosure - Shareholders' Equity (Deficit): Repurchase of Common Stock (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitStockOptionsDetails" id="DisclosureShareholdersEquityDeficitStockOptionsDetails">
+        <link:definition>99940603 - Disclosure - Shareholders' Equity (Deficit): Stock Options (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitStockOptionsActivityDetails" id="DisclosureShareholdersEquityDeficitStockOptionsActivityDetails">
+        <link:definition>99940604 - Disclosure - Shareholders' Equity (Deficit): Stock Options Activity (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureShareholdersEquityDeficitAdditionalInformationDetails" id="DisclosureShareholdersEquityDeficitAdditionalInformationDetails">
+        <link:definition>99940605 - Disclosure - Shareholders' Equity (Deficit): Additional Information (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureDebtLineOfCreditDetails" id="DisclosureDebtLineOfCreditDetails">
+        <link:definition>99940701 - Disclosure - Debt: Line of Credit (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureDebtNotesPayableDetails" id="DisclosureDebtNotesPayableDetails">
+        <link:definition>99940702 - Disclosure - Debt: Notes Payable (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureContractLiabilitiesPerformanceObligationsDetails" id="DisclosureContractLiabilitiesPerformanceObligationsDetails">
+        <link:definition>99940902 - Disclosure - Contract Liabilities: Performance Obligations (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureContractLiabilitiesPerformanceObligationsDefaultDetails" id="DisclosureContractLiabilitiesPerformanceObligationsDefaultDetails">
+        <link:definition>40902 - Disclosure - Contract Liabilities: Performance Obligations Default (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureOperatingLeasesSummaryDetails" id="DisclosureOperatingLeasesSummaryDetails">
+        <link:definition>99941001 - Disclosure - Operating Leases: Summary (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureOperatingLeasesMaturitiesAndOtherDetails" id="DisclosureOperatingLeasesMaturitiesAndOtherDetails">
+        <link:definition>99941002 - Disclosure - Operating Leases: Maturities and other (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIncomeTaxesOtherDetails" id="DisclosureIncomeTaxesOtherDetails">
+        <link:definition>99941106 - Disclosure - Income Taxes: Other (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureCommitmentsAndContingenciesDetails" id="DisclosureCommitmentsAndContingenciesDetails">
+        <link:definition>99941201 - Disclosure - Commitments and Contingencies: (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureSegmentReportingDetails" id="DisclosureSegmentReportingDetails">
+        <link:definition>99941301 - Disclosure - Segment Reporting: (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfShareholdersEquityDeficitParenthetical" id="StatementConsolidatedCondensedStatementsOfShareholdersEquityDeficitParenthetical">
+        <link:definition>995200405 - Statement - CONSOLIDATED CONDENSED STATEMENTS OF SHAREHOLDERS' EQUITY (DEFICIT) (Parenthetical)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/StatementConsolidatedCondensedStatementsOfCashFlowsSupplementalDisclosures" id="StatementConsolidatedCondensedStatementsOfCashFlowsSupplementalDisclosures">
+        <link:definition>995200505 - Statement - CONSOLIDATED CONDENSED STATEMENTS OF CASH FLOWS - Supplemental Disclosures</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIntangibleAssets" id="DisclosureIntangibleAssets">
+        <link:definition>995210501 - Disclosure - Intangible Assets:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureDebt" id="DisclosureDebt">
+        <link:definition>995210701 - Disclosure - Debt:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureContractLiabilities" id="DisclosureContractLiabilities">
+        <link:definition>995210901 - Disclosure - Contract Liabilities:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureOperatingLeases" id="DisclosureOperatingLeases">
+        <link:definition>995211001 - Disclosure - Operating Leases:</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureIntangibleAssetsTables" id="DisclosureIntangibleAssetsTables">
+        <link:definition>99930503 - Disclosure - Intangible Assets: (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureDebtTables" id="DisclosureDebtTables">
+        <link:definition>99930703 - Disclosure - Debt (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureContractLiabilitiesTables" id="DisclosureContractLiabilitiesTables">
+        <link:definition>99930903 - Disclosure - Contract Liabilities: (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureOperatingLeasesTables" id="DisclosureOperatingLeasesTables">
+        <link:definition>99931003 - Disclosure - Operating Leases: (Tables)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.winmarkcorporation.com/role/DisclosureContractLiabilitiesActivityDetails" id="DisclosureContractLiabilitiesActivityDetails">
+        <link:definition>99940901 - Disclosure - Contract Liabilities: Activity (Details)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:linkbaseRef xlink:type="simple" xlink:href="wina-20251227_pre.xml" xlink:role="http://www.xbrl.org/2003/role/presentationLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase" />
+      <link:linkbaseRef xlink:type="simple" xlink:href="wina-20251227_cal.xml" xlink:role="http://www.xbrl.org/2003/role/calculationLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase" />
+      <link:linkbaseRef xlink:type="simple" xlink:href="wina-20251227_def.xml" xlink:role="http://www.xbrl.org/2003/role/definitionLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase" />
+      <link:linkbaseRef xlink:type="simple" xlink:href="wina-20251227_lab.xml" xlink:role="http://www.xbrl.org/2003/role/labelLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase" />
+    </xsd:appinfo>
+  </xsd:annotation>
+  <xsd:import namespace="https://xbrl.org/2023/calculation-1.1" schemaLocation="https://www.xbrl.org/2023/calculation-1.1.xsd" />
+  <xsd:import namespace="http://xbrl.sec.gov/ecd/2024" schemaLocation="https://xbrl.sec.gov/ecd/2024/ecd-2024.xsd" />
+  <xsd:import namespace="http://xbrl.sec.gov/dei/2024" schemaLocation="https://xbrl.sec.gov/dei/2024/dei-2024.xsd" />
+  <xsd:import namespace="http://xbrl.sec.gov/stpr/2024" schemaLocation="https://xbrl.sec.gov/stpr/2024/stpr-2024.xsd" />
+  <xsd:import namespace="http://www.xbrl.org/dtr/type/2022-03-31" schemaLocation="https://www.xbrl.org/dtr/type/2022-03-31/types.xsd" />
+  <xsd:import namespace="http://www.xbrl.org/2009/role/negated" schemaLocation="http://www.xbrl.org/lrr/role/negated-2009-12-16.xsd" />
+  <xsd:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd" />
+  <xsd:import namespace="http://xbrl.org/2005/xbrldt" schemaLocation="http://www.xbrl.org/2005/xbrldt-2005.xsd" />
+  <xsd:import namespace="http://fasb.org/us-roles/2024" schemaLocation="https://xbrl.fasb.org/us-gaap/2024/elts/us-roles-2024.xsd" />
+  <xsd:import namespace="http://fasb.org/us-gaap/2024" schemaLocation="https://xbrl.fasb.org/us-gaap/2024/elts/us-gaap-2024.xsd" />
+  <xsd:import namespace="http://xbrl.sec.gov/country/2024" schemaLocation="https://xbrl.sec.gov/country/2024/country-2024.xsd" />
+  <xsd:import namespace="http://fasb.org/srt/2024" schemaLocation="https://xbrl.fasb.org/srt/2024/elts/srt-2024.xsd" />
+  <xsd:import namespace="http://xbrl.sec.gov/ecd-sub/2024" schemaLocation="https://xbrl.sec.gov/ecd/2024/ecd-sub-2024.xsd" />
+  <xsd:import namespace="http://xbrl.sec.gov/cyd/2024" schemaLocation="https://xbrl.sec.gov/cyd/2024/cyd-2024.xsd" />
+  <xsd:import namespace="http://xbrl.sec.gov/cyd-af-sub/2024" schemaLocation="https://xbrl.sec.gov/cyd/2024/cyd-af-sub-2024.xsd" />
+  <xsd:element name="DebtInstrumentVariableRateBaseRateMember" id="wina_DebtInstrumentVariableRateBaseRateMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="LineOfCreditFacilityNumberOfInterestRateOptions" id="wina_LineOfCreditFacilityNumberOfInterestRateOptions" type="xbrli:integerItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="FranchiseNameDomain" id="wina_FranchiseNameDomain" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="SalesTaxPolicyTextBlock" id="wina_SalesTaxPolicyTextBlock" type="dtr-types:textBlockItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="AllCountriesAxis" id="wina_AllCountriesAxis" type="xbrli:stringItemType" substitutionGroup="xbrldt:dimensionItem" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="InvestmentLeasingOperationsAbstract" id="wina_InvestmentLeasingOperationsAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="AllowanceForLoanAndLeaseLossesAbstract" id="wina_AllowanceForLoanAndLeaseLossesAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="AllowanceForLoanAndLeaseLossesWriteOffsDelinquentPeriod" id="wina_AllowanceForLoanAndLeaseLossesWriteOffsDelinquentPeriod" type="xbrli:durationItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="SignificantChangeInUnrecognizedTaxBenefitsPeriodOverWhichVariousStatutesOfLimitationAreExpectedToExpire" id="wina_SignificantChangeInUnrecognizedTaxBenefitsPeriodOverWhichVariousStatutesOfLimitationAreExpectedToExpire" type="xbrli:durationItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="RoyaltyReceivableNetCurrent" id="wina_RoyaltyReceivableNetCurrent" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="debit" xbrli:periodType="instant" />
+  <xsd:element name="DocumentAndEntityInformationAbstract" id="wina_DocumentAndEntityInformationAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="LeasingExpense" id="wina_LeasingExpense" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:balance="debit" xbrli:periodType="duration" />
+  <xsd:element id="wina_AdditionsToAdvanceAndSecurityDeposits" name="AdditionsToAdvanceAndSecurityDeposits" nillable="true" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" xbrli:balance="debit" />
+  <xsd:element id="wina_ShareBasedCompensationArrangementByShareBasedPaymentAwardOptionsWeightedAverageRemainingContractualTermRollForward" name="ShareBasedCompensationArrangementByShareBasedPaymentAwardOptionsWeightedAverageRemainingContractualTermRollForward" nillable="true" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" xbrli:periodType="duration" />
+  <xsd:element id="wina_ShareBasedCompensationArrangementByShareBasedPaymentAwardOptionsIntrinsicValueRollForward" name="ShareBasedCompensationArrangementByShareBasedPaymentAwardOptionsIntrinsicValueRollForward" nillable="true" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" xbrli:periodType="duration" />
+  <xsd:element name="StockOptionPlan2010Member" id="wina_StockOptionPlan2010Member" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="FranchisingMember" id="wina_FranchisingMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="StockOptionPlanForNonemployeeDirectorsMember" id="wina_StockOptionPlanForNonemployeeDirectorsMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="ConcentrationRiskNumberOfCustomers" id="wina_ConcentrationRiskNumberOfCustomers" type="xbrli:integerItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="DeferredTaxAssetsTaxDeferredExpenseReservesAndAccrualsAllowanceForDoubtfulAccountsAndLeaseReserves" id="wina_DeferredTaxAssetsTaxDeferredExpenseReservesAndAccrualsAllowanceForDoubtfulAccountsAndLeaseReserves" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="debit" xbrli:periodType="instant" />
+  <xsd:element name="UnrecognizedTaxBenefitsIncludingInterestAndPenalties" id="wina_UnrecognizedTaxBenefitsIncludingInterestAndPenalties" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="credit" xbrli:periodType="instant" />
+  <xsd:element name="DefinedContributionPlanRequisiteServicePeriod" id="wina_DefinedContributionPlanRequisiteServicePeriod" type="xbrli:durationItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="NumberOfWeeksInFiscalYear" id="wina_NumberOfWeeksInFiscalYear" type="xbrli:integerItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="FranchiseNameAxis" id="wina_FranchiseNameAxis" type="xbrli:stringItemType" substitutionGroup="xbrldt:dimensionItem" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="FurnitureAndEquipmentMember" id="wina_FurnitureAndEquipmentMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="GoodwillAbstract" id="wina_GoodwillAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="StockOptionPlan2001AndStockOptionPlan2010Member" id="wina_StockOptionPlan2001AndStockOptionPlan2010Member" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="CommonStockRepurchaseProgramMember" id="wina_CommonStockRepurchaseProgramMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="ShareBasedCompensationArrangementByShareBasedPaymentAwardExercisePriceAsPercentageOfGrantDateFairValue" id="wina_ShareBasedCompensationArrangementByShareBasedPaymentAwardExercisePriceAsPercentageOfGrantDateFairValue" type="dtr-types:percentItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="ShareBasedCompensationArrangementByShareBasedPaymentAwardThresholdPercentageOfVotingInterestForSpecifiedExercisePrice" id="wina_ShareBasedCompensationArrangementByShareBasedPaymentAwardThresholdPercentageOfVotingInterestForSpecifiedExercisePrice" type="dtr-types:percentItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="ShareBasedCompensationArrangementByShareBasedPaymentAwardExercisePriceAsPercentageOfGrantDateFairValueForIndividualsHoldingMoreThanTenPercentOfVotingRights" id="wina_ShareBasedCompensationArrangementByShareBasedPaymentAwardExercisePriceAsPercentageOfGrantDateFairValueForIndividualsHoldingMoreThanTenPercentOfVotingRights" type="dtr-types:percentItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="ShareBasedCompensationArrangementsByShareBasedPaymentAwardOptionsExpirationTerm" id="wina_ShareBasedCompensationArrangementsByShareBasedPaymentAwardOptionsExpirationTerm" type="xbrli:durationItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration" />
+  <xsd:element name="DebtInstrumentPrepaymentMinimum" id="wina_DebtInstrumentPrepaymentMinimum" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:balance="debit" xbrli:periodType="duration" />
+  <xsd:element id="wina_InterestAndOtherIncomeExpense" name="InterestAndOtherIncomeExpense" nillable="true" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" xbrli:balance="credit" />
+  <xsd:element id="wina_OrganizationAndBusinessDisclosureAbstract" name="OrganizationAndBusinessDisclosureAbstract" nillable="true" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" xbrli:periodType="duration" />
+  <xsd:element id="wina_OrganizationDisclosureTextBlock" name="OrganizationDisclosureTextBlock" nillable="true" type="dtr-types:textBlockItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" />
+  <xsd:element id="wina_EmployeeServiceShareBasedCompensationTaxBenefitFromExerciseOfStockOptionsCashFlowImpact" name="EmployeeServiceShareBasedCompensationTaxBenefitFromExerciseOfStockOptionsCashFlowImpact" nillable="true" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" xbrli:balance="debit" />
+  <xsd:element id="wina_ContractWithCustomerLiabilityAdditions" name="ContractWithCustomerLiabilityAdditions" nillable="true" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" xbrli:balance="credit" />
+  <xsd:element id="wina_MarketingFeesMember" name="MarketingFeesMember" nillable="true" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" xbrli:periodType="duration" />
+  <xsd:element id="wina_SoftwareLicenseFeesMember" name="SoftwareLicenseFeesMember" nillable="true" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" xbrli:periodType="duration" />
+  <xsd:element id="wina_CommissionFeesMember" name="CommissionFeesMember" nillable="true" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" xbrli:periodType="duration" />
+  <xsd:element id="wina_ContractWithCustomerLiabilityTextBlock" name="ContractWithCustomerLiabilityTextBlock" nillable="true" type="dtr-types:textBlockItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" />
+  <xsd:element id="wina_AccruedPurchasesGoodsAndServicesCurrent" name="AccruedPurchasesGoodsAndServicesCurrent" nillable="true" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="instant" xbrli:balance="credit" />
+  <xsd:element id="wina_LeasingOperationsLessorTextBlock" name="LeasingOperationsLessorTextBlock" nillable="true" type="dtr-types:textBlockItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" />
+  <xsd:element id="wina_ScheduleOfInvestmentInLeasingOperationsLessorTableTextBlock" name="ScheduleOfInvestmentInLeasingOperationsLessorTableTextBlock" nillable="true" type="dtr-types:textBlockItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" />
+  <xsd:element id="wina_MinnesotaCorporateOfficeOperatingLeaseMember" name="MinnesotaCorporateOfficeOperatingLeaseMember" nillable="true" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" xbrli:periodType="duration" />
+  <xsd:element id="wina_SupplementalCashFlowInformationRelatedToOperatingLeasesTableTextBlock" name="SupplementalCashFlowInformationRelatedToOperatingLeasesTableTextBlock" nillable="true" type="dtr-types:textBlockItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" />
+  <xsd:element id="wina_OtherLeaseIncome" name="OtherLeaseIncome" nillable="true" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" xbrli:balance="credit" />
+  <xsd:element id="wina_IncomeOnSalesOfEquipmentUnderLease" name="IncomeOnSalesOfEquipmentUnderLease" nillable="true" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" xbrli:balance="credit" />
+  <xsd:element id="wina_ScheduleOfLeasingIncomeTableTextBlock" name="ScheduleOfLeasingIncomeTableTextBlock" nillable="true" type="dtr-types:textBlockItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" />
+  <xsd:element id="wina_LesseeOperatingLeaseNumberOfExtensionPeriods" name="LesseeOperatingLeaseNumberOfExtensionPeriods" nillable="true" type="xbrli:integerItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" />
+  <xsd:element id="wina_AccountsReceivableTradeNetCurrent" name="AccountsReceivableTradeNetCurrent" nillable="true" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="instant" xbrli:balance="debit" />
+  <xsd:element id="wina_AccountsReceivableOtherNetCurrent" name="AccountsReceivableOtherNetCurrent" nillable="true" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="instant" xbrli:balance="debit" />
+  <xsd:element id="wina_TenantAllowanceRecordedDuringPeriodAsReductionToOperatingLeaseRightOfUseAsset" name="TenantAllowanceRecordedDuringPeriodAsReductionToOperatingLeaseRightOfUseAsset" nillable="true" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="duration" xbrli:balance="credit" />
+  <xsd:element id="wina_StockOptionPlan2020Member" name="StockOptionPlan2020Member" nillable="true" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true" xbrli:periodType="duration" />
+  <xsd:element id="wina_LeaseOperatingAbstract" name="LeaseOperatingAbstract" nillable="true" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" xbrli:periodType="duration" />
+  <xsd:element name="NotesPayableSeriesCMember" id="wina_NotesPayableSeriesCMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="PrivateShelfAgreementWithPrudentialMember" id="wina_PrivateShelfAgreementWithPrudentialMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="NoteAgreementWithPrudentialMember" id="wina_NoteAgreementWithPrudentialMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="DelayedDrawTermFacilityMember" id="wina_DelayedDrawTermFacilityMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="MaximumAmountOfShelfNotesAvailableForIssuance" id="wina_MaximumAmountOfShelfNotesAvailableForIssuance" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="instant" abstract="false" xbrli:balance="credit" />
+  <xsd:element name="TerminationOfAgreementConsiderationPaid" id="wina_TerminationOfAgreementConsiderationPaid" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="false" xbrli:balance="credit" />
+  <xsd:element name="ReacquiredFranchiseRightsNumberOfStores" id="wina_ReacquiredFranchiseRightsNumberOfStores" type="xbrli:integerItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="false" />
+  <xsd:element name="SignedFranchiseAgreementsNumberOfStores" id="wina_SignedFranchiseAgreementsNumberOfStores" type="xbrli:integerItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="false" />
+  <xsd:element name="TerminationOfAgreementRightsNumberOfStores" id="wina_TerminationOfAgreementRightsNumberOfStores" type="xbrli:integerItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="false" />
+  <xsd:element name="DeferredTaxAssetsLeaseRevenueAndInitialDirectCosts" id="wina_DeferredTaxAssetsLeaseRevenueAndInitialDirectCosts" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="instant" abstract="false" xbrli:balance="debit" />
+  <xsd:element name="NumberOfNonReportableOperatingSegments" id="wina_NumberOfNonReportableOperatingSegments" type="xbrli:integerItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="false" />
+  <xsd:element name="OperatingLeaseAssets" id="wina_OperatingLeaseAssets" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="instant" abstract="false" xbrli:balance="debit" />
+  <xsd:element name="OperatingLeaseAssetsAccumulatedDepreciation" id="wina_OperatingLeaseAssetsAccumulatedDepreciation" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="instant" abstract="false" xbrli:balance="credit" />
+  <xsd:element name="OperatingLeaseAssetsNet" id="wina_OperatingLeaseAssetsNet" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="instant" abstract="false" xbrli:balance="debit" />
+  <xsd:element name="S2024DividendsMember" id="wina_S2024DividendsMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="O2024AdividendsMember" id="wina_O2024AdividendsMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="DeferredTaxAssetsOperatingLeaseLiabilities" id="wina_DeferredTaxAssetsOperatingLeaseLiabilities" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="instant" abstract="false" xbrli:balance="debit" />
+  <xsd:element name="S2025DividendsMember" id="wina_S2025DividendsMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="S2023DividendsMember" id="wina_S2023DividendsMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="O2023AdividendsMember" id="wina_O2023AdividendsMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="O2025AdividendsMember" id="wina_O2025AdividendsMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="EffectiveIncomeTaxRateReconciliationUnrecognizedTaxBenefitsAmount" id="wina_EffectiveIncomeTaxRateReconciliationUnrecognizedTaxBenefitsAmount" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="false" xbrli:balance="debit" />
+  <xsd:element name="EffectiveIncomeTaxRateReconciliationUnrecognizedTaxBenefitsPercent" id="wina_EffectiveIncomeTaxRateReconciliationUnrecognizedTaxBenefitsPercent" type="dtr-types:percentItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="false" />
+  <xsd:element name="ForeignTaxCreditsExpirationPeriod" id="wina_ForeignTaxCreditsExpirationPeriod" type="xbrli:durationItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="false" />
+  <xsd:element name="ScheduleOfIncomeTaxesPaidTableTextBlock" id="wina_ScheduleOfIncomeTaxesPaidTableTextBlock" type="dtr-types:textBlockItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="false" />
+  <xsd:element name="LineOfCreditWithCibcBankMember" id="wina_LineOfCreditWithCibcBankMember" type="dtr-types:domainItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="SignificantAccountingPoliciesTable" id="wina_SignificantAccountingPoliciesTable" type="xbrli:stringItemType" substitutionGroup="xbrldt:hypercubeItem" nillable="true" xbrli:periodType="duration" abstract="true" />
+  <xsd:element name="SignificantAccountingPoliciesLineItems" id="wina_SignificantAccountingPoliciesLineItems" type="xbrli:stringItemType" substitutionGroup="xbrli:item" nillable="true" xbrli:periodType="duration" abstract="true" />
+</xsd:schema>

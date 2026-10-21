@@ -1,0 +1,7 @@
+{
+ "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000908315/us-gaap/Revenues.json",
+ "status": 200,
+ "content_type": "application/json",
+ "sha256": "4a795df81032fc51e83a00bfa2b0f8dfbc5173ff6cc41cdcaeb170021701cc29",
+ "retrieved_at": "2026-10-21T19:26:58Z"
+}

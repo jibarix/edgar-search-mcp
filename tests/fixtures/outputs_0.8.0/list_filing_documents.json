@@ -1,0 +1,147 @@
+{
+ "arguments": {
+  "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227x10k.htm"
+ },
+ "result": {
+  "accession_number": "0000908315-26-000007",
+  "cik": "0000908315",
+  "count": 14,
+  "documents": [
+   {
+    "description": "10-K",
+    "document": "wina-20251227x10k.htm",
+    "readable": true,
+    "sequence": "1",
+    "size_bytes": 1980355,
+    "type": "10-K",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227x10k.htm"
+   },
+   {
+    "description": "EX-23.1",
+    "document": "wina-20251227xex23d1.htm",
+    "readable": true,
+    "sequence": "2",
+    "size_bytes": 3602,
+    "type": "EX-23.1",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227xex23d1.htm"
+   },
+   {
+    "description": "EX-31.1",
+    "document": "wina-20251227xex31d1.htm",
+    "readable": true,
+    "sequence": "3",
+    "size_bytes": 14791,
+    "type": "EX-31.1",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227xex31d1.htm"
+   },
+   {
+    "description": "EX-31.2",
+    "document": "wina-20251227xex31d2.htm",
+    "readable": true,
+    "sequence": "4",
+    "size_bytes": 15049,
+    "type": "EX-31.2",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227xex31d2.htm"
+   },
+   {
+    "description": "EX-32.1",
+    "document": "wina-20251227xex32d1.htm",
+    "readable": true,
+    "sequence": "5",
+    "size_bytes": 8784,
+    "type": "EX-32.1",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227xex32d1.htm"
+   },
+   {
+    "description": "EX-32.2",
+    "document": "wina-20251227xex32d2.htm",
+    "readable": true,
+    "sequence": "6",
+    "size_bytes": 8804,
+    "type": "EX-32.2",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227xex32d2.htm"
+   },
+   {
+    "description": "GRAPHIC",
+    "document": "wina-20251227x10k003.jpg",
+    "readable": false,
+    "sequence": "7",
+    "size_bytes": 54974,
+    "type": "GRAPHIC",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227x10k003.jpg"
+   },
+   {
+    "description": "Complete submission text file",
+    "document": "0000908315-26-000007.txt",
+    "readable": true,
+    "sequence": null,
+    "size_bytes": 8993050,
+    "type": null,
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/0000908315-26-000007.txt"
+   },
+   {
+    "description": "EX-101.SCH",
+    "document": "wina-20251227.xsd",
+    "readable": false,
+    "sequence": "8",
+    "size_bytes": 59659,
+    "type": "EX-101.SCH",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227.xsd"
+   },
+   {
+    "description": "EX-101.CAL",
+    "document": "wina-20251227_cal.xml",
+    "readable": true,
+    "sequence": "9",
+    "size_bytes": 91904,
+    "type": "EX-101.CAL",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227_cal.xml"
+   },
+   {
+    "description": "EX-101.DEF",
+    "document": "wina-20251227_def.xml",
+    "readable": true,
+    "sequence": "10",
+    "size_bytes": 173951,
+    "type": "EX-101.DEF",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227_def.xml"
+   },
+   {
+    "description": "EX-101.LAB",
+    "document": "wina-20251227_lab.xml",
+    "readable": true,
+    "sequence": "11",
+    "size_bytes": 573443,
+    "type": "EX-101.LAB",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227_lab.xml"
+   },
+   {
+    "description": "EX-101.PRE",
+    "document": "wina-20251227_pre.xml",
+    "readable": true,
+    "sequence": "12",
+    "size_bytes": 395220,
+    "type": "EX-101.PRE",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227_pre.xml"
+   },
+   {
+    "description": "EXTRACTED XBRL INSTANCE DOCUMENT",
+    "document": "wina-20251227x10k_htm.xml",
+    "readable": true,
+    "sequence": "93",
+    "size_bytes": 1616496,
+    "type": "XML",
+    "url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/wina-20251227x10k_htm.xml"
+   }
+  ],
+  "filing_date": "2026-02-25",
+  "form": "10-K",
+  "frozen": false,
+  "retrieved_at": "2026-10-21T19:26:59Z",
+  "returned_at": "2026-10-21T19:26:59Z",
+  "sha256": "748bd08e175a9130d220f5f863d61a00d6e2dc5b50bbbb444b5017c836a1367f",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/908315/000090831526000007/0000908315-26-000007-index.htm",
+  "warnings": []
+ },
+ "tool": "list_filing_documents"
+}
