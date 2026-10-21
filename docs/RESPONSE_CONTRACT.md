@@ -165,8 +165,12 @@ The rows of the filing's index page (`<accession>-index.htm`), read from its
 HTML table by the rules listed in `transformation`: `sequence`, `description`,
 `type` and `size` as the page shows them, the file name (`document`) and its
 `url`. `original` names the index page and its `sha256`; `get_filing_document`
-returns it byte for byte. A link outside the filing folder is left out and
-named in `warnings`.
+returns it byte for byte. The page is read with an HTML parser, so an href is
+read however it is quoted. A row with a link that the rules do not read (not
+five cells, more than one link, a link outside the filing folder) and a row of
+five cells without a link are left out and listed in `skipped_rows` (`line`,
+the text of its `cells`, its `links`, `reason`) and in `warnings`; nothing is
+dropped in silence.
 
 ### `get_filing_document(url, offset=0, max_bytes=1000000)` — `source`
 
@@ -258,7 +262,11 @@ Each `files` entry says how it was found (`found_by`). Zero or several
 candidates (two rows listed as the instance, two `schemaRef`s, one pointing
 outside the filing) leave the entry `resolved: false` with the reason and
 its `candidates`, and the same in `unresolved`; the caller then names the
-file. `instance_file` and `schema_file` are plain file names of the filing
+file. When the index page has a row that its rules cannot read
+(`files.index.skipped_rows`, as `list_filing_documents` reports them), the
+candidate list may be incomplete, so no file is chosen from the index even
+when one row matches: the entry is `resolved: false` with the rows it did
+read as `candidates`, and the skipped rows are in `unresolved`. `instance_file` and `schema_file` are plain file names of the filing
 folder (no path); one that is not there is `NOT_FOUND`. A filing without
 `FilingSummary.xml` is not an error: `filing_summary` is null,
 `files.input_files` is null, and `unresolved` names `FilingSummary.xml` and

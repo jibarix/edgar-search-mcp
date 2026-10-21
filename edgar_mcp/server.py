@@ -29,6 +29,7 @@ import re
 import threading
 from collections import OrderedDict
 from datetime import datetime
+from html.parser import HTMLParser
 from typing import Literal
 from urllib.parse import parse_qs, quote, urlsplit
 
@@ -71,10 +72,61 @@ _SEARCH_URL = "https://efts.sec.gov/LATEST/search-index"
 _SEARCH_PAGE = 100
 _DOCUMENT_PATH = re.compile(r"/Archives/edgar/data/\d{1,10}/\d{18}/[A-Za-z0-9][A-Za-z0-9._-]*\.(htm|html|txt|xml)")
 _FILING_PATH = re.compile(r"/Archives/edgar/data/(?P<cik>\d{1,10})/(?P<folder>\d{18})/[A-Za-z0-9][A-Za-z0-9._-]*")
-# One row of a filing index table: sequence, description, document link, type, size.
-_INDEX_ROW = re.compile(r"(?is)<tr[^>]*>\s*<td[^>]*>(?P<seq>[^<]*)</td>\s*<td[^>]*>(?P<description>.*?)</td>\s*"
-                        r"<td[^>]*>.*?href=\"(?P<href>[^\"]+)\".*?</td>\s*<td[^>]*>(?P<type>[^<]*)</td>\s*"
-                        r"<td[^>]*>(?P<size>[^<]*)</td>\s*</tr>")
+
+
+class _TableRows(HTMLParser):
+    """The <tr> rows of an HTML page, in page order: for each, its line and
+    its <td> cells, each with its text (as written, and with a space where a
+    tag was) and the href of every link in it. An omitted </td> or </tr> is
+    closed by the next cell, row or table, as HTML does."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.rows, self._row, self._cell = [], None, None
+
+    def _end_cell(self):
+        if self._cell is not None:
+            self._row["cells"].append({"text": "".join(self._cell["text"]), "spaced": "".join(self._cell["spaced"]),
+                                       "links": self._cell["links"]})
+            self._cell = None
+
+    def _end_row(self):
+        self._end_cell()
+        if self._row is not None:
+            self.rows.append(self._row)
+            self._row = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "tr":
+            self._end_row()
+            self._row = {"line": self.getpos()[0], "cells": []}
+        elif tag in ("td", "th"):
+            self._end_cell()
+            if self._row is not None and tag == "td":
+                self._cell = {"text": [], "spaced": [], "links": []}
+        elif tag == "table":
+            self._end_row()
+        elif self._cell is not None:
+            self._cell["spaced"].append(" ")
+            if tag == "a":
+                self._cell["links"] += [value or "" for name, value in attrs if name == "href"]
+
+    def handle_endtag(self, tag):
+        if tag in ("tr", "table"):
+            self._end_row()
+        elif tag in ("td", "th"):
+            self._end_cell()
+        elif self._cell is not None:
+            self._cell["spaced"].append(" ")
+
+    def handle_data(self, data):
+        if self._cell is not None:
+            self._cell["text"].append(data)
+            self._cell["spaced"].append(data)
+
+    def close(self):
+        super().close()
+        self._end_row()
 
 
 def _tool(fn):
@@ -268,13 +320,16 @@ def get_frames(taxonomy: str, concept: str, unit: str, period: str) -> dict:
 _ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _FORM = re.compile(r"[A-Za-z0-9][A-Za-z0-9 /.-]{0,19}")
-_INDEX_TABLE = "filing-index-rows-v1"
+_INDEX_TABLE = "filing-index-rows-v2"  # v2: read with an HTML parser; rows it cannot read are reported
 _INDEX_RULES = [
-    "each <tr> of the index page with five <td> cells, the third holding a link, is one row, in page order",
+    "the page is read with an HTML parser (Python's html.parser): an href is read however it is quoted",
+    "each <tr> of the index page with five <td> cells, the third holding exactly one link and the others none, "
+    "is one row, in page order",
     "sequence, type and size: the cell text with HTML entities decoded and the ends trimmed; an empty cell is null",
     "description: the cell with tags removed, HTML entities decoded and runs of whitespace read as one space",
     "a link through the SEC viewer (/ix?doc=<path>) is read as <path>",
-    "a link outside the filing folder is left out and named in warnings",
+    "a row with a link that is not read this way (another number of cells, more than one link, a link outside the "
+    "filing folder) is left out and named in skipped_rows and warnings, as are rows of five cells without a link",
 ]
 
 
@@ -356,30 +411,49 @@ def _filing_file(url: str) -> tuple[str, int, str]:
 
 
 def _index_documents(cik: int, folder: str, sources: list) -> tuple[str, list, list]:
-    """(index page URL, its document rows, links left out) for one filing
+    """(index page URL, its document rows, rows left out) for one filing
     folder, read from the SEC's filing index page by the rules of
-    `_INDEX_RULES`. SecNotFound when the folder has no index page."""
+    `_INDEX_RULES`. Each row left out has its `line`, the text of its
+    `cells`, its `links` and the `reason`. SecNotFound when the folder has
+    no index page."""
     accession = f"{folder[:10]}-{folder[10:12]}-{folder[12:]}"
     base = f"/Archives/edgar/data/{cik}/{folder}/"
     index_url = f"https://www.sec.gov{base}{accession}-index.htm"
-    page = _archive(index_url, sources).decode("utf-8", errors="replace")
+    parser = _TableRows()
+    parser.feed(_archive(index_url, sources).decode("utf-8", errors="replace"))
+    parser.close()
 
     def cell(text):
-        return html.unescape(text).strip() or None
+        return text.strip() or None
 
     documents, skipped = [], []
-    for row in _INDEX_ROW.finditer(page):
-        link = urlsplit(html.unescape(row["href"]))
+    for row in parser.rows:
+        cells = row["cells"]
+        links = [href for c in cells for href in c["links"]]
+        if not links and len(cells) != 5:
+            continue  # a heading row or a row of another layout, with no document link
+
+        def skip(reason):
+            skipped.append({"line": row["line"], "cells": [" ".join(c["spaced"].split()) for c in cells],
+                            "links": links, "reason": reason})
+        if len(cells) != 5:
+            skip(f"the row has a link and {len(cells)} cells, not five")
+            continue
+        if len(cells[2]["links"]) != 1 or len(links) != 1:
+            skip(f"the third cell holds {len(cells[2]['links'])} links and the row {len(links)}, not exactly one")
+            continue
+        link = urlsplit(links[0])
         # The main document of an inline XBRL filing is linked through the SEC's viewer: /ix?doc=<path>.
         path = parse_qs(link.query).get("doc", [""])[0] if link.path == "/ix" else link.path
-        if not path.startswith(base):
-            skipped.append(path)
+        if link.netloc not in ("", "www.sec.gov") or not path.startswith(base) or "/" in path[len(base):] \
+                or not path[len(base):]:
+            skip(f"the link is outside this filing folder: {links[0]}")
             continue
         documents.append({
-            "sequence": cell(row["seq"]),
-            "description": " ".join(html.unescape(re.sub(r"<[^>]+>", " ", row["description"])).split()),
-            "type": cell(row["type"]),
-            "size": cell(row["size"]),
+            "sequence": cell(cells[0]["text"]),
+            "description": " ".join(cells[1]["spaced"].split()),
+            "type": cell(cells[3]["text"]),
+            "size": cell(cells[4]["text"]),
             "document": path[len(base):],
             "url": f"https://www.sec.gov{path}",
         })
@@ -395,9 +469,10 @@ def list_filing_documents(url: str) -> dict:
     `size` as the index page shows them, the file name (`document`) and its
     `url`. This is a view read from the page's HTML table by the rules named
     in `transformation`; the page itself is `original.url`, which
-    `get_filing_document` returns byte for byte. The type is the SEC's label
-    for a document ("8-K", "EX-99.1", "GRAPHIC", ...); it does not say whether
-    a document was filed or furnished.
+    `get_filing_document` returns byte for byte. A row with a link the rules
+    do not read is left out and listed in `skipped_rows` and `warnings`. The
+    type is the SEC's label for a document ("8-K", "EX-99.1", "GRAPHIC", ...);
+    it does not say whether a document was filed or furnished.
     """
     _, cik, folder = _filing_file(url)
     accession = f"{folder[:10]}-{folder[10:12]}-{folder[12:]}"
@@ -408,8 +483,9 @@ def list_filing_documents(url: str) -> dict:
     return envelope("transformed", sources, cik=format_cik(cik), accession_number=accession,
                     transformation={"name": _INDEX_TABLE, "rules": _INDEX_RULES},
                     original={"url": index_url, "sha256": sources[0]["sha256"], "tool": "get_filing_document"},
-                    count=len(documents), documents=documents,
-                    warnings=[f"left out a link outside this filing: {p}" for p in skipped])
+                    count=len(documents), documents=documents, skipped_rows=skipped,
+                    warnings=[f"left out a row the rules cannot read (line {s['line']}): {s['reason']}"
+                              for s in skipped])
 
 
 _MAX_DOCUMENT_PAGE = 5_000_000
@@ -590,7 +666,9 @@ def _xbrl_files(folder: str, cik: int, accession: str, sources: list, unresolved
     EX-101.INS or described as the extracted XBRL instance; the schema is the
     caller's `schema_file`, else the instance's own link:schemaRef, else
     (instance unresolved) the one index row typed EX-101.SCH. Zero or several
-    candidates leave the file unresolved, with the candidates named."""
+    candidates leave the file unresolved, with the candidates named, and so
+    does any index row the rules cannot read (the candidates may then be
+    incomplete); those rows are in `index.skipped_rows` and `unresolved`."""
     summary_url = folder + "FilingSummary.xml"
     summary = input_files = None
     try:
@@ -613,10 +691,14 @@ def _xbrl_files(folder: str, cik: int, accession: str, sources: list, unresolved
     folder_digits = accession.replace("-", "")
     index = {"url": f"{folder}{accession}-index.htm"}
     try:
-        index["url"], documents, _ = _index_documents(cik, folder_digits, sources)
-        index.update(read=True, rows=len(documents))
+        index["url"], documents, skipped = _index_documents(cik, folder_digits, sources)
+        index.update(read=True, rows=len(documents), skipped_rows=skipped)
         if not documents:
             index["reason"] = "the page has no rows in the expected table layout"
+        if skipped:
+            unresolved.append({"file": "index", "url": index["url"], "skipped_rows": skipped,
+                               "reason": f"the filing index page has {len(skipped)} row(s) with a link that the "
+                                         "rules cannot read, so no file is chosen from its rows as the only one"})
     except SecNotFound:
         documents = []
         index.update(read=False, reason="the filing folder has no index page")
@@ -629,6 +711,11 @@ def _xbrl_files(folder: str, cik: int, accession: str, sources: list, unresolved
         return {"resolved": True, "name": name, "url": folder + name, "found_by": f"named by the caller ({parameter})"}
 
     def index_choice(rows, what, label, parameter):
+        if index.get("skipped_rows"):
+            return {"resolved": False, "candidates": [r["document"] for r in rows],
+                    "reason": f"the filing index page has {len(index['skipped_rows'])} row(s) the rules cannot read "
+                              f"(files.index.skipped_rows), so the {len(rows)} document(s) it lists {what} may not be "
+                              f"all; name the file with {parameter}"}
         if len(rows) == 1:
             return {"resolved": True, "name": rows[0]["document"], "url": rows[0]["url"],
                     "found_by": f"the filing index page lists it {label(rows[0])}", "index_row": row_of(rows[0])}

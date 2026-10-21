@@ -94,11 +94,12 @@
   },
   "list_filing_documents": {
    "allOf": [{"$ref": "#/$defs/envelope"}, {
-    "required": ["cik", "accession_number", "transformation", "original", "documents", "warnings"],
+    "required": ["cik", "accession_number", "transformation", "original", "documents", "skipped_rows", "warnings"],
     "properties": {"representation": {"const": "transformed"},
                    "transformation": {"type": "object", "required": ["name", "rules"]},
                    "original": {"type": "object", "required": ["url", "sha256", "tool"]},
-                   "documents": {"type": "array", "items": {"type": "object", "required": ["sequence", "description", "type", "size", "document", "url"]}}}
+                   "documents": {"type": "array", "items": {"type": "object", "required": ["sequence", "description", "type", "size", "document", "url"]}},
+                   "skipped_rows": {"type": "array", "items": {"type": "object", "required": ["line", "cells", "links", "reason"]}}}
    }]
   },
   "get_filing_document": {

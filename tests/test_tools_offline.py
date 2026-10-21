@@ -1517,6 +1517,104 @@ def dts_closure_cases():
           code or str(r and r["unresolved"]))
 
 
+# ── Round 3, blocker 2: the index page is parsed as HTML, and a row it cannot read blocks a unique choice ──
+
+def index_html(rows):
+    """An index page from (sequence, description, link cell HTML, type) rows, the link cell written as given."""
+    body = "".join(f"<tr><td>{q}</td><td>{d}</td><td>{cell}</td><td>{t}</td><td>100</td></tr>"
+                   for q, d, cell, t in rows)
+    return f'<html><body><table class="tableFile">{body}</table></body></html>'.encode()
+
+
+def list_documents(page):
+    """list_filing_documents on one made-up index page."""
+    real = server.fetch_response
+
+    def fetch(url, **k):
+        if url != FOLDER_URL + "0000000001-26-000001-index.htm":
+            raise sec_client.SecNotFound(f"nothing at {url}")
+        return sec_client.Response(page, "text/html", "2026-07-03T00:00:00Z")
+    server.fetch_response = fetch
+    server._archive_cache.clear()
+    try:
+        return call(server.list_filing_documents, url=FOLDER_URL + "t-20251231.htm")
+    finally:
+        server.fetch_response = real
+        server._archive_cache.clear()
+
+
+def index_cases():
+    path = "/Archives/edgar/data/1/000000000126000001/"
+    main = ("1", "10-K", f'<a href="{path}t-20251231.htm">t-20251231.htm</a>', "10-K")
+    schema = ("3", "XBRL TAXONOMY EXTENSION SCHEMA DOCUMENT", f'<a href="{path}t-20251231.xsd">t-20251231.xsd</a>',
+              "EX-101.SCH")
+    first = ("2", "XBRL INSTANCE DOCUMENT", f'<a href="{path}t-20251231.xml">t-20251231.xml</a>', "EX-101.INS")
+    # The reviewer's probe: a second instance row whose link is valid HTML with single quotes.
+    second = ("4", "XBRL INSTANCE DOCUMENT", f"<a href='{path}t-other.xml'>t-other.xml</a>", "EX-101.INS")
+    folder = filed(inline=False)
+    folder["0000000001-26-000001-index.htm"] = index_html([main, first, schema, second])
+    r, code = xbrl_call(folder, part="summary")
+    instance = r["files"]["instance"] if r else {}
+    check("r3 b2: two EX-101.INS rows, one linked with single quotes, leave the instance unresolved with both named",
+          code is None and instance.get("resolved") is False
+          and instance.get("candidates") == ["t-20251231.xml", "t-other.xml"], code or str(instance))
+    r, code = list_documents(index_html([main, first, schema, second]))
+    check("r3 b2: list_filing_documents reads the single-quoted link as a row",
+          code is None and [d["document"] for d in r["documents"]] == ["t-20251231.htm", "t-20251231.xml",
+                                                                        "t-20251231.xsd", "t-other.xml"],
+          code or str(r and r["documents"]))
+    unquoted = ("4", "XBRL INSTANCE DOCUMENT", f"<a href={path}t-other.xml>t-other.xml</a>", "EX-101.INS")
+    r, code = list_documents(index_html([main, first, unquoted]))
+    check("r3 b2: an unquoted href is read too",
+          code is None and [d["document"] for d in r["documents"]] == ["t-20251231.htm", "t-20251231.xml",
+                                                                        "t-other.xml"],
+          code or str(r and r["documents"]))
+
+    # A document row the rules cannot read (a link cell with two links): no unique choice, and it is reported.
+    odd = ("4", "XBRL INSTANCE DOCUMENT", f'<a href="{path}t-a.xml">t-a.xml</a> <a href="{path}t-b.xml">t-b.xml</a>',
+           "EX-101.INS")
+    folder = filed(inline=False)
+    folder["0000000001-26-000001-index.htm"] = index_html([main, first, schema, odd])
+    r, code = xbrl_call(folder, part="summary")
+    files = r["files"] if r else {}
+    instance = files.get("instance", {})
+    check("r3 b2: a document row the rules cannot read leaves the instance unresolved, though one row matches",
+          code is None and instance.get("resolved") is False and instance.get("candidates") == ["t-20251231.xml"]
+          and "cannot read" in instance.get("reason", ""), code or str(instance))
+    check("r3 b2: the skipped row is passed through to files.index and unresolved",
+          r is not None and len(files["index"].get("skipped_rows", [])) == 1
+          and files["index"]["skipped_rows"][0]["links"] == [f"{path}t-a.xml", f"{path}t-b.xml"]
+          and any(u.get("file") == "index" and u.get("skipped_rows") for u in r["unresolved"]),
+          str(r and (files.get("index"), r["unresolved"])))
+    r, code = xbrl_call(folder, part="presentation")
+    check("r3 b2: and a part that needs the company schema is refused, never read from an incomplete row set",
+          code == "UNSUPPORTED_DOCUMENT", code)
+    r, code = list_documents(index_html([main, first, odd]))
+    check("r3 b2: list_filing_documents reports the row it cannot read, in skipped_rows and warnings",
+          code is None and [d["document"] for d in r["documents"]] == ["t-20251231.htm", "t-20251231.xml"]
+          and len(r.get("skipped_rows", [])) == 1 and any("cannot read" in w for w in r["warnings"]),
+          code or str(r and (r.get("skipped_rows"), r["warnings"])))
+    short = ("4", "XBRL INSTANCE DOCUMENT", f'<a href="{path}t-a.xml">t-a.xml</a>', "EX-101.INS")
+    page = index_html([main, first]).replace(b"</table>", (
+        f"<tr><td>4</td><td>XBRL INSTANCE DOCUMENT</td><td>{short[2]}</td><td>EX-101.INS</td></tr>"
+        "</table>").encode())
+    r, code = list_documents(page)
+    check("r3 b2: a row with four cells and a link is reported, not dropped in silence",
+          code is None and len(r.get("skipped_rows", [])) == 1, code or str(r and r.get("skipped_rows")))
+
+    # A row linking outside the filing folder is skipped: it is reported and blocks a unique choice too.
+    outside = ("4", "XBRL INSTANCE DOCUMENT", '<a href="/Archives/edgar/data/2/000000000226000002/x.xml">x.xml</a>',
+               "EX-101.INS")
+    folder = filed(inline=False)
+    folder["0000000001-26-000001-index.htm"] = index_html([main, first, schema, outside])
+    r, code = xbrl_call(folder, part="summary")
+    instance = r["files"]["instance"] if r else {}
+    check("r3 b2: a skipped row with a link outside the filing blocks the unique choice and is passed through",
+          code is None and instance.get("resolved") is False
+          and r["files"]["index"].get("skipped_rows", [{}])[0].get("links")
+          == ["/Archives/edgar/data/2/000000000226000002/x.xml"], code or str(r and r["files"]))
+
+
 if __name__ == "__main__":
     no_implicit_filter_cases()
     discovery_cases()
@@ -1526,6 +1624,7 @@ if __name__ == "__main__":
     tuple_cases()
     exact_number_cases()
     dts_closure_cases()
+    index_cases()
     search_cases()
     client_cases()
     lookup_cases()
