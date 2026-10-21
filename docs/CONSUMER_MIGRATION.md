@@ -176,18 +176,18 @@ Callers: `valuation/facts.py:18`, `valuation/companies.py:34`,
 
 ### Version and build checks
 
-`edgar_mcp.__version__` is `1.0.0rc2`. Three checks in the app have to
+`edgar_mcp.__version__` is `1.0.0rc3`. Three checks in the app have to
 change before it can run on 1.0; updating the version number in
 `requirements.lock` is not enough.
 
 1. **The lock-file pattern rejects a pre-release.** `valuation/build.py:95`
    reads the pin with
    `edgar_search_mcp-([\d.]+)-py3-none-any\.whl`. `[\d.]+` stops at the
-   `r` of `1.0.0rc2` (and of `1.0.0rc1`), so the pattern does not match,
+   `r` of `1.0.0rc3` (and of the earlier release candidates), so the pattern does not match,
    `locked` is None, and the assertion at `valuation/build.py:189-190`
    fails even when the right wheel is installed and pinned. A wheel file
    name puts no `-` inside the version, so `edgar_search_mcp-([^-]+)-py3-none-any\.whl`
-   reads every PEP 440 version (`1.0.0rc2`, `1.0.0`, `1.0.1.post1`).
+   reads every PEP 440 version (`1.0.0rc3`, `1.0.0`, `1.0.1.post1`).
 2. **The installed files are not compared with the wheel.** `build.py`
    checks that `edgar_mcp` is imported from `site-packages`, that its
    `__version__` equals the pinned version, and it hashes the installed
@@ -464,6 +464,15 @@ What 1.0 leaves unresolved, and says so:
   `filing`) has its own `numbers_as_text`, with paths from that `record`;
   rc2 sent such a value as a string with no way to tell it from a string
   the SEC sent.
+- From rc3 `list_filing_documents` reads the index page with an HTML parser
+  and has a `skipped_rows` list (required): each row with a link that its
+  rules cannot read, with `line`, `cells`, `links` and `reason`, also named
+  in `warnings` ("left out a row the rules cannot read (line N): ...").
+  `get_filing_xbrl` then picks no file from the index (`resolved: false`,
+  the rows it did read as `candidates`), and names the caller's file only.
+- From rc3 `get_filing_xbrl` follows every schema and linkbase the filing
+  references before it selects a part, so `part="label"` finds a label
+  linkbase that only a presentation locator's schema points to.
 - A part's `roleRef` and `arcroleRef` items come from linkbases that hold an
   extended link of that part's kind, and from linkbases that hold no
   extended link any part returns (a roleRefs-only linkbase is in every

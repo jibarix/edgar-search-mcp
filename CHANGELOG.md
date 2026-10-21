@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.0.0rc3
+
+A review of 1.0.0rc2 found three places where an answer depended on the
+request or hid what the source left open, and a migration check that could
+not see stale files. **Breaking** against rc2:
+
+- **Whole DTS first**: `get_filing_xbrl` follows every reference of the
+  instance, schemas and linkbases (`linkbaseRef`, `roleRef`, `arcroleRef`,
+  `import`, `include` and every locator of every extended link) to its end
+  before it selects the requested part. rc2 followed only the requested
+  part's references, so a label linkbase reached through a presentation
+  locator's schema was missing from `part="label"`, with nothing in
+  `unresolved`. The schema part names schemas outside the filing it was
+  pointed to, with a count of references by element.
+- **Index read with an HTML parser**: `list_filing_documents` and the index
+  step of `get_filing_xbrl` read the index page with the standard library's
+  `html.parser`, so an href is read however it is quoted. Rows the rules
+  cannot read are listed in the new required `skipped_rows` and in
+  `warnings` ("left out a row the rules cannot read (line N): reason",
+  replacing the old wording for a link outside the folder). While any row is
+  skipped, `get_filing_xbrl` asserts no unique file from the index: the
+  entry is `resolved: false`, and `files.index.skipped_rows` and
+  `unresolved` carry the skipped rows.
+- **`numbers_as_text` on every record**: each `search_filings` hit, each
+  `list_filings` row, each `lookup_company` match and `get_filing_xbrl`'s
+  `filing` has its own `numbers_as_text`, paths from that `record`, so a
+  number kept as text is told apart from a string the SEC sent. No response
+  type is exempt.
+- **Migration check**: the installed-content check in
+  `CONSUMER_MIGRATION.md` compares the install with the pinned wheel or the
+  release manifest, walking every installed file under `edgar_mcp/` and the
+  dist-info, so missing, modified and unexpected files fail. It no longer
+  trusts the installed `RECORD`.
+
 ## 1.0.0rc2
 
 A review of 1.0.0rc1 found places where the server still chose or guessed.
