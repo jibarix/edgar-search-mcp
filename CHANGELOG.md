@@ -33,6 +33,13 @@ A review of 1.0.0rc1 found places where the server still chose or guessed.
   `unresolved`, including imported schemas outside the filing in the linkbase
   parts. New `schemas` list; schema items carry `file`; locator targets carry
   `file`; `linkbases` entries carry `discovered_by`.
+- **Locators**: every locator, `roleRef` and `arcroleRef` href is resolved
+  against its effective base URI (inherited `xml:base`) and returned as
+  `url` beside the `href` as written. An id that several schema elements
+  share no longer resolves to the first: the target is `resolved: false`,
+  `ambiguous: true`, with all candidates. In the library, `read_schema`'s
+  `ids` maps each id to a list, and `concept_at` and `locator_resolver` do the
+  lookup.
 
 ## 1.0.0rc1
 

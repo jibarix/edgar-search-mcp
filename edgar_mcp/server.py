@@ -30,7 +30,7 @@ import threading
 from collections import OrderedDict
 from datetime import datetime
 from typing import Literal
-from urllib.parse import parse_qs, quote, urljoin, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -924,11 +924,12 @@ class _Dts:
     def linkbase_ref(self, url: str | None, href: str | None, attributes: dict, discovered_by: dict):
         self.linkbases.append({"url": url, "href": href, "attributes": attributes, "discovered_by": discovered_by})
 
-    def target_of(self, base_url: str):
+    def target_of(self):
+        """Resolves a locator's absolute href (resolved by `read_linkbase` against its effective base URI)."""
         def resolve(href):
             if not href:
                 return {"resolved": False, "reason": "the locator has no href"}
-            url, _, fragment = urljoin(base_url, href).partition("#")
+            url, _, fragment = href.partition("#")
             if not url.startswith(self.folder):
                 self.external[url] = self.external.get(url, 0) + 1
                 return {"resolved": False, "schema": url, "fragment": fragment,
@@ -941,12 +942,8 @@ class _Dts:
             if not record["read"]:
                 return {"resolved": False, "schema": url, "fragment": fragment,
                         "reason": f"the schema {name} was not read: {record['reason']}"}
-            concept = record["_result"]["ids"].get(fragment)
-            if concept is None:
-                return {"resolved": False, "schema": url, "fragment": fragment,
-                        "reason": f"no element of {name} has this id"}
-            return {"resolved": True, "file": name, "namespace": concept["namespace"],
-                    "local_name": concept["local_name"], "schema_seq": concept["seq"]}
+            target = xs.concept_at(record["_result"], name, fragment)
+            return target if target["resolved"] else {**target, "schema": url}
         return resolve
 
     def read_linkbase(self, ref: dict, part: str) -> tuple[list, dict]:
@@ -955,7 +952,7 @@ class _Dts:
         if "embedded" in ref:
             record = self.schemas[ref["schema_url"]]
             found, missing = xs.read_linkbase(record["_result"]["doc"], ref["embedded"], ref["schema"], part,
-                                              self.target_of(ref["schema_url"]))
+                                              self.target_of(), url=ref["schema_url"])
             self.unresolved += missing
             return found, {"seq": where["seq"], "embedded_in": ref["schema"], "discovered_by": where, "read": True,
                            "extended_links": sum(1 for i in found if i["node"] == "extendedLink")}
@@ -984,7 +981,7 @@ class _Dts:
             raise ToolError(f"UNSUPPORTED_DOCUMENT: {self.accession}: {name}: the document element is "
                             f"{doc.root.tag}, not link:linkbase")
         self.read_linkbases[url] = where
-        found, missing = xs.read_linkbase(doc, doc.root, name, part, self.target_of(url))
+        found, missing = xs.read_linkbase(doc, doc.root, name, part, self.target_of(), url=url)
         self.unresolved += doc.conflicts() + missing
         entry.update(read=True, name=name, namespaces=doc.namespaces(),
                      extended_links=sum(1 for i in found if i["node"] == "extendedLink"))

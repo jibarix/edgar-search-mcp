@@ -377,8 +377,9 @@ def read_schema(raw: bytes, name: str = "schema", url: str | None = None) -> dic
     (a linkbase written inside the schema), or "other" (any other top-level
     schema component, as XML). Each keeps every attribute; QNames in `type`
     and `substitutionGroup` are resolved where they are written. `ids` maps
-    each element id to the element's namespace and local name, which is how
-    a locator's href finds its concept. With the schema's `url`, each import,
+    each element id to every element with that id (namespace, local name and
+    seq), which is how a locator's href finds its concept; an id two elements
+    share is listed in `unresolved` and resolves to neither (`concept_at`). With the schema's `url`, each import,
     include and linkbaseRef also has `url`, its schemaLocation or href
     resolved against the base URI in effect where it is written.
     """
@@ -421,13 +422,46 @@ def read_schema(raw: bytes, name: str = "schema", url: str | None = None) -> dic
             if item["id"] is not None:
                 if item["id"] in ids:
                     unresolved.append({"seq": item["seq"], "id": item["id"],
-                                       "reason": "two elements of the schema have this id"})
-                ids.setdefault(item["id"], {"namespace": target, "local_name": name_attr, "seq": item["seq"]})
+                                       "reason": "more than one element of the schema has this id, so a locator "
+                                                 "pointing to it is ambiguous and is not resolved"})
+                ids.setdefault(item["id"], []).append({"namespace": target, "local_name": name_attr,
+                                                       "seq": item["seq"]})
         elif (ns, local) not in ((XS, "import"), (XS, "include"), (XS, "annotation")):
             items.append({**base, "node": "other", "element": element_name(doc, element), "xml": doc.to_xml(element)})
     items.sort(key=lambda i: i["seq"])
     return {"target_namespace": target, "namespaces": doc.namespaces(), "items": items, "ids": ids,
             "unresolved": unresolved, "linkbases": linkbases, "doc": doc}
+
+
+def concept_at(schema: dict, file: str, fragment: str) -> dict:
+    """The element of a read schema whose id is `fragment`: resolved when
+    exactly one element has it; ambiguous, with every candidate and none
+    chosen, when several do; unresolved when none does."""
+    found = schema["ids"].get(fragment, [])
+    if len(found) == 1:
+        return {"resolved": True, "file": file, "namespace": found[0]["namespace"],
+                "local_name": found[0]["local_name"], "schema_seq": found[0]["seq"]}
+    if found:
+        return {"resolved": False, "ambiguous": True, "file": file, "fragment": fragment,
+                "candidates": [{"namespace": c["namespace"], "local_name": c["local_name"], "schema_seq": c["seq"]}
+                               for c in found],
+                "reason": f"{len(found)} elements of {file} have this id; none is chosen"}
+    return {"resolved": False, "file": file, "fragment": fragment, "reason": f"no element of {file} has this id"}
+
+
+def locator_resolver(schemas: dict):
+    """A `target_of` for `read_linkbase` over schemas already read: `schemas`
+    maps a schema's absolute URL to (file name, `read_schema` result). The
+    href it is given is absolute (see `read_linkbase`'s `url`)."""
+    def resolve(href):
+        if not href:
+            return {"resolved": False, "reason": "the locator has no href"}
+        url, _, fragment = href.partition("#")
+        if url not in schemas:
+            return {"resolved": False, "schema": url, "fragment": fragment, "reason": "the schema was not read"}
+        name, schema = schemas[url]
+        return concept_at(schema, name, fragment)
+    return resolve
 
 
 # ── linkbases ──────────────────────────────────────────────────────────────
@@ -439,26 +473,38 @@ _XLINK_TYPE = f"{{{XLINK}}}type"
 _XLINK_HREF = f"{{{XLINK}}}href"
 
 
-def read_linkbase(doc: XmlDoc, linkbase, file: str, part: str, target_of) -> tuple[list, list]:
+def read_linkbase(doc: XmlDoc, linkbase, file: str, part: str, target_of,
+                  url: str | None = None) -> tuple[list, list]:
     """The extended links of one kind in one linkbase element, flattened in
     document order to items, and what could not be resolved.
 
     Every child of the extended link is an item by its xlink:type:
-    "loc" (with `href` as written and `target`, what `target_of(href)` says it
+    "loc" (with `href` as written and `target`, what `target_of` says it
     points to), "arc", "resource" (with its text, and its markup as XML) or
     "other". Each keeps every attribute and the `seq` of its extended link
     (`link_seq`). Arcs are never combined, overridden or dropped: priority,
     use="prohibited", order and weight are attributes like any other.
     The roleRef and arcroleRef elements of the linkbase are returned with
     them when the linkbase holds at least one extended link of this kind.
+
+    With `url`, the URL of the file `doc` was read from, each href is also
+    resolved against the base URI in effect where it is written (the file's
+    URL changed by every inherited xml:base): it is given as `url` and that
+    absolute address is what `target_of` receives. Without it, `target_of`
+    receives the href as written.
     """
+
+    def located(element, href):
+        return doc.resolve_href(href, element, url) if url is not None and href else href
     wanted = EXTENDED_LINKS[part]
     items, unresolved = [], []
     for element in linkbase:
         ns, local = split(element.tag)
         base = {"seq": doc.seq(element), "file": file, "attributes": dict(element.attrib)}
         if ns == LINK and local in ("roleRef", "arcroleRef"):
-            items.append({**base, "node": local, "href": element.get(_XLINK_HREF)})
+            href = element.get(_XLINK_HREF)
+            items.append({**base, "node": local, "href": href,
+                          **({"url": located(element, href)} if url is not None else {})})
             continue
         if element.get(_XLINK_TYPE) != "extended":
             continue
@@ -475,7 +521,9 @@ def read_linkbase(doc: XmlDoc, linkbase, file: str, part: str, target_of) -> tup
                      "attributes": dict(child.attrib)}
             if kind == "locator":
                 href = child.get(_XLINK_HREF)
-                entry.update(node="loc", href=href, target=target_of(href))
+                absolute = located(child, href)
+                entry.update(node="loc", href=href, **({"url": absolute} if url is not None else {}),
+                             target=target_of(absolute))
             elif kind == "arc":
                 entry.update(node="arc")
             elif kind == "resource":

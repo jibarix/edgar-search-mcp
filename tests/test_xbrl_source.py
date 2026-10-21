@@ -249,14 +249,28 @@ def schema(body, extra_ns=""):
             ).encode()
 
 
-def linkbase(body, part, extra_ns=""):
-    doc = xs.XmlDoc(f'<link:linkbase {LB_NS} {extra_ns}>{body}</link:linkbase>'.encode(), "x_lab.xml")
+FOLDER = "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/"
+# The schema the helper's locators point into: one element per id a test uses.
+A_SCHEMA_IDS = ("Sales", "Unlabelled", "P", "Total", "Part", "X", "Y", "Z", "A", "M", "Child", "Parent")
+
+
+def a_schema():
+    return xs.read_schema(schema("".join(
+        f'<xs:element name="{n}" id="a_{n}" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item"/>'
+        for n in A_SCHEMA_IDS)), "a.xsd", FOLDER + "a.xsd")
+
+
+def linkbase(body, part, extra_ns="", root_attrs=""):
+    """`body` read as the linkbase x_lab.xml of the folder: hrefs resolved against its URL and any xml:base,
+    locators into a.xsd resolved through the parsed schema `a_schema()`."""
+    doc = xs.XmlDoc(f'<link:linkbase {LB_NS} {extra_ns} {root_attrs}>{body}</link:linkbase>'.encode(), "x_lab.xml")
     seen = []
+    resolve = xs.locator_resolver({FOLDER + "a.xsd": ("a.xsd", a_schema())})
 
     def target_of(href):
         seen.append(href)
-        return {"resolved": False, "href_seen": href}
-    items, unresolved = xs.read_linkbase(doc, doc.root, "x_lab.xml", part, target_of)
+        return resolve(href)
+    items, unresolved = xs.read_linkbase(doc, doc.root, "x_lab.xml", part, target_of, url=FOLDER + "x_lab.xml")
     return items, unresolved, seen
 
 
@@ -347,9 +361,44 @@ def same_fragment_two_schemas():
     body = (loc("x1", "a.xsd#Revenue") + loc("x2", "https://b.example/b.xsd#Revenue")
             + arc("definition", "x1", "x2", arcrole="http://xbrl.org/int/dim/arcrole/domain-member"))
     items, _, seen = linkbase(ext("definition", body), "definition")
-    check("locators: the same fragment in two schemas is two locators, each href passed on as written",
-          seen == ["a.xsd#Revenue", "https://b.example/b.xsd#Revenue"]
-          and [l["target"]["href_seen"] for l in of(items, "loc")] == seen, str(seen))
+    locs = of(items, "loc")
+    check("locators: the same fragment in two schemas is two locators, each href kept as written and resolved",
+          [l["href"] for l in locs] == ["a.xsd#Revenue", "https://b.example/b.xsd#Revenue"]
+          and seen == [FOLDER + "a.xsd#Revenue", "https://b.example/b.xsd#Revenue"]
+          and [l["url"] for l in locs] == seen, str(seen))
+    check("locators: each is looked up in its own schema: no element of a.xsd has id Revenue, b.xsd was not read",
+          locs[0]["target"] == {"resolved": False, "file": "a.xsd", "fragment": "Revenue",
+                                "reason": "no element of a.xsd has this id"}
+          and locs[1]["target"]["schema"] == "https://b.example/b.xsd"
+          and locs[1]["target"]["resolved"] is False, str([l["target"] for l in locs]))
+
+
+def locators_and_base_uri():
+    items, _, _ = linkbase(ext("presentation", loc("P")), "presentation")
+    check("locators: a locator into a parsed schema resolves to the one element with that id",
+          of(items, "loc")[0]["target"] == {"resolved": True, "file": "a.xsd", "namespace": A, "local_name": "P",
+                                            "schema_seq": of(items, "loc")[0]["target"]["schema_seq"]},
+          str(of(items, "loc")))
+    nested = ('<link:presentationLink xlink:type="extended" xlink:role="http://a.example/role/R1" xml:base="b/">'
+              + loc("P") + '</link:presentationLink>')
+    items, _, seen = linkbase(nested, "presentation", root_attrs='xml:base="https://x.example/a/"')
+    check("locators: the href is resolved against the inherited xml:base, outermost first",
+          seen == ["https://x.example/a/b/a.xsd#a_P"] and of(items, "loc")[0]["target"]["resolved"] is False
+          and of(items, "loc")[0]["target"]["schema"] == "https://x.example/a/b/a.xsd", str(seen))
+    doc = xs.XmlDoc(f'<link:linkbase {LB_NS} xml:base="sub/"><link:roleRef xlink:type="simple" '
+                    f'roleURI="http://a.example/role/R1" xlink:href="../a.xsd#R1"/></link:linkbase>'.encode(), "l.xml")
+    check("locators: base_uri applies xml:base relative to the document URL",
+          doc.base_uri(doc.root[0], FOLDER + "l.xml") == FOLDER + "sub/"
+          and doc.resolve_href("../a.xsd#R1", doc.root[0], FOLDER + "l.xml") == FOLDER + "a.xsd#R1")
+    twice = schema('<xs:element name="First" id="a_T" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item"/>'
+                   '<xs:element name="Second" id="a_T" type="xbrli:stringItemType" substitutionGroup="xbrli:item"/>')
+    resolve = xs.locator_resolver({FOLDER + "a.xsd": ("a.xsd", xs.read_schema(twice, "a.xsd", FOLDER + "a.xsd"))})
+    doc = xs.XmlDoc(f'<link:linkbase {LB_NS}>{ext("presentation", loc("T"))}</link:linkbase>'.encode(), "x.xml")
+    items, _ = xs.read_linkbase(doc, doc.root, "x.xml", "presentation", resolve, url=FOLDER + "x.xml")
+    target = of(items, "loc")[0]["target"]
+    check("locators: an id two elements share is ambiguous, both named, neither chosen",
+          target["resolved"] is False and target.get("ambiguous") is True
+          and [c["local_name"] for c in target.get("candidates", [])] == ["First", "Second"], str(target))
 
 
 def other_links_and_children():
@@ -404,9 +453,10 @@ def schema_declarations():
           total["name"] == "TotalAssetsParenthetical"
           and total["attributes"]["{http://www.xbrl.org/2003/instance}periodType"] == "duration"
           and "balance" not in total and "kind" not in total, str(total))
-    check("schema: a duplicate id is reported, and the first element keeps it",
-          r["ids"]["a_T"]["local_name"] == "TotalAssetsParenthetical"
-          and any(u.get("id") == "a_T" for u in r["unresolved"]), str(r["unresolved"]))
+    check("schema: a duplicate id is reported, and both elements keep it; neither wins",
+          [c["local_name"] for c in r["ids"]["a_T"]] == ["TotalAssetsParenthetical", "Second"]
+          and any(u.get("id") == "a_T" for u in r["unresolved"])
+          and xs.concept_at(r, "a.xsd", "a_T")["resolved"] is False, str(r["unresolved"]))
     typed = r["items"][5]
     check("schema: a type and substitution group with an undeclared prefix are unresolved, value kept",
           typed["type"] == {"qname": "nope:thing", "resolved": False,
@@ -422,8 +472,12 @@ def schema_declarations():
     check("schema: a linkbase written inside the schema is listed and handed back to read",
           [i["node"] for i in r["items"]] == ["linkbase"] and len(r["linkbases"]) == 1
           and r["items"][0]["element_count"] == 2, str(r["items"]))
-    items, _ = xs.read_linkbase(r["doc"], r["linkbases"][0], "a.xsd", "presentation", lambda h: {"href": h})
-    check("schema: the embedded linkbase reads like any other", [i["node"] for i in items] == ["extendedLink", "loc"],
+    r = xs.read_schema(embedded.replace(b"<xs:annotation>", b'<xs:element name="P" id="a_P" '
+                                         b'substitutionGroup="xbrli:item"/><xs:annotation>'), "a.xsd", FOLDER + "a.xsd")
+    items, _ = xs.read_linkbase(r["doc"], r["linkbases"][0], "a.xsd", "presentation",
+                                xs.locator_resolver({FOLDER + "a.xsd": ("a.xsd", r)}), url=FOLDER + "a.xsd")
+    check("schema: the embedded linkbase reads like any other, its locator resolved into the schema around it",
+          [i["node"] for i in items] == ["extendedLink", "loc"] and items[1]["target"]["local_name"] == "P",
           str(items))
     for label, raw in (("a linkbase", f'<link:linkbase {LB_NS}/>'.encode()), ("not XML", b"<xs:schema")):
         try:
@@ -449,6 +503,7 @@ def main():
     prohibited_arcs()
     equal_orders()
     same_fragment_two_schemas()
+    locators_and_base_uri()
     other_links_and_children()
     schema_declarations()
     print(f"problems: {len(problems)}")

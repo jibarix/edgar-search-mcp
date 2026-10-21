@@ -311,6 +311,9 @@ choice below is now the consumer's.
 
 What 1.0 leaves unresolved, and says so:
 
+- A locator whose fragment names an id that several elements of a filing
+  schema share is `resolved: false` with `ambiguous: true` and every
+  candidate. 0.8 and rc1 took the first element; 1.0 does not choose.
 - A locator whose schema is outside the filing (the us-gaap or dei taxonomy)
   keeps its `href` and fragment and is counted in `unresolved`. The concept
   name is the fragment as written (e.g. `us-gaap_Assets`), which by the EDGAR

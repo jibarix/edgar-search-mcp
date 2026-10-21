@@ -1146,10 +1146,50 @@ def dependency_cases():
           code is None and r["items"] == [] and r["unresolved"], code or str(r and r["unresolved"]))
 
 
+# ── Round 2, blocker 4: locators against the effective base, no first-wins ──
+
+def locator_cases():
+    folder = filed()
+    folder["t-20251231_pre.xml"] = folder["t-20251231_pre.xml"].replace(
+        b"<link:linkbase ", b'<link:linkbase xml:base="https://example.com/elsewhere/" ', 1)
+    r, code = xbrl_call(folder, part="presentation")
+    own = [l for l in (nodes(r, "loc") if r else []) if l["href"] == "t-20251231.xsd#t_FulfillmentExpense"]
+    check("b4: a locator is resolved against the linkbase's xml:base, not the file's URL",
+          code is None and own and own[0]["target"]["resolved"] is False
+          and own[0]["target"].get("schema") == "https://example.com/elsewhere/t-20251231.xsd"
+          and own[0].get("url") == "https://example.com/elsewhere/t-20251231.xsd#t_FulfillmentExpense",
+          code or str(own))
+
+    folder = filed()
+    folder["t-20251231_cal.xml"] = folder["t-20251231_cal.xml"].replace(
+        b"<link:calculationLink ", f'<link:calculationLink xml:base="{FOLDER_URL}" '.encode(), 1).replace(
+        b"<link:linkbase ", b'<link:linkbase xml:base="https://example.com/ignored/" ', 1)
+    r, code = xbrl_call(folder, part="calculation")
+    first_link = [l for l in (nodes(r, "loc") if r else []) if l["href"] == "t-20251231.xsd#t_FulfillmentExpense"]
+    check("b4: the innermost xml:base wins over the outer one (inherited, then overridden)",
+          code is None and first_link and first_link[0]["target"]["resolved"] is True, code or str(first_link))
+
+    folder = filed()
+    folder["t-20251231.xsd"] = folder["t-20251231.xsd"].replace(b"</xs:schema>", (
+        b'<xs:element id="t_FulfillmentExpense" name="FulfillmentExpenseAgain" type="xbrli:monetaryItemType" '
+        b'substitutionGroup="xbrli:item" xbrli:periodType="duration"/></xs:schema>'), 1)
+    r, code = xbrl_call(folder, part="presentation")
+    own = [l for l in (nodes(r, "loc") if r else []) if l["href"] == "t-20251231.xsd#t_FulfillmentExpense"]
+    target = own[0]["target"] if own else {}
+    check("b4: a locator to an id two schema elements share is ambiguous: resolved false, both named",
+          code is None and target.get("resolved") is False and target.get("ambiguous") is True
+          and [c["local_name"] for c in target.get("candidates", [])] == ["FulfillmentExpense",
+                                                                           "FulfillmentExpenseAgain"],
+          code or str(target))
+    check("b4: and the shared id is in unresolved", r is not None
+          and any(u.get("id") == "t_FulfillmentExpense" for u in r["unresolved"]), str(r and r["unresolved"]))
+
+
 if __name__ == "__main__":
     no_implicit_filter_cases()
     discovery_cases()
     dependency_cases()
+    locator_cases()
     search_cases()
     client_cases()
     lookup_cases()

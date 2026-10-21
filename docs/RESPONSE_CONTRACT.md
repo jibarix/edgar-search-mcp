@@ -298,9 +298,15 @@ The XBRL files of one filing, one `part` at a time:
   orders and several parents of one concept are all returned as written;
   nothing is applied, combined or sorted. Label resources keep their
   language, role and text; no language is preferred and no label is
-  invented. A locator's `target` is the element of the filing's schema
-  (`file`) whose `id` its href fragment names (`namespace`, `local_name`,
-  `schema_seq`); a
+  invented. A locator and a `roleRef` or `arcroleRef` keep `href` as written
+  and add `url`, the href resolved against the base URI in effect where it is
+  written (the file's URL changed by every inherited `xml:base`, outermost
+  first). A locator's `target` is the element of the filing's schema at that
+  `url` (`file`) that is the only one with the `id` its fragment names
+  (`namespace`, `local_name`, `schema_seq`). When several elements of the
+  schema have that id, the target is `resolved: false`, `ambiguous: true`,
+  with every `candidates` entry and none chosen, and the shared id is in
+  `unresolved`; a
   locator into a schema outside the filing (the US GAAP taxonomy, say) is
   `resolved: false` with `schema` and `fragment`, and each such schema is
   listed once in `unresolved` with its count of locators. The fragment is
