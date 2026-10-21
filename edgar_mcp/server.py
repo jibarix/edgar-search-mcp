@@ -709,7 +709,9 @@ def get_filing_xbrl(
     concepts and the contexts and units they use. A name is "prefix:local"
     (prefix resolved through the instance's own declarations),
     "{namespace}local", or a bare local name, which matches that local name in
-    every namespace; `concept_matches` says what each name matched.
+    every namespace; `concept_matches` says what each name matched. A fact
+    inside a tuple is found too and has `path`; a name of an element that is
+    no fact (a tuple) is listed as `unsupported` and in `unresolved`.
     Items are paged by `offset` and `limit`; `page.next_offset` is null on the
     last page. Attribute names in a namespace are given as "{namespace}local".
     Each file parsed comes with its document element (`root`) and namespace

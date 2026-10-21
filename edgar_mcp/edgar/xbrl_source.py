@@ -325,6 +325,21 @@ def _fact(doc: XmlDoc, element) -> dict:
     return out
 
 
+def _nested(doc: XmlDoc, element, path: list, facts: list, non_facts: list):
+    """Inside a top-level element that is no fact (a tuple, say): every element
+    carrying contextRef is a fact, given with `path`, the elements it is
+    written in from the top-level one down (`seq` and `element`); every other
+    element is recorded in `non_facts`. A fact's own content is not searched."""
+    ns, local = split(element.tag)
+    non_facts.append({"seq": doc.seq(element), "namespace": ns, "local_name": local})
+    here = path + [{"seq": doc.seq(element), "element": element_name(doc, element)}]
+    for child in element:
+        if child.get("contextRef") is not None:
+            facts.append({**_fact(doc, child), "path": here})
+        else:
+            _nested(doc, child, here, facts, non_facts)
+
+
 def read_instance(raw: bytes | None, name: str = "instance", doc: XmlDoc | None = None) -> dict:
     """Every top-level element of an instance, in document order.
 
@@ -332,15 +347,18 @@ def read_instance(raw: bytes | None, name: str = "instance", doc: XmlDoc | None 
     "context" (xbrli:context), "unit" (xbrli:unit), "fact" (an element
     outside the xbrli and link namespaces that carries contextRef), "link"
     (an element in the link namespace: schemaRef, footnoteLink, ...), or
-    "other" (anything else, a tuple say), returned as XML. `doc` is the file
-    already parsed, if it was.
+    "other" (anything else, a tuple say), returned as XML with
+    `nested_facts`, the facts written inside it at any depth, each with its
+    `path`. `non_fact_elements` lists every element of an "other" item that
+    carries no contextRef (the item's own element included). `doc` is the
+    file already parsed, if it was.
     """
     doc = doc if doc is not None else XmlDoc(raw, name)
     root_ns, root_local = split(doc.root.tag)
     unresolved = list(doc.conflicts())
     if (root_ns, root_local) != (XBRLI, "xbrl"):
         raise FilingDataError(f"{name}: the document element is {doc.root.tag}, not xbrli:xbrl")
-    items = []
+    items, non_facts = [], []
     for element in doc.root:
         ns, local = split(element.tag)
         if ns == XBRLI and local == "context":
@@ -353,8 +371,10 @@ def read_instance(raw: bytes | None, name: str = "instance", doc: XmlDoc | None 
         elif ns not in (XBRLI, LINK) and element.get("contextRef") is not None:
             items.append(_fact(doc, element))
         else:
+            nested = []
+            _nested(doc, element, [], nested, non_facts)
             items.append({"seq": doc.seq(element), "node": "other", "element": element_name(doc, element),
-                          "attributes": dict(element.attrib), "xml": doc.to_xml(element)})
+                          "attributes": dict(element.attrib), "xml": doc.to_xml(element), "nested_facts": nested})
     for item in items:
         for where in ("segment", "scenario"):
             members = item.get(where) or {}
@@ -368,7 +388,13 @@ def read_instance(raw: bytes | None, name: str = "instance", doc: XmlDoc | None 
             if not m["resolved"]:
                 unresolved.append({"seq": item["seq"], "unit": item["id"], "value": m["qname"], "reason": m["reason"]})
     return {"root": root_record(doc), "namespaces": doc.namespaces(), "declarations": doc.declarations,
-            "namespace_declarations": scoped_declarations(doc), "items": items, "unresolved": unresolved, "doc": doc}
+            "namespace_declarations": scoped_declarations(doc), "items": items, "non_fact_elements": non_facts,
+            "unresolved": unresolved, "doc": doc}
+
+
+_NOT_A_FACT = ("elements of this name carry no contextRef (a tuple, say), so they are not facts and `concepts`, "
+               "which selects facts, does not return them; without `concepts` each top-level one is an `other` item, "
+               "as XML, with the facts written inside it in `nested_facts`")
 
 
 def select_concepts(instance: dict, names: list) -> tuple[list, list, list]:
@@ -376,21 +402,32 @@ def select_concepts(instance: dict, names: list) -> tuple[list, list, list]:
 
     A name is "{namespace}local", "prefix:local" (the prefix resolved through
     the instance's own declarations) or a bare local name, which matches that
-    local name in every namespace. Returns (items in document order,
-    concept_matches, unresolved)."""
-    facts = [i for i in instance["items"] if i["node"] == "fact"]
+    local name in every namespace. A fact written inside a tuple matches like
+    any other and is returned with its `path`. A name that matches elements
+    which are no facts (tuples) has them in `unsupported` and in `unresolved`;
+    an empty `matches` with no `unsupported` means no element of the instance
+    has that name. Returns (items in document order, concept_matches,
+    unresolved)."""
+    facts = []
+    for i in instance["items"]:
+        if i["node"] == "fact":
+            facts.append(i)
+        elif i["node"] == "other":
+            facts += i.get("nested_facts", [])
     present = {}
     for f in facts:
         present.setdefault((f["concept"]["namespace"], f["concept"]["local_name"]), None)
+    non_facts = {}
+    for e in instance.get("non_fact_elements", []):
+        non_facts.setdefault((e["namespace"], e["local_name"]), []).append(e["seq"])
     bound = {}
     for d in instance["declarations"]:
         bound.setdefault(d["prefix"], set()).add(d["namespace"])
     matches, unresolved, wanted = [], [], set()
     for name in names:
+        spec = None
         if name.startswith("{"):
-            ns, local = split(name)
-            found = [(ns, local)] if (ns, local) in present else []
-            entry = {"name": name, "resolved": True, "matches": found}
+            spec = split(name)
         elif ":" in name:
             prefix, _, local = name.partition(":")
             uris = bound.get(prefix, set())
@@ -400,12 +437,19 @@ def select_concepts(instance: dict, names: list) -> tuple[list, list, list]:
                 entry = {"name": name, "resolved": False, "reason": reason, "namespaces": sorted(uris), "matches": []}
                 unresolved.append({"name": name, "reason": reason})
             else:
-                ns = next(iter(uris))
-                entry = {"name": name, "resolved": True,
-                         "matches": [(ns, local)] if (ns, local) in present else []}
+                spec = (next(iter(uris)), local)
         else:
-            entry = {"name": name, "resolved": True, "matches": [k for k in present if k[1] == name]}
-        entry["matches"] = [{"namespace": ns, "local_name": local} for ns, local in entry["matches"]]
+            spec = (None, name)
+        if spec is not None:
+            def pick(keys):
+                return [k for k in keys if (spec[0] is None or k[0] == spec[0]) and k[1] == spec[1]]
+            entry = {"name": name, "resolved": True,
+                     "matches": [{"namespace": ns, "local_name": local} for ns, local in pick(present)]}
+            others = [{"namespace": ns, "local_name": local, "seqs": non_facts[(ns, local)]}
+                      for ns, local in pick(non_facts)]
+            if others:
+                entry["unsupported"] = [{**o, "reason": _NOT_A_FACT} for o in others]
+                unresolved.append({"name": name, "elements": others, "reason": _NOT_A_FACT})
         wanted |= {(m["namespace"], m["local_name"]) for m in entry["matches"]}
         matches.append(entry)
     chosen = [f for f in facts if (f["concept"]["namespace"], f["concept"]["local_name"]) in wanted]
@@ -418,9 +462,13 @@ def select_concepts(instance: dict, names: list) -> tuple[list, list, list]:
     for ref in sorted(units - declared_units):
         unresolved.append({"unitRef": ref, "reason": "no unit with this id in the instance"})
     chosen_ids = {id(f) for f in chosen}
-    items = [i for i in instance["items"]
-             if id(i) in chosen_ids or (i["node"] == "context" and i["id"] in contexts)
-             or (i["node"] == "unit" and i["id"] in units)]
+    items = []
+    for i in instance["items"]:
+        if id(i) in chosen_ids or (i["node"] == "context" and i["id"] in contexts) or (
+                i["node"] == "unit" and i["id"] in units):
+            items.append(i)
+        elif i["node"] == "other":
+            items += [f for f in i.get("nested_facts", []) if id(f) in chosen_ids]
     return items, matches, unresolved
 
 

@@ -52,6 +52,11 @@ A review of 1.0.0rc1 found places where the server still chose or guessed.
   that holds only roleRefs, or no link any part returns, gives its roleRefs
   to every part, and other non-link children of a linkbase are `other`
   items. Each `linkbases` entry counts its extended links by element.
+- **Tuples**: `concepts` finds facts written inside tuples, at any depth,
+  and returns each with `path`, the elements it is nested in. A name that
+  matches a tuple (an element with no contextRef) is reported in
+  `unsupported` and `unresolved` instead of an empty match. Without
+  `concepts`, a tuple's `other` item lists its `nested_facts`.
 
 ## 1.0.0rc1
 

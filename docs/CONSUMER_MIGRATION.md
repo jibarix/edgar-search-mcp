@@ -330,6 +330,8 @@ What 1.0 leaves unresolved, and says so:
   `unresolved` names the missing file.
 - A fact with `xsi:nil` keeps `nil` and its text as written. No value is
   invented for it.
+- A fact inside a tuple is selected by `concepts` and has `path`; a tuple's
+  own name is `unsupported` (rc1 returned an empty match for both).
 - A part's `roleRef` and `arcroleRef` items come from linkbases that hold an
   extended link of that part's kind, and from linkbases that hold no
   extended link any part returns (a roleRefs-only linkbase is in every

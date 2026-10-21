@@ -348,13 +348,22 @@ The XBRL files of one filing, one `part` at a time:
   XML. Each measure keeps its `seq` and `attributes`. Facts have
   their concept as namespace URI plus local name, `contextRef`, `unitRef`,
   `decimals`, `precision`, `nil` as written in `xsi:nil`, the text exactly as
-  written and `lang`. Duplicates are all returned; none is chosen.
+  written and `lang`. Any other top-level element (a tuple, say) is an
+  `other` item, as XML, with `nested_facts`: every fact written inside it at
+  any depth, each with `path`, the elements it is nested in from the
+  top-level one down (`seq`, `element`). Duplicates are all returned; none is chosen.
 
 `concepts` (with `part="instance"`) keeps only facts of the named concepts and
 the contexts and units they use. A name is `prefix:local` (prefix resolved
 through the instance's own declarations), `{namespace}local`, or a bare local
 name, which returns every concept with that local name in any namespace;
-`concept_matches` says which concepts each name matched.
+`concept_matches` says which concepts each name matched. A fact inside a
+tuple matches like any other and is returned as a `fact` item with its
+`path`, in document order. A name that matches elements that are no facts
+(a tuple's own element) lists them in its entry's `unsupported` (with their
+`seqs` and the reason) and in `unresolved`: `concepts` selects facts only.
+So an empty `matches` without `unsupported` means that no element of the
+instance, at any depth, has that name.
 
 ## What the server never returns
 

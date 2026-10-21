@@ -321,6 +321,35 @@ def lossless_schema_and_linkbase():
                                          "prefixes": ["link"]}, "attributes": {"id": "x"}}, str(root))
 
 
+def tuples():
+    body = (context("C") + context("P") + USD + '<a:Cash contextRef="C" unitRef="usd" decimals="0">1</a:Cash>'
+            '<a:Holding><a:Amount contextRef="C" unitRef="usd" decimals="0">7</a:Amount>'
+            '<a:Inner><a:Cash contextRef="P" unitRef="usd" decimals="0">3</a:Cash></a:Inner></a:Holding>')
+    r = xs.read_instance(instance(body))
+    holding = next(i for i in r["items"] if i["node"] == "other")
+    nested = holding.get("nested_facts") or []
+    check("tuples: the facts inside a tuple are listed with their nesting path, the tuple kept as XML",
+          [(f["concept"]["local_name"], f["text"], [p["element"]["local_name"] for p in f.get("path", [])])
+           for f in nested] == [("Amount", "7", ["Holding"]), ("Cash", "3", ["Holding", "Inner"])]
+          and "<a:Amount" in holding["xml"], str(nested))
+    items, matches, unresolved = xs.select_concepts(r, ["a:Amount"])
+    got = [i for i in items if i["node"] == "fact"]
+    check("tuples: a fact inside a tuple is selected by name, with its path, context and unit",
+          [(f["text"], [p["seq"] for p in f.get("path", [])]) for f in got] == [("7", [holding["seq"]])]
+          and [i["id"] for i in items if i["node"] in ("context", "unit")] == ["C", "usd"]
+          and matches[0]["matches"] == [{"namespace": A, "local_name": "Amount"}] and not unresolved,
+          str((items, matches)))
+    items, _, _ = xs.select_concepts(r, ["Cash"])
+    got = [(f["text"], len(f.get("path", []))) for f in items if f["node"] == "fact"]
+    check("tuples: a name matches its facts at every depth, in document order",
+          got == [("1", 0), ("3", 2)] and [i["seq"] for i in items] == sorted(i["seq"] for i in items), str(got))
+    items, matches, unresolved = xs.select_concepts(r, ["a:Holding"])
+    check("tuples: a name of an element that is no fact (a tuple) is said to be unsupported, never a silent empty match",
+          not items and matches[0].get("unsupported")
+          and matches[0]["unsupported"][0]["seqs"] == [holding["seq"]]
+          and any(u.get("name") == "a:Holding" for u in unresolved), str((matches, unresolved)))
+
+
 def schema(body, extra_ns=""):
     return (f'<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" {LB_NS} '
             f'xmlns:xbrli="http://www.xbrl.org/2003/instance" {extra_ns} targetNamespace="{A}">{body}</xs:schema>'
@@ -600,6 +629,7 @@ def main():
     schema_declarations()
     lossless_instance()
     lossless_schema_and_linkbase()
+    tuples()
     print(f"problems: {len(problems)}")
     return 1 if problems else 0
 

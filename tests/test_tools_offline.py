@@ -1276,12 +1276,51 @@ def lossless_cases():
           str(r and r.get("not_returned")))
 
 
+# ── Round 2, blocker 6: named-concept selection finds facts nested in tuples ──
+
+def tuple_cases():
+    inst = "t-20251231_htm.xml"
+    folder = filed()
+    folder[inst] = folder[inst].replace(b"</xbrli:xbrl>", (
+        b'<t:Holding><t:Amount contextRef="I25" unitRef="usd" decimals="0">7</t:Amount>'
+        b'<t:Inner><us-gaap:Cash contextRef="I23x" unitRef="usd" decimals="0">3</us-gaap:Cash></t:Inner>'
+        b'</t:Holding></xbrli:xbrl>'), 1)
+    r, code = xbrl_call(folder, part="instance", concepts=["t:Amount"])
+    facts = nodes(r, "fact")
+    check("b6: a fact inside a tuple is selected by its name, with the path of elements it is nested in",
+          code is None and [(f["text"], [p["element"]["local_name"] for p in f.get("path", [])]) for f in facts]
+          == [("7", ["Holding"])] and [i["id"] for i in r["items"] if i["node"] != "fact"] == ["I25", "usd"],
+          code or str(r and r["items"]))
+    check("b6: its match is the concept, resolved, and nothing is unresolved",
+          r is not None and r["concept_matches"][0]["matches"] == [{"namespace": "http://t.example/2025",
+                                                                   "local_name": "Amount"}]
+          and not r["unresolved"], str(r and (r["concept_matches"], r["unresolved"])))
+    r, code = xbrl_call(folder, part="instance", concepts=["us-gaap:Cash"])
+    cash = [(f["text"], len(f.get("path", []))) for f in nodes(r, "fact")]
+    check("b6: a name matches facts at the top level and two tuples deep alike",
+          code is None and cash == [("10000000", 0), ("8000000", 0), ("3", 2)], code or str(cash))
+    check("b6: a context a nested fact names and the instance lacks is unresolved, as for any fact",
+          r is not None and any(u.get("contextRef") == "I23x" for u in r["unresolved"]), str(r and r["unresolved"]))
+    r, code = xbrl_call(folder, part="instance", concepts=["t:Holding"])
+    match = (r or {}).get("concept_matches", [{}])[0]
+    check("b6: asking for a tuple by name is reported as unsupported, not answered with a silent empty match",
+          code is None and not r["items"] and match.get("unsupported")
+          and any(u.get("name") == "t:Holding" for u in r["unresolved"]), code or str(r and (match, r["unresolved"])))
+    r, code = xbrl_call(folder, part="instance")
+    holding = [i for i in nodes(r, "other") if i["element"]["local_name"] == "Holding"]
+    check("b6: unselected, the tuple stays one item as XML and lists the facts inside it",
+          code is None and len(holding) == 1
+          and [f["concept"]["local_name"] for f in holding[0].get("nested_facts", [])] == ["Amount", "Cash"],
+          code or str(holding))
+
+
 if __name__ == "__main__":
     no_implicit_filter_cases()
     discovery_cases()
     dependency_cases()
     locator_cases()
     lossless_cases()
+    tuple_cases()
     search_cases()
     client_cases()
     lookup_cases()
