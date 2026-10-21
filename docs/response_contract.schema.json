@@ -73,9 +73,11 @@
   },
   "get_submissions": {
    "allOf": [{"$ref": "#/$defs/envelope"}, {
-    "required": ["cik", "payload"],
+    "required": ["cik", "payload", "numbers_as_text"],
     "properties": {"representation": {"const": "source"}, "payload": {"type": "object"},
-                   "older_files": {"type": "array", "items": {"type": "object", "required": ["name", "payload"]}}}
+                   "numbers_as_text": {"type": "array", "items": {"type": "array", "items": {"type": ["string", "integer"]}}},
+                   "older_files": {"type": "array", "items": {"type": "object",
+                                   "required": ["name", "payload", "numbers_as_text"]}}}
    }]
   },
   "list_filings": {
@@ -126,20 +128,23 @@
   },
   "get_companyfacts": {
    "allOf": [{"$ref": "#/$defs/envelope"}, {
-    "required": ["cik", "filters", "payload"],
-    "properties": {"representation": {"enum": ["source", "source_records"]}, "payload": {"type": "object"}}
+    "required": ["cik", "filters", "payload", "numbers_as_text"],
+    "properties": {"representation": {"enum": ["source", "source_records"]}, "payload": {"type": "object"},
+                   "numbers_as_text": {"type": "array", "items": {"type": "array", "items": {"type": ["string", "integer"]}}}}
    }]
   },
   "get_companyconcept": {
    "allOf": [{"$ref": "#/$defs/envelope"}, {
-    "required": ["cik", "payload"],
-    "properties": {"representation": {"const": "source"}, "payload": {"type": "object"}}
+    "required": ["cik", "payload", "numbers_as_text"],
+    "properties": {"representation": {"const": "source"}, "payload": {"type": "object"},
+                   "numbers_as_text": {"type": "array", "items": {"type": "array", "items": {"type": ["string", "integer"]}}}}
    }]
   },
   "get_frames": {
    "allOf": [{"$ref": "#/$defs/envelope"}, {
-    "required": ["payload"],
-    "properties": {"representation": {"const": "source"}, "payload": {"type": "object"}}
+    "required": ["payload", "numbers_as_text"],
+    "properties": {"representation": {"const": "source"}, "payload": {"type": "object"},
+                   "numbers_as_text": {"type": "array", "items": {"type": "array", "items": {"type": ["string", "integer"]}}}}
    }]
   },
   "get_filing_xbrl": {

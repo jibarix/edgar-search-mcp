@@ -57,6 +57,14 @@ A review of 1.0.0rc1 found places where the server still chose or guessed.
   matches a tuple (an element with no contextRef) is reported in
   `unsupported` and `unresolved` instead of an empty match. Without
   `concepts`, a tuple's `other` item lists its `nested_facts`.
+- **Exact JSON numbers**: SEC JSON is no longer parsed into binary floats
+  that change a value (rc1 turned `9007199254740993.0` into
+  `9007199254740992.0` and `1e400` into an invalid `Infinity`). A number a
+  double carries exactly stays a JSON number; any other is returned as the
+  text the SEC wrote, a string, and `get_submissions`, `get_companyfacts`,
+  `get_companyconcept` and `get_frames` list where in `numbers_as_text`
+  (empty in the usual case). Cache entries written by rc1 are fetched again.
+  In the library, `sec_client.decode_json` does the parsing.
 
 ## 1.0.0rc1
 

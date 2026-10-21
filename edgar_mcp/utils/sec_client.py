@@ -8,11 +8,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import os
 import tempfile
 import threading
 import time
 from datetime import datetime, timezone
+from decimal import Decimal
 from email.utils import parsedate_to_datetime
 from typing import NamedTuple
 
@@ -244,28 +246,82 @@ def fetch_response(url, max_bytes=MAX_JSON_BYTES):
     raise failure
 
 
+class _NumberText(str):
+    """A JSON number kept as the text it was written as (see decode_json)."""
+
+
+def _float(text):
+    value = float(text)
+    # The double is kept when the shortest text that reads back as it, which
+    # is what a JSON encoder writes, denotes exactly the decimal in the source.
+    if math.isfinite(value) and Decimal(repr(value)) == Decimal(text):
+        return value
+    return _NumberText(text)
+
+
+def _int(text):
+    try:
+        return int(text)
+    except ValueError:  # more digits than Python converts
+        return _NumberText(text)
+
+
+def _collect_text(node, path, found):
+    items = list(node.items()) if isinstance(node, dict) else list(enumerate(node))
+    for k, v in items:
+        if isinstance(v, _NumberText):
+            node[k] = str(v)
+            found.append(path + [k])
+        elif isinstance(v, (dict, list)):
+            _collect_text(v, path + [k], found)
+
+
+def decode_json(body):
+    """Parse JSON without changing the value of any number.
+
+    An integer is a Python int, and a number with a fraction or an exponent
+    is a float when the float denotes the same decimal value as the text
+    (1.50 is 1.5). Any other number (9007199254740993.0, 1e400, a NaN or
+    Infinity constant, an integer of more digits than Python converts) is
+    kept as its text, a string. Returns (data, paths): `paths` lists where
+    each number kept as text is, as the keys and list indexes from the top,
+    in document order.
+    """
+    data = json.loads(body, parse_float=_float, parse_int=_int, parse_constant=_NumberText)
+    if isinstance(data, _NumberText):
+        return str(data), [[]]
+    found = []
+    if isinstance(data, (dict, list)):
+        _collect_text(data, [], found)
+    return data, found
+
+
 def get_json(url, cache=None, key=None, ttl=None):
-    """Fetch and parse JSON. Returns (data, meta).
+    """Fetch and parse JSON with decode_json, so no number changes value.
+    Returns (data, meta).
 
     `meta` records where the data came from and when it left the SEC:
-    {'source_url', 'retrieved_at', 'cache_hit', 'frozen', 'sha256'}; a cache
-    hit keeps the retrieval time and the hash of the bytes of the answer it
-    holds (sha256 is None for an entry stored before hashes were kept).
+    {'source_url', 'retrieved_at', 'cache_hit', 'frozen', 'sha256',
+    'numbers_as_text'}; a cache hit keeps the retrieval time and the hash of
+    the bytes of the answer it holds (sha256 is None for an entry stored
+    before hashes were kept). An entry stored without `numbers_as_text` was
+    parsed by a release that rounded numbers to doubles, and is not used.
     """
     if cache is not None:
         entry = cache.get_entry(key or url)
-        if entry:
-            return entry['data'], {'sha256': None, **entry.get('meta', {}), 'source_url': url, 'cache_hit': True}
+        if entry and isinstance((entry.get('meta') or {}).get('numbers_as_text'), list):
+            return entry['data'], {'sha256': None, **entry['meta'], 'source_url': url, 'cache_hit': True}
     response = fetch_response(url)
     try:
-        data = json.loads(response.body)
-    except ValueError as e:
+        data, numbers_as_text = decode_json(response.body)
+    except (ValueError, RecursionError) as e:
         raise SecError(f"{url} did not return JSON: {e}") from e
     meta = {
         'source_url': url,
         'retrieved_at': response.retrieved_at,
         'frozen': response.frozen,
         'sha256': hashlib.sha256(response.body).hexdigest(),
+        'numbers_as_text': numbers_as_text,
     }
     if cache is not None:
         cache.set(key or url, data, ttl=ttl, meta=meta)

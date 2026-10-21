@@ -1314,6 +1314,133 @@ def tuple_cases():
           code or str(holding))
 
 
+# ── Round 2, blocker 7: JSON numbers keep their exact value ─────────────────
+
+EXACT_OBS = (b'[{"val":9007199254740993.0,"fy":2024},{"val":1.50},{"val":1e400},'
+             b'{"val":123456789012345678901234567890},{"val":0.1}]')
+
+
+def wire(result):
+    """The tool result as an MCP client receives it (the server serializes a
+    dict result with pydantic_core.to_json), read back strictly: a number as
+    a Decimal. None when the text is not JSON (Infinity or NaN in it)."""
+    import decimal
+    import pydantic_core
+    text = pydantic_core.to_json(result, fallback=str).decode()
+
+    def refuse(name):
+        raise ValueError(f"not JSON: {name}")
+    try:
+        return json.loads(text, parse_float=decimal.Decimal, parse_constant=refuse)
+    except ValueError:
+        return None
+
+
+def wire_obs(result, code, *path):
+    """The observations at `path` of the payload as sent, or [] when there
+    is no answer or the answer is not JSON."""
+    node = wire(result) if code is None else None
+    for step in ("payload",) + path:
+        if node is None:
+            return []
+        node = node.get(step)
+    return node or []
+
+
+def exact_vals(observations):
+    """Each `val` as the exact decimal it denotes, whether sent as a number
+    or as its text; None when it does not denote one."""
+    import decimal
+    out = []
+    for o in observations:
+        try:
+            out.append(decimal.Decimal(str(o["val"])))
+        except (decimal.InvalidOperation, KeyError, TypeError):
+            out.append(None)
+    return out
+
+
+def exact_number_cases():
+    import decimal
+    D = decimal.Decimal
+    expected = [D("9007199254740993.0"), D("1.50"), D("1e400"), D("123456789012345678901234567890"), D("0.1")]
+    cik = "0000000077"
+    facts_url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
+    concept_url = f"https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/EarningsPerShareBasic.json"
+    frame_url = "https://data.sec.gov/api/xbrl/frames/us-gaap/EarningsPerShareBasic/USD-per-shares/CY2024.json"
+    bodies = {
+        facts_url: (b'{"cik":77,"entityName":"T","facts":{"dei":{"X":{"units":{"shares":[{"val":5}]}}},'
+                    b'"us-gaap":{"EarningsPerShareBasic":{"label":"EPS","units":{"USD/shares":' + EXACT_OBS + b'}}}}}'),
+        concept_url: b'{"cik":77,"taxonomy":"us-gaap","tag":"EarningsPerShareBasic","units":{"USD/shares":'
+                     + EXACT_OBS + b'}}',
+        frame_url: b'{"taxonomy":"us-gaap","tag":"EarningsPerShareBasic","ccp":"CY2024","uom":"USD-per-shares",'
+                   b'"pts":5,"data":' + EXACT_OBS + b'}',
+    }
+    seen = []
+
+    def handler(request):
+        url = str(request.url)
+        seen.append(url)
+        if url in bodies:
+            return httpx.Response(200, content=bodies[url], headers={"content-type": "application/json"})
+        return httpx.Response(404)
+    transport(handler)
+    obs_path = ["facts", "us-gaap", "EarningsPerShareBasic", "units", "USD/shares"]
+    try:
+        for attempt in ("fetched", "cache hit"):
+            r, code = call(server.get_companyfacts, cik_or_ticker=cik)
+            got = wire(r) if code is None else None
+            vals = exact_vals(wire_obs(r, code, *obs_path))
+            check(f"b7 companyfacts ({attempt}): 9007199254740993.0, 1e400 and every other number keep their exact "
+                  "value on the wire", code is None and vals == expected, code or str(vals))
+            check(f"b7 companyfacts ({attempt}): a number a double cannot carry is listed in numbers_as_text",
+                  r is not None and r.get("numbers_as_text") == [obs_path + [0, "val"], obs_path + [2, "val"]],
+                  str(r and r.get("numbers_as_text")))
+            check(f"b7 companyfacts ({attempt}): a number a double carries stays a JSON number",
+                  got is not None and isinstance(got["payload"]["facts"]["us-gaap"]["EarningsPerShareBasic"]["units"]
+                                                 ["USD/shares"][1]["val"], D)
+                  and got["payload"]["facts"]["dei"]["X"]["units"]["shares"][0]["val"] == 5, str(got)[:200])
+        check("b7: the second answer came from the cache, and the SEC was asked once",
+              r is not None and r["sources"][0]["cache_hit"] is True and seen.count(facts_url) == 1, str(seen))
+        r, code = call(server.get_companyfacts, cik_or_ticker=cik, taxonomy="us-gaap", concept="EarningsPerShareBasic")
+        vals = exact_vals(wire_obs(r, code, *obs_path))
+        check("b7 companyfacts filtered: exact values and their numbers_as_text paths are kept",
+              code is None and vals == expected
+              and r.get("numbers_as_text") == [obs_path + [0, "val"], obs_path + [2, "val"]], code or str(vals))
+        r, code = call(server.get_companyfacts, cik_or_ticker=cik, taxonomy="dei")
+        check("b7 companyfacts filtered away: numbers_as_text names only what the payload holds",
+              code is None and r.get("numbers_as_text") == [], code or str(r and r.get("numbers_as_text")))
+        r, code = call(server.get_companyconcept, cik_or_ticker=cik, taxonomy="us-gaap",
+                       concept="EarningsPerShareBasic")
+        vals = exact_vals(wire_obs(r, code, "units", "USD/shares"))
+        check("b7 companyconcept: exact values on the wire, with numbers_as_text",
+              code is None and vals == expected
+              and r.get("numbers_as_text") == [["units", "USD/shares", 0, "val"], ["units", "USD/shares", 2, "val"]],
+              code or str(vals))
+        r, code = call(server.get_frames, taxonomy="us-gaap", concept="EarningsPerShareBasic", unit="USD-per-shares",
+                       period="CY2024")
+        vals = exact_vals(wire_obs(r, code, "data"))
+        check("b7 frames: exact values on the wire, with numbers_as_text",
+              code is None and vals == expected
+              and r.get("numbers_as_text") == [["data", 0, "val"], ["data", 2, "val"]], code or str(vals))
+        # A cache entry stored by a release that rounded is not served.
+        stale_url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK0000000078.json"
+        bodies[stale_url] = bodies[facts_url]
+        filing_retrieval.filing_cache.set("company_facts_0000000078", {"facts": {"rounded": 9007199254740992.0}},
+                                          meta={"source_url": stale_url, "retrieved_at": "2026-01-01T00:00:00Z",
+                                                "frozen": False, "sha256": None})
+        r, code = call(server.get_companyfacts, cik_or_ticker="78")
+        check("b7: a cached document stored without the record of its exact numbers is fetched again",
+              code is None and stale_url in seen and "rounded" not in r["payload"]["facts"]
+              and r["sources"][0]["cache_hit"] is False, code or str(r and r["payload"])[:200])
+    finally:
+        transport(unexpected)
+        for key in ("company_facts_0000000077", "company_facts_0000000078",
+                    "company_concept_0000000077_us-gaap_EarningsPerShareBasic",
+                    "frame_us-gaap_EarningsPerShareBasic_USD-per-shares_CY2024"):
+            filing_retrieval.filing_cache.delete(key)
+
+
 if __name__ == "__main__":
     no_implicit_filter_cases()
     discovery_cases()
@@ -1321,6 +1448,7 @@ if __name__ == "__main__":
     locator_cases()
     lossless_cases()
     tuple_cases()
+    exact_number_cases()
     search_cases()
     client_cases()
     lookup_cases()

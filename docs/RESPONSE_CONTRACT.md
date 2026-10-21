@@ -42,7 +42,8 @@ Every successful answer is a JSON object with these fields.
 
 - `source`: `payload` is the SEC document, parsed from JSON and returned
   unchanged: every key, every value and the original order of lists. Nothing is
-  added inside `payload`.
+  added inside `payload`. See "Numbers" below for how a number keeps its
+  value.
 - `source_records`: records copied verbatim from a source document (key names
   as the SEC spells them), selected by the literal filters echoed in `filters`.
   Fields the server adds beside a record (a document URL built from the CIK,
@@ -56,6 +57,27 @@ Every successful answer is a JSON object with these fields.
 - `transformed`: a convenience view, such as plain text extracted from HTML.
   `transformation` names the rules. It never replaces the original, which
   `get_filing_document` returns byte for byte.
+
+### Numbers
+
+No number of an SEC JSON document changes value. An integer is returned as
+an integer, every digit kept. A number with a fraction or an exponent is
+returned as a JSON number when the shortest decimal a double writes as
+(what a JSON encoder sends) has exactly the value the SEC wrote: `1.50` is
+sent as `1.5`, `0.1` as `0.1`. A number that a double cannot carry exactly,
+such as `9007199254740993.0` (a double holds 9007199254740992) or `1e400`
+(no finite double), is returned as the text the SEC wrote, a JSON string. So
+are a non-JSON `NaN` or `Infinity` constant and an integer with more digits
+than Python converts. Every answer that returns an SEC JSON document as
+`payload` (`get_submissions`, its `older_files`, `get_companyfacts`,
+`get_companyconcept`, `get_frames`) has `numbers_as_text`: the path of each
+such string in `payload`, as the keys and list indexes from the top of
+`payload`, in document order. It is empty when there are none, which is the
+usual case. Only the value is kept, not the spelling (`1.50` comes back as
+`1.5`, `1E3` as `1000.0`). The bytes as published are the ones `sha256` in
+`sources` hashes. Records copied from SEC JSON into other answers
+(`list_filings`, `search_filings`, `lookup_company`) follow the same rule,
+without a list of paths.
 
 ### Unresolved and ambiguous
 
@@ -110,7 +132,8 @@ CIK. A CIK missing from the feed can still be given to every other tool.
 The SEC submissions document unchanged, including `sic` and `sicDescription`
 as the SEC publishes them. With `include_older_files`, `older_files` lists each
 file named in `filings.files`, in the order listed, each as `{"name",
-"payload"}` with the file unchanged.
+"payload", "numbers_as_text"}` with the file unchanged. `numbers_as_text` as
+in "Numbers" above.
 
 ### `list_filings(cik_or_ticker, form=None, as_of=None, limit=10, include_amendments=False)` — `source_records`
 
@@ -179,16 +202,18 @@ hits; `filters` echoes the arguments.
 
 The companyfacts document. With `taxonomy` (and optionally `concept`) the
 `facts` object keeps only those literal keys; every unit and observation under
-them is unchanged.
+them is unchanged. `numbers_as_text` lists the numbers kept as text that are
+in the returned `payload` (see "Numbers").
 
 ### `get_companyconcept(cik_or_ticker, taxonomy, concept)` — `source`
 
-The companyconcept document unchanged: every unit and every observation.
+The companyconcept document unchanged: every unit and every observation,
+with `numbers_as_text` (see "Numbers").
 
 ### `get_frames(taxonomy, concept, unit, period)` — `source`
 
-The frames document unchanged. `period` is `CY2023`, `CY2023Q4` or
-`CY2023Q4I`.
+The frames document unchanged, with `numbers_as_text` (see "Numbers").
+`period` is `CY2023`, `CY2023Q4` or `CY2023Q4I`.
 
 ### `get_filing_xbrl(cik_or_ticker, accession_number=None, form=None, as_of=None, part="summary", concepts=None, offset=0, limit=500, instance_file=None, schema_file=None)` — `parsed_source`
 

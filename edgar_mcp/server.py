@@ -151,6 +151,25 @@ def lookup_company(query: str) -> dict:
                     unresolved=unresolved)
 
 
+def _numbers_as_text(payload, meta: dict) -> list:
+    """Where `payload` holds a number of the SEC document kept as its text
+    (sec_client.decode_json): each path of the document's `numbers_as_text`
+    that is still in `payload`, in document order."""
+    kept = []
+    for path in meta.get("numbers_as_text") or []:
+        node = payload
+        for step in path:
+            if isinstance(node, dict) and isinstance(step, str) and step in node:
+                node = node[step]
+            elif isinstance(node, list) and isinstance(step, int) and 0 <= step < len(node):
+                node = node[step]
+            else:
+                break
+        else:
+            kept.append(path)
+    return kept
+
+
 @_tool
 def get_submissions(cik_or_ticker: str, include_older_files: bool = False) -> dict:
     """The SEC submissions document of one company, unchanged.
@@ -159,19 +178,22 @@ def get_submissions(cik_or_ticker: str, include_older_files: bool = False) -> di
     addresses, `sic` and `sicDescription` exactly as given, and the filing
     tables. Filings older than the recent table are in the files that
     `filings.files` names; with `include_older_files` each of them is returned
-    too, unchanged, in `older_files` as {"name", "payload"}, in the order
-    listed.
+    too, unchanged, in `older_files` as {"name", "payload",
+    "numbers_as_text"}, in the order listed. No number changes value: one a
+    double cannot carry exactly is given as the text the SEC wrote, and
+    `numbers_as_text` lists where.
     """
     company = _resolve(cik_or_ticker)
     data, meta = _filings.get_company_submissions(company["cik"])
     sources = [source(meta)]
-    fields = {"cik": company["cik"], "payload": data}
+    fields = {"cik": company["cik"], "payload": data, "numbers_as_text": _numbers_as_text(data, meta)}
     if include_older_files:
         older = []
         for name in _filings.older_file_names(data, company["cik"]):
             payload, older_meta = _filings.get_older_submissions(name)
             sources.append(source(older_meta))
-            older.append({"name": name, "payload": payload})
+            older.append({"name": name, "payload": payload,
+                          "numbers_as_text": _numbers_as_text(payload, older_meta)})
         fields["older_files"] = older
     return envelope("source", sources, **fields)
 
@@ -181,7 +203,8 @@ def get_companyfacts(cik_or_ticker: str, taxonomy: str | None = None, concept: s
     """The SEC companyfacts document of one company, unchanged.
 
     `cik_or_ticker` accepts a CIK, an exact ticker or an exact company name.
-    Without filters `payload` is the document as the SEC published it
+    No number changes value: one a double cannot carry exactly is given as
+    the text the SEC wrote, and `numbers_as_text` lists where. Without filters `payload` is the document as the SEC published it
     (`representation` "source"). With `taxonomy` (and optionally `concept`)
     `payload.facts` keeps only those keys, compared literally (case
     included); every unit and every observation under them is unchanged and
@@ -195,7 +218,8 @@ def get_companyfacts(cik_or_ticker: str, taxonomy: str | None = None, concept: s
     data, meta = _filings.get_company_facts(company["cik"])
     filters = {"taxonomy": taxonomy, "concept": concept}
     if taxonomy is None:
-        return envelope("source", [source(meta)], cik=company["cik"], filters=filters, payload=data)
+        return envelope("source", [source(meta)], cik=company["cik"], filters=filters, payload=data,
+                        numbers_as_text=_numbers_as_text(data, meta))
     facts = data.get("facts") if isinstance(data.get("facts"), dict) else {}
     kept = {}
     if taxonomy in facts:
@@ -204,7 +228,8 @@ def get_companyfacts(cik_or_ticker: str, taxonomy: str | None = None, concept: s
                           else {concept: concepts[concept]} if isinstance(concepts, dict) and concept in concepts
                           else {})
     payload = {k: (kept if k == "facts" else v) for k, v in data.items()}
-    return envelope("source_records", [source(meta)], cik=company["cik"], filters=filters, payload=payload)
+    return envelope("source_records", [source(meta)], cik=company["cik"], filters=filters, payload=payload,
+                    numbers_as_text=_numbers_as_text(payload, meta))
 
 
 @_tool
@@ -215,10 +240,13 @@ def get_companyconcept(cik_or_ticker: str, taxonomy: str, concept: str) -> dict:
     `taxonomy` and `concept` are put into the SEC address as given (checked
     for syntax only), so "Revenues" and "revenues" are different requests.
     A concept the company never reported is NOT_FOUND, as the SEC answers.
+    A number a double cannot carry exactly is given as the text the SEC
+    wrote; `numbers_as_text` lists where.
     """
     company = _resolve(cik_or_ticker)
     data, meta = _filings.get_company_concept(company["cik"], taxonomy, concept)
-    return envelope("source", [source(meta)], cik=company["cik"], payload=data)
+    return envelope("source", [source(meta)], cik=company["cik"], payload=data,
+                    numbers_as_text=_numbers_as_text(data, meta))
 
 
 @_tool
@@ -230,10 +258,11 @@ def get_frames(taxonomy: str, concept: str, unit: str, period: str) -> dict:
     "pure"). `period` is "CY2023" (annual), "CY2023Q4" (quarterly duration)
     or "CY2023Q4I" (instant). Each argument is checked for syntax only and
     put into the address as given. A frame the SEC does not publish is
-    NOT_FOUND.
+    NOT_FOUND. A number a double cannot carry exactly is given as the text
+    the SEC wrote; `numbers_as_text` lists where.
     """
     data, meta = _filings.get_frame(taxonomy, concept, unit, period)
-    return envelope("source", [source(meta)], payload=data)
+    return envelope("source", [source(meta)], payload=data, numbers_as_text=_numbers_as_text(data, meta))
 
 
 _ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")
