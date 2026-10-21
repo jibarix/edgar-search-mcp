@@ -143,7 +143,7 @@ def same_local_name():
           and "not declared" in unresolved[0]["reason"], str(unresolved))
 
 
-def sparse_periods():
+def period_shapes():
     body = (context("F", period="<xbrli:forever/>") + context("N", period=None)
             + context("S", period="<xbrli:startDate>2025-01-01</xbrli:startDate>")
             + context("W", period="<xbrli:instant> 2025-12-31 </xbrli:instant>")
@@ -157,6 +157,51 @@ def sparse_periods():
                       "S": [{"element": "startDate", "text": "2025-01-01"}],
                       "W": [{"element": "instant", "text": " 2025-12-31 "}]}, str(periods))
     check("periods: no fact is dropped for its period", len(facts(r)) == 4)
+
+
+def duration(start, end):
+    return f"<xbrli:startDate>{start}</xbrli:startDate><xbrli:endDate>{end}</xbrli:endDate>"
+
+
+def unequal_coverage():
+    """Sparse periods: concepts reported for different sets of periods. Each
+    fact is returned as written; no concept is padded out to the periods
+    another concept has, and no period is dropped for having few facts."""
+    body = (context("FY25", period=duration("2025-01-01", "2025-12-31"))
+            + context("FY24", period=duration("2024-01-01", "2024-12-31"))
+            + context("FY23", period=duration("2023-01-01", "2023-12-31"))
+            + context("FY22", period=duration("2022-01-01", "2022-12-31")) + USD
+            + '<a:Revenue contextRef="FY25" unitRef="usd" decimals="0">30</a:Revenue>'
+            + '<a:Revenue contextRef="FY24" unitRef="usd" decimals="0">20</a:Revenue>'
+            + '<a:Revenue contextRef="FY23" unitRef="usd" decimals="0">10</a:Revenue>'
+            + '<a:NewLine contextRef="FY25" unitRef="usd" decimals="0">5</a:NewLine>'
+            + '<a:OldLine contextRef="FY24" unitRef="usd" decimals="0">4</a:OldLine>'
+            + '<a:OldLine contextRef="FY23" unitRef="usd" decimals="0">3</a:OldLine>')
+    r = xs.read_instance(instance(body))
+    got = [(f["concept"]["local_name"], f["contextRef"], f["text"]) for f in facts(r)]
+    check("sparse periods: every fact is returned once, in document order, with its own context",
+          got == [("Revenue", "FY25", "30"), ("Revenue", "FY24", "20"), ("Revenue", "FY23", "10"),
+                  ("NewLine", "FY25", "5"), ("OldLine", "FY24", "4"), ("OldLine", "FY23", "3")], str(got))
+    covered = {}
+    for name, cid, _ in got:
+        covered.setdefault(name, []).append(cid)
+    check("sparse periods: a concept reported for fewer periods is not padded to the others (no null or zero rows)",
+          covered == {"Revenue": ["FY25", "FY24", "FY23"], "NewLine": ["FY25"], "OldLine": ["FY24", "FY23"]}
+          and all(f["text"] not in (None, "", "0") and not f["nil"] for f in facts(r)), str(covered))
+    check("sparse periods: a context no fact uses is still returned, with its period as written",
+          [i["id"] for i in r["items"] if i["node"] == "context"] == ["FY25", "FY24", "FY23", "FY22"]
+          and [p["text"] for p in item(r, "FY22")["period"]] == ["2022-01-01", "2022-12-31"],
+          str([i.get("id") for i in r["items"]]))
+    items, matches, unresolved = xs.select_concepts(r, ["a:NewLine"])
+    check("sparse periods: selecting a concept reported for one period returns that fact and only its context",
+          [(i["node"], i.get("id") or i.get("contextRef")) for i in items]
+          == [("context", "FY25"), ("unit", "usd"), ("fact", "FY25")] and not unresolved,
+          str([(i["node"], i.get("id"), i.get("contextRef")) for i in items]))
+    items, _, _ = xs.select_concepts(r, ["a:OldLine", "a:NewLine"])
+    check("sparse periods: selecting concepts of different coverage keeps each fact, the union of contexts, "
+          "in document order",
+          [i.get("id") or i.get("contextRef") for i in items] == ["FY25", "FY24", "FY23", "usd", "FY25", "FY24", "FY23"],
+          str([(i["node"], i.get("id"), i.get("contextRef")) for i in items]))
 
 
 def misleading_names():
@@ -614,7 +659,8 @@ def main():
     multi_entity()
     duplicates()
     same_local_name()
-    sparse_periods()
+    period_shapes()
+    unequal_coverage()
     misleading_names()
     undeclared_and_conflicting_prefixes()
     references_and_order()
