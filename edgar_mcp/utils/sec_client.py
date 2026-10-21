@@ -276,6 +276,13 @@ def _collect_text(node, path, found):
             _collect_text(v, path + [k], found)
 
 
+def paths_under(paths, prefix) -> list:
+    """The paths of `paths` (as decode_json lists them) that lie under
+    `prefix`, made relative to it, in their order."""
+    n = len(prefix)
+    return [list(p[n:]) for p in paths or [] if len(p) > n and list(p[:n]) == list(prefix)]
+
+
 def decode_json(body):
     """Parse JSON without changing the value of any number.
 

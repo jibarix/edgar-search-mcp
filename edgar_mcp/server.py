@@ -43,7 +43,8 @@ from edgar_mcp.edgar import xbrl_source as xs
 from edgar_mcp.edgar.company_lookup import find_company, format_cik
 from edgar_mcp.edgar.filing_retrieval import FilingRetrieval
 from edgar_mcp.utils.helpers import iso_date
-from edgar_mcp.utils.sec_client import SecError, SecNotFound, SecUnsupported, fetch_response, get_json
+from edgar_mcp.utils.sec_client import (SecError, SecNotFound, SecUnsupported, fetch_response, get_json,
+                                        paths_under)
 
 mcp = MCPServer("edgar-search", version=__version__)
 
@@ -188,9 +189,10 @@ def lookup_company(query: str) -> dict:
     of spaces read as one). There is no suffix, prefix or fuzzy matching.
     `status` is "resolved" (the matches share one CIK), "ambiguous" (they name
     several: choose one and use its CIK) or "not_found". Each match has the
-    10-digit `cik`, `matched_on` ("cik", "ticker" or "title") and `record`,
-    the row as the SEC publishes it; a company with several tickers has
-    several rows. The feed lists current tickers and titles only, and a CIK
+    10-digit `cik`, `matched_on` ("cik", "ticker" or "title"), `record`,
+    the row as the SEC publishes it, and `numbers_as_text`, where in `record`
+    a number is kept as its text (see the response contract); a company with
+    several tickers has several rows. The feed lists current tickers and titles only, and a CIK
     that is not in it can still be given to every other tool directly.
     """
     status, matches, meta = find_company(query)
@@ -363,8 +365,9 @@ def list_filings(
     Each filing has `record`, every column under the SEC's own key
     (`accessionNumber`, `filingDate`, `reportDate`, `acceptanceDateTime`,
     `form`, `primaryDocument`, `items`, ...); `url`, the primary document's
-    address built from the CIK, accession number and `primaryDocument`; and
-    `source`, the file and row index the record came from. An older file that
+    address built from the CIK, accession number and `primaryDocument`;
+    `source`, the file and row index the record came from; and
+    `numbers_as_text`, where in `record` a number is kept as its text. An older file that
     cannot be read is an error, never a shorter list. `complete` is false
     when a warning says a row was left out or cut short.
     """
@@ -389,7 +392,8 @@ def list_filings(
                 continue
             if filed > as_of:
                 continue
-        filings.append({"record": record, "url": _primary_url(company["cik"], record), "source": row["source"]})
+        filings.append({"record": record, "url": _primary_url(company["cik"], record), "source": row["source"],
+                        "numbers_as_text": row.get("numbers_as_text", [])})
         if len(filings) == limit:
             break
     return envelope("source_records", [source(m) for m in metas], cik=company["cik"],
@@ -872,7 +876,8 @@ def get_filing_xbrl(
     if not _ACCESSION.fullmatch(accession):
         raise ToolError(f"UNSUPPORTED_DOCUMENT: the submissions row has no usable accessionNumber: {accession!r}")
     folder = f"https://www.sec.gov/Archives/edgar/data/{int(company['cik'])}/{accession.replace('-', '')}/"
-    filing = {"accessionNumber": accession, "record": record, "source": row["source"], "folder": folder}
+    filing = {"accessionNumber": accession, "record": record, "source": row["source"],
+              "numbers_as_text": row.get("numbers_as_text", []), "folder": folder}
     files = _xbrl_files(folder, int(company["cik"]), accession, sources, unresolved, instance_file, schema_file)
     common = {"cik": company["cik"], "filing": filing, "part": part, "warnings": warnings}
 
@@ -1335,7 +1340,10 @@ def search_filings(
     document's address under each CIK of `_source.ciks`, in that order, built
     with the accession number and file name in `_id` ("<accession>:<file>");
     `url` is that address when the hit names exactly one CIK, else null, and a
-    hit naming several CIKs is listed in `unresolved`. A hit says the words are somewhere in the
+    hit naming several CIKs is listed in `unresolved`. `numbers_as_text`
+    lists where in `record` a number is kept as its text (a `_score` of
+    9007199254740993.0, say, which a double cannot carry), so it is told
+    apart from a value the index sent as a string. A hit says the words are somewhere in the
     document, not that they are near each other or what they mean: read the
     passage before relying on it. Hits are in the SEC's order of relevance.
     When `next_offset` is not null there are more: call again with it as
@@ -1369,7 +1377,8 @@ def search_filings(
     data, meta = get_json(url)
     found, total = _search_page(data, url)
     hits, unresolved = [], []
-    for h in found[offset - page_start:offset - page_start + limit]:
+    as_text = meta.get("numbers_as_text") or []
+    for index, h in enumerate(found[offset - page_start:offset - page_start + limit], offset - page_start):
         accession, _, document = h["_id"].partition(":")
         ciks = h["_source"].get("ciks") or []
         urls = ([f"https://www.sec.gov/Archives/edgar/data/{int(c)}/{accession.replace('-', '')}/{document}"
@@ -1378,7 +1387,8 @@ def search_filings(
             unresolved.append({"_id": h["_id"], "ciks": list(ciks),
                                "reason": "the hit names several CIKs; the filing is under each one's folder, so "
                                          "`url` is null and `urls` lists every address"})
-        hits.append({"record": h, "url": urls[0] if len(urls) == 1 else None, "urls": urls})
+        hits.append({"record": h, "url": urls[0] if len(urls) == 1 else None, "urls": urls,
+                     "numbers_as_text": paths_under(as_text, ["hits", "hits", index]) if as_text else []})
     end = offset + len(hits)
     return envelope("source_records", [source(meta)],
                     filters={"query": query, "forms": wanted, "filed_from": filed_from, "filed_to": filed_to},

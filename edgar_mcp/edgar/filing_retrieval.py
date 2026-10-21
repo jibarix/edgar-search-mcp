@@ -13,7 +13,7 @@ from jsonschema import validate, ValidationError
 
 from edgar_mcp.config.constants import SUBMISSIONS_URL
 from edgar_mcp.utils.cache import Cache
-from edgar_mcp.utils.sec_client import SecError, get_json
+from edgar_mcp.utils.sec_client import SecError, get_json, paths_under
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -48,8 +48,12 @@ def _format_cik(cik):
     return digits.zfill(10)
 
 
-def _rows(table, file_name, warnings):
-    """The rows of one column table ({column: [values]}), each value under its column's key."""
+def _rows(table, file_name, warnings, as_text=()):
+    """The rows of one column table ({column: [values]}), each value under its
+    column's key. `as_text` lists the numbers of the table kept as text
+    (sec_client.decode_json), as paths from the table ([column, index, ...]);
+    each row's `numbers_as_text` lists those of its record, as paths from the
+    record ([column, ...])."""
     if not isinstance(table, dict):
         raise SecError(f"{file_name} is not a table of filings")
     columns = {k: v for k, v in table.items() if isinstance(v, list)}
@@ -57,9 +61,13 @@ def _rows(table, file_name, warnings):
     if len(lengths) > 1:
         warnings.append(f"the columns of {file_name} have different lengths {sorted(lengths)}; "
                         "a row lacks the columns that stop short of it")
+    by_row = {}
+    for path in as_text:
+        if len(path) >= 2 and path[0] in columns and isinstance(path[1], int):
+            by_row.setdefault(path[1], []).append([path[0], *path[2:]])
     for i in range(max(lengths, default=0)):
         yield {"record": {k: v[i] for k, v in columns.items() if i < len(v)},
-               "source": {"file": file_name, "index": i}}
+               "source": {"file": file_name, "index": i}, "numbers_as_text": by_row.get(i, [])}
 
 
 class FilingRetrieval:
@@ -105,9 +113,10 @@ class FilingRetrieval:
     def iter_filing_records(self, cik, sources, warnings, older=True):
         """Every row of the submissions filing tables, in the SEC's order: the
         recent table, then each file `filings.files` names, in the order it
-        names them. Each row is {"record", "source"}: `record` maps every
-        column, under the SEC's key, to the row's value; `source` is the file
-        and the row's index in it. Older files are read only when the caller
+        names them. Each row is {"record", "source", "numbers_as_text"}:
+        `record` maps every column, under the SEC's key, to the row's value;
+        `source` is the file and the row's index in it; `numbers_as_text`
+        lists the numbers of `record` kept as text, as paths from it. Older files are read only when the caller
         goes on past the recent table, and a file that cannot be read raises:
         the rows are never silently cut short. The meta of every file read is
         appended to `sources`; a column shorter than the others is reported in
@@ -117,13 +126,14 @@ class FilingRetrieval:
         submissions, meta = self.get_company_submissions(formatted_cik)
         sources.append(meta)
         name = f"CIK{formatted_cik}.json"
-        yield from _rows(submissions["filings"]["recent"], f"{name}#filings.recent", warnings)
+        yield from _rows(submissions["filings"]["recent"], f"{name}#filings.recent", warnings,
+                         paths_under(meta.get("numbers_as_text"), ["filings", "recent"]))
         if not older:
             return
         for file_name in self.older_file_names(submissions, formatted_cik):
             data, older_meta = self.get_older_submissions(file_name)
             sources.append(older_meta)
-            yield from _rows(data, file_name, warnings)
+            yield from _rows(data, file_name, warnings, older_meta.get("numbers_as_text") or [])
 
     def get_company_facts(self, cik):
         """

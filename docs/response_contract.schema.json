@@ -50,6 +50,7 @@
     "next_offset": {"type": ["integer", "null"]}
    }
   },
+  "paths": {"type": "array", "items": {"type": "array", "items": {"type": ["string", "integer"]}}},
   "concept_ref": {
    "type": "object",
    "required": ["resolved"],
@@ -65,10 +66,11 @@
      "representation": {"const": "source_records"},
      "status": {"enum": ["resolved", "ambiguous", "not_found"]},
      "matches": {"type": "array", "items": {
-      "type": "object", "required": ["cik", "matched_on", "record"],
+      "type": "object", "required": ["cik", "matched_on", "record", "numbers_as_text"],
       "properties": {"cik": {"type": "string", "pattern": "^\\d{10}$"},
                      "matched_on": {"enum": ["cik", "ticker", "title"]},
-                     "record": {"type": "object", "required": ["cik_str", "ticker", "title"]}}}}
+                     "record": {"type": "object", "required": ["cik_str", "ticker", "title"]},
+                     "numbers_as_text": {"$ref": "#/$defs/paths"}}}}
     }}]
   },
   "get_submissions": {
@@ -87,9 +89,10 @@
      "representation": {"const": "source_records"},
      "filters": {"type": "object"},
      "filings": {"type": "array", "items": {
-      "type": "object", "required": ["record", "url", "source"],
+      "type": "object", "required": ["record", "url", "source", "numbers_as_text"],
       "properties": {"record": {"type": "object", "required": ["accessionNumber", "form", "filingDate"]},
-                     "source": {"type": "object", "required": ["file", "index"]}}}}
+                     "source": {"type": "object", "required": ["file", "index"]},
+                     "numbers_as_text": {"$ref": "#/$defs/paths"}}}}
     }}]
   },
   "list_filing_documents": {
@@ -121,10 +124,11 @@
    "allOf": [{"$ref": "#/$defs/envelope"}, {
     "required": ["filters", "hits", "total_hits", "total_relation", "offset", "count", "next_offset", "unresolved"],
     "properties": {"representation": {"const": "source_records"},
-                   "hits": {"type": "array", "items": {"type": "object", "required": ["record", "url", "urls"],
+                   "hits": {"type": "array", "items": {"type": "object", "required": ["record", "url", "urls", "numbers_as_text"],
                             "properties": {"record": {"type": "object", "required": ["_id", "_source"]},
                                            "url": {"type": ["string", "null"]},
-                                           "urls": {"type": "array", "items": {"type": "string"}}}}}}
+                                           "urls": {"type": "array", "items": {"type": "string"}},
+                                           "numbers_as_text": {"$ref": "#/$defs/paths"}}}}}
    }]
   },
   "get_companyfacts": {
@@ -154,10 +158,11 @@
     "properties": {
      "representation": {"const": "parsed_source"},
      "part": {"enum": ["summary", "schema", "presentation", "calculation", "definition", "label", "reference", "instance"]},
-     "filing": {"type": "object", "required": ["accessionNumber", "record", "source", "folder"],
+     "filing": {"type": "object", "required": ["accessionNumber", "record", "source", "numbers_as_text", "folder"],
                 "properties": {"accessionNumber": {"type": "string", "pattern": "^\\d{10}-\\d{2}-\\d{6}$"},
                                "record": {"type": "object"},
                                "source": {"type": "object", "required": ["file", "index"]},
+                               "numbers_as_text": {"$ref": "#/$defs/paths"},
                                "folder": {"type": "string", "pattern": "^https://www\\.sec\\.gov/Archives/edgar/data/"}}},
      "unresolved": {"type": "array", "items": {"type": "object"}},
      "not_returned": {"type": "array", "items": {"type": "string"}},

@@ -107,8 +107,9 @@ on dict order being the feed's order; `rows` keeps that order.
 `name_suffix`, `shared_name`, `prefix`, `fuzzy`, `none`, and each hit
 `{"cik", "ticker", "name"}`. 1.0 returns `(status, matches, meta)`. `status` is
 `resolved`, `ambiguous` or `not_found`. Each match is `{"cik", "matched_on",
-"record"}`, where `matched_on` is `cik`, `ticker` or `title` and `record` is the
-feed row as published.
+"record", "numbers_as_text"}`, where `matched_on` is `cik`, `ticker` or `title`,
+`record` is the feed row as published and `numbers_as_text` lists where in
+`record` a number is kept as its text (rc3; usually empty).
 
 | 0.8 `match` | 1.0 |
 |-------------|-----|
@@ -412,6 +413,11 @@ What 1.0 leaves unresolved, and says so:
   `numbers_as_text` lists its path. Code doing arithmetic on `val` should
   read each listed path with `decimal.Decimal(text)`, or refuse it, rather
   than assume every `val` is a JSON number. rc1 returned the rounded double.
+  From rc3 every item holding a `record` copied from SEC JSON (search hits,
+  `list_filings` rows, `lookup_company` matches, `get_filing_xbrl`'s
+  `filing`) has its own `numbers_as_text`, with paths from that `record`;
+  rc2 sent such a value as a string with no way to tell it from a string
+  the SEC sent.
 - A part's `roleRef` and `arcroleRef` items come from linkbases that hold an
   extended link of that part's kind, and from linkbases that hold no
   extended link any part returns (a roleRefs-only linkbase is in every

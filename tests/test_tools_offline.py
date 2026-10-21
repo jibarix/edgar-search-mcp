@@ -1615,6 +1615,91 @@ def index_cases():
           == ["/Archives/edgar/data/2/000000000226000002/x.xml"], code or str(r and r["files"]))
 
 
+# ── Round 3, blocker 3: a record copied from SEC JSON says which of its numbers are kept as text ──
+
+def record_number_cases():
+    big = b"9007199254740993.0"
+    search_body = (b'{"hits":{"total":{"value":2,"relation":"eq"},"hits":['
+                   b'{"_id":"0000000001-24-000001:a.htm","_score":' + big + b',"_source":{"ciks":["0000000001"]}},'
+                   b'{"_id":"0000000001-24-000002:b.htm","_score":"' + big + b'","_source":{"ciks":["0000000001"],'
+                   b'"n":[1,1e400]}}]}}')
+    submissions_url = "https://data.sec.gov/submissions/CIK0000000099.json"
+    submissions_body = (b'{"cik":"99","name":"T","filings":{"recent":{"accessionNumber":["0000000099-26-000001",'
+                        b'"0000000099-26-000002"],"form":["10-K","10-K"],"filingDate":["2026-03-01","2025-03-01"],'
+                        b'"primaryDocument":["a.htm","b.htm"],"size":[' + big + b',"' + big + b'"]},"files":[]}}')
+    feed = (b'{"0":{"cik_str":1,"ticker":"AAA","title":"Alpha Inc","x":1e400},'
+            b'"1":{"cik_str":1,"ticker":"AAB","title":"Alpha Inc","x":"1e400"}}')
+
+    def handler(request):
+        url = str(request.url)
+        if url.startswith(server._SEARCH_URL):
+            body = search_body
+        elif url == submissions_url:
+            body = submissions_body
+        elif url == company_lookup.COMPANY_TICKERS_URL:
+            body = feed
+        else:
+            return httpx.Response(404)
+        return httpx.Response(200, content=body, headers={"content-type": "application/json"})
+    transport(handler)
+    company_lookup.company_cache.delete("company_tickers_v6")
+    filing_retrieval.filing_cache.delete("submissions_0000000099")
+    try:
+        # The reviewer's probe: a numeric _score of 9007199254740993.0 and a quoted one.
+        r, code = call(server.search_filings, query="x")
+        sent = wire(r) if code is None else None
+        hits = (sent or {}).get("hits", [])
+        check("r3 b3 search_filings: both _score values reach the client as the same string",
+              len(hits) == 2 and hits[0]["record"]["_score"] == hits[1]["record"]["_score"] == big.decode(),
+              code or str(hits)[:300])
+        check("r3 b3 search_filings: numbers_as_text, relative to each hit's record, tells the number from the text",
+              len(hits) == 2 and hits[0].get("numbers_as_text") == [["_score"]]
+              and hits[1].get("numbers_as_text") == [["_source", "n", 1]], str([h.get("numbers_as_text") for h in hits]))
+
+        r, code = call(server.list_filings, cik_or_ticker="99")
+        rows = (r or {}).get("filings", [])
+        check("r3 b3 list_filings: a numeric size a double cannot carry is listed for its row, a quoted one is not",
+              code is None and len(rows) == 2 and rows[0].get("numbers_as_text") == [["size"]]
+              and rows[1].get("numbers_as_text") == [] and rows[0]["record"]["size"] == rows[1]["record"]["size"],
+              code or str([(f["record"].get("size"), f.get("numbers_as_text")) for f in rows]))
+        r, code = call(server.list_filings, cik_or_ticker="99")
+        rows = (r or {}).get("filings", [])
+        check("r3 b3 list_filings: the same from the cache",
+              code is None and r["sources"][0]["cache_hit"] is True and rows[0].get("numbers_as_text") == [["size"]],
+              code or str(r and r["sources"]))
+
+        r, code = call(server.lookup_company, query="Alpha Inc")
+        matches = (r or {}).get("matches", [])
+        check("r3 b3 lookup_company: each match lists its own numbers kept as text",
+              code is None and [m.get("numbers_as_text") for m in matches] == [[["x"]], []]
+              and matches[0]["record"]["x"] == matches[1]["record"]["x"] == "1e400",
+              code or str(matches))
+
+        folder = filed()
+        real = (server._resolve, server.fetch_response)
+        server._resolve = lambda q: {"cik": "0000000099", "matched_on": "cik"}
+
+        def fetch(url, **k):
+            name = url.rsplit("/", 1)[1]
+            if name not in folder:
+                raise sec_client.SecNotFound(f"nothing at {url}")
+            return sec_client.Response(folder[name], "application/xml", "2026-07-03T00:00:00Z")
+        server.fetch_response = fetch
+        server._archive_cache.clear()
+        try:
+            r, code = call(server.get_filing_xbrl, cik_or_ticker="99", accession_number="0000000099-26-000001",
+                           instance_file="t-20251231_htm.xml")
+        finally:
+            server._resolve, server.fetch_response = real
+            server._archive_cache.clear()
+        check("r3 b3 get_filing_xbrl: the submissions record of the filing lists its numbers kept as text",
+              code is None and r["filing"].get("numbers_as_text") == [["size"]], code or str(r and r["filing"]))
+    finally:
+        transport(unexpected)
+        company_lookup.company_cache.delete("company_tickers_v6")
+        filing_retrieval.filing_cache.delete("submissions_0000000099")
+
+
 if __name__ == "__main__":
     no_implicit_filter_cases()
     discovery_cases()
@@ -1625,6 +1710,7 @@ if __name__ == "__main__":
     exact_number_cases()
     dts_closure_cases()
     index_cases()
+    record_number_cases()
     search_cases()
     client_cases()
     lookup_cases()

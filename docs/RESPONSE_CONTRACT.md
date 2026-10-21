@@ -75,9 +75,13 @@ such string in `payload`, as the keys and list indexes from the top of
 `payload`, in document order. It is empty when there are none, which is the
 usual case. Only the value is kept, not the spelling (`1.50` comes back as
 `1.5`, `1E3` as `1000.0`). The bytes as published are the ones `sha256` in
-`sources` hashes. Records copied from SEC JSON into other answers
-(`list_filings`, `search_filings`, `lookup_company`) follow the same rule,
-without a list of paths.
+`sources` hashes. No response type is exempt: every item that carries a
+`record` copied from SEC JSON (each `hits` entry of `search_filings`, each
+`filings` entry of `list_filings`, each `matches` entry of `lookup_company`,
+and `filing` in `get_filing_xbrl`) has its own `numbers_as_text`, the paths
+of the strings kept this way as keys and list indexes from the top of that
+`record` (`[["_score"]]`, say), empty when there are none. A string in a
+record whose path is not listed is a string the SEC sent.
 
 ### Unresolved and ambiguous
 
