@@ -10,6 +10,7 @@ Tools:
     get_filing_text      - plain text of a filing document (main document or exhibit), in pages
     get_filed_statements - the primary statements of one filing as filed: lines, labels, own elements, calculations
     get_segment_revenue  - revenue by business segment, product and geography from the annual report's XBRL data
+    get_filing_xbrl      - one filing's XBRL files as written, one part at a time (summary, instance)
     search_filings       - filings whose text contains given words (SEC full-text search)
     search_companies     - filter the local SIC/country index (discovery only)
 
@@ -27,7 +28,7 @@ import html
 import io
 import re
 import threading
-from collections import Counter
+from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 from typing import Literal
 from urllib.parse import parse_qs, quote, urlsplit
@@ -37,8 +38,9 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import ToolAnnotations
 
 from edgar_mcp import __version__
-from edgar_mcp.contract import envelope, source
+from edgar_mcp.contract import envelope, source, source_of_response
 from edgar_mcp.edgar import filed_statements as fs
+from edgar_mcp.edgar import xbrl_source as xs
 from edgar_mcp.edgar.company_lookup import find_company, format_cik, get_company_tickers
 from edgar_mcp.edgar.filing_retrieval import FilingRetrieval
 from edgar_mcp.utils.helpers import iso_date
@@ -545,7 +547,6 @@ def _segment_facts(raw: bytes, document: str) -> list:
 
 
 _FILED_FORMS = ("10-K", "10-Q", "20-F", "40-F", "10-K/A", "10-Q/A", "20-F/A", "40-F/A")
-_ELEMENT = re.compile(r"([A-Za-z][\w.-]*:)?[A-Za-z_][\w.-]*")
 _ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")
 _AS_OF_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 _HEADER_ACCEPTED = re.compile(r"<ACCEPTANCE-DATETIME>\s*(\d{14})")
@@ -590,7 +591,6 @@ def get_filed_statements(
     form: Literal["10-K", "10-Q", "20-F", "40-F", "10-K/A", "10-Q/A", "20-F/A", "40-F/A"] = "10-K",
     accession_number: str | None = None,
     as_of: str | None = None,
-    facts: list[str] | None = None,
 ) -> dict:
     """The primary financial statements of one filing, as the company filed them.
 
@@ -621,11 +621,6 @@ def get_filed_statements(
     the period to the opening balance and compares it with the closing one, and
     says whether the balance sheet shows the same element at that date.
 
-    `facts`, up to 50 element names ("us-gaap:FinanceLeaseLiabilityCurrent", or
-    a name without its prefix), returns in `requested_facts` the whole-company
-    values of those elements wherever the filing tags them, a note included,
-    and in `by_member` each value tagged under members, with its dimensions.
-
     The filing is the latest `form` on file, or `accession_number` (of this
     company). `as_of`, YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ, leaves out filings
     filed (or accepted by the SEC) after it.
@@ -634,8 +629,6 @@ def get_filed_statements(
         iso_date(as_of)
     if accession_number is not None and not _ACCESSION.fullmatch(accession_number):
         raise ValueError(f"accession_number must look like 0000320193-24-000123, got {accession_number!r}")
-    if facts is not None and (len(facts) > 50 or not all(isinstance(n, str) and _ELEMENT.fullmatch(n) for n in facts)):
-        raise ValueError("facts must be up to 50 element names such as us-gaap:LongTermDebt")
     company = _resolve(cik_or_ticker)
     cutoff = as_of[:10] if as_of else None
     if accession_number:
@@ -732,10 +725,254 @@ def get_filed_statements(
         "entities": entities,
         "statements": statements,
         "conflicts": conflicts,
-        **({"requested_facts": fs.named_facts(instance, facts)} if facts else {}),
         "sources": sources,
         "returned_at": _now(),
     }
+
+
+# ── get_filing_xbrl ─────────────────────────────────────────────────────────
+
+_XBRL_PARTS = ("summary", "schema", "presentation", "calculation", "definition", "label", "reference", "instance")
+_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+# An instance as the EDGAR Filer Manual names it before inline XBRL: "ko-20181231.xml".
+_INSTANCE_NAME = re.compile(r"[A-Za-z0-9]+-\d{8}\.xml")
+_HTML_NAME = re.compile(r"(?i)(?P<stem>.+)\.html?")
+_MAX_CONCEPTS = 50
+# The syntax of a name, nothing more: prefix:local, {namespace}local or a bare local name (XML NCNames).
+_CONCEPT_NAME = re.compile(r"(?:[A-Za-z_][\w.-]*:|\{[^{}\s]{1,500}\})?[A-Za-z_][\w.-]*")
+
+# Files of filing folders already read in this process. A filing folder never
+# changes once accepted, so its files are kept: url -> (body, Response, sha256).
+_archive_cache: "OrderedDict[str, tuple]" = OrderedDict()
+_archive_lock = threading.Lock()
+_ARCHIVE_FILES = 32
+_ARCHIVE_BYTES = 100 * 1024 * 1024
+
+
+def _archive(url: str, sources: list) -> bytes:
+    """The bytes of one file of a filing folder; the read is added to `sources`."""
+    with _archive_lock:
+        hit = _archive_cache.get(url)
+        if hit:
+            _archive_cache.move_to_end(url)
+    if hit:
+        body, response, sha = hit
+        sources.append(source_of_response(url, response, sha, cache_hit=True))
+        return body
+    response = fetch_response(url, max_bytes=_MAX_DOCUMENT_BYTES)
+    sha = hashlib.sha256(response.body).hexdigest()
+    sources.append(source_of_response(url, response, sha))
+    with _archive_lock:
+        _archive_cache[url] = (response.body, response, sha)
+        while (len(_archive_cache) > _ARCHIVE_FILES
+               or sum(len(v[0]) for v in _archive_cache.values()) > _ARCHIVE_BYTES) and len(_archive_cache) > 1:
+            _archive_cache.popitem(last=False)
+    return response.body
+
+
+def _find_filing(cik: str, accession_number: str | None, form: str, as_of: str | None, sources: list,
+                 warnings: list) -> dict:
+    """The first submissions row, in the SEC's order, with this accession
+    number (or, without one, whose `form` equals `form`) and a `filingDate`
+    on or before `as_of`. Every value is compared literally."""
+    metas = []
+    try:
+        for row in _filings.iter_filing_records(cik, metas, warnings):
+            record = row["record"]
+            if accession_number is not None:
+                if record.get("accessionNumber") != accession_number:
+                    continue
+                if as_of and str(record.get("filingDate") or "") > as_of:
+                    raise ToolError(f"NOT_FOUND: {accession_number} has filingDate {record.get('filingDate')}, "
+                                    f"after {as_of}")
+                return row
+            if record.get("form") == form and (as_of is None or str(record.get("filingDate") or "") <= as_of):
+                return row
+    finally:
+        sources.extend(source(m) for m in metas)
+    if accession_number is not None:
+        raise ToolError(f"NOT_FOUND: {accession_number} is not in the submissions of CIK {cik}")
+    raise ToolError(f"NOT_FOUND: no filing with form {form!r} in the submissions of CIK {cik}"
+                    + (f" with filingDate on or before {as_of}" if as_of else ""))
+
+
+def _header_acceptance(folder: str, accession: str, record: dict, sources: list) -> dict:
+    """The acceptance time as the filing's header states it (US Eastern civil
+    time), the same time converted to UTC, and the submissions value as the
+    SEC publishes it. None where the source has none."""
+    url = f"{folder}{accession}-index-headers.html"
+    header = None
+    try:
+        m = _HEADER_ACCEPTED.search(_archive(url, sources).decode("latin-1"))
+        header = m.group(1) if m else None
+    except SecNotFound:
+        pass
+    return {"header_acceptance_datetime": header,
+            "header_utc": _eastern_to_utc(header) if header else None,
+            "header_utc_derivation": "the header time read as US Eastern civil time (daylight time by the 2007 "
+                                     "rule) and converted to UTC" if header else None,
+            "submissions_acceptanceDateTime": record.get("acceptanceDateTime")}
+
+
+def _xbrl_files(folder: str, accession: str, sources: list, unresolved: list) -> dict:
+    """The filing's FilingSummary.xml as parsed, and the instance and the
+    company schema with how each was found."""
+    try:
+        summary_raw = _archive(folder + "FilingSummary.xml", sources)
+    except SecNotFound:
+        raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession} has no XBRL financial data "
+                        "(no FilingSummary.xml in its folder)") from None
+    try:
+        summary = xs.XmlDoc(summary_raw, "FilingSummary.xml")
+    except xs.FilingDataError as e:
+        raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {e}") from e
+    inputs = summary.root.find("InputFiles")
+    input_files = [] if inputs is None else [
+        {"seq": summary.seq(f), "name": (f.text or "").strip(), "attributes": dict(f.attrib)} for f in inputs.iter("File")]
+    names = [f["name"] for f in input_files]
+    listing = None
+
+    def folder_names():
+        nonlocal listing
+        if listing is None:
+            data, meta = get_json(folder + "index.json")
+            sources.append(source(meta))
+            listing = [str(i.get("name", "")) for i in data.get("directory", {}).get("item", []) if isinstance(i, dict)]
+        return listing
+
+    def one(found, name, url_name, found_by, candidates):
+        return ({"resolved": True, "name": url_name, "url": folder + url_name, "found_by": found_by}
+                if found else {"resolved": False, "reason": name, "candidates": candidates})
+
+    marked = [f for f in input_files if "doctype" in f["attributes"]]
+    if len(marked) == 1:
+        document = marked[0]["name"]
+        html = _HTML_NAME.fullmatch(document)
+        instance = one(True, None, f"{html.group('stem')}_htm.xml" if html else document,
+                       ("InputFiles names one file with a doctype attribute, an inline XBRL document; the SEC "
+                        "publishes the instance it extracted from it as <document name>_htm.xml") if html
+                       else "InputFiles names one file with a doctype attribute", [])
+    elif len(marked) > 1:
+        instance = one(False, "InputFiles names several files with a doctype attribute", None, None,
+                       [f["name"] for f in marked])
+    else:
+        plain = [n for n in names if _INSTANCE_NAME.fullmatch(n)] or [n for n in folder_names()
+                                                                     if _INSTANCE_NAME.fullmatch(n)]
+        instance = one(len(plain) == 1, "no InputFiles entry has a doctype attribute, and the files named "
+                       "<name>-<YYYYMMDD>.xml are not exactly one", plain[0] if len(plain) == 1 else None,
+                       "the only file named <name>-<YYYYMMDD>.xml (the EDGAR Filer Manual's instance name) "
+                       + ("in InputFiles" if any(_INSTANCE_NAME.fullmatch(n) for n in names) else "in the folder"),
+                       plain)
+    schemas = [n for n in names if n.lower().endswith(".xsd")]
+    where = "InputFiles"
+    if len(schemas) != 1:
+        schemas, where = [n for n in folder_names() if n.lower().endswith(".xsd")], "the folder"
+    schema = one(len(schemas) == 1, "the .xsd files of the filing are not exactly one",
+                 schemas[0] if len(schemas) == 1 else None, f"the only .xsd file in {where}", schemas)
+    for key, entry in (("instance", instance), ("schema", schema)):
+        if not entry["resolved"]:
+            unresolved.append({"file": key, "reason": entry["reason"], "candidates": entry["candidates"]})
+    return {"summary": summary, "input_files": input_files, "instance": instance, "schema": schema}
+
+
+@_tool
+def get_filing_xbrl(
+    cik_or_ticker: str,
+    accession_number: str | None = None,
+    form: str = "10-K",
+    as_of: str | None = None,
+    part: Literal["summary", "schema", "presentation", "calculation", "definition", "label", "reference",
+                  "instance"] = "summary",
+    concepts: list[str] | None = None,
+    offset: int = 0,
+    limit: int = 500,
+) -> dict:
+    """The XBRL files of one filing as the filer wrote them, one `part` at a time.
+
+    The filing is `accession_number`, else the first row of the company's
+    submissions, in the SEC's order, whose `form` equals `form` exactly; with
+    `as_of` (YYYY-MM-DD) only rows whose `filingDate` is on or before it.
+
+    - "summary": the submissions row, the acceptance time as the filing header
+      states it, the instance and schema files and how each was found, and the
+      SEC's FilingSummary.xml as an element tree.
+    - "instance": the instance in document order: contexts (entity identifier
+      and scheme, period as written, explicit members, typed members as XML),
+      units and facts (concept as namespace URI and local name, contextRef,
+      unitRef, decimals, precision, nil, the text as written). Every
+      duplicate is returned; none is chosen.
+
+    `concepts` (with "instance", up to 50) keeps the facts of the named
+    concepts and the contexts and units they use. A name is "prefix:local"
+    (prefix resolved through the instance's own declarations),
+    "{namespace}local", or a bare local name, which matches that local name in
+    every namespace; `concept_matches` says what each name matched.
+    Items are paged by `offset` and `limit`; `page.next_offset` is null on the
+    last page. Attribute names in a namespace are given as "{namespace}local".
+    """
+    if accession_number is not None and not _ACCESSION.fullmatch(accession_number):
+        raise ValueError(f"accession_number must look like 0000320193-24-000123, got {accession_number!r}")
+    if as_of is not None and not _DATE.fullmatch(as_of):
+        raise ValueError(f"as_of must be YYYY-MM-DD, got {as_of!r}")
+    if as_of is not None:
+        iso_date(as_of)
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 /.-]{0,19}", form):
+        raise ValueError(f"not an SEC form type: {form!r}")
+    if part not in _XBRL_PARTS:
+        raise ValueError(f"part must be one of {', '.join(_XBRL_PARTS)}, got {part!r}")
+    if concepts is not None:
+        if part != "instance":
+            raise ValueError("`concepts` selects facts of the instance: use it with part=\"instance\"")
+        if not (1 <= len(concepts) <= _MAX_CONCEPTS) or not all(
+                isinstance(n, str) and _CONCEPT_NAME.fullmatch(n) for n in concepts):
+            raise ValueError(f"concepts must be 1 to {_MAX_CONCEPTS} names: prefix:local, {{namespace}}local "
+                             "or a local name")
+    _bounded("offset", offset, 0, 10**7)
+    _bounded("limit", limit, 1, 5000)
+    company = _resolve(cik_or_ticker)
+    sources, warnings, unresolved = [], [], []
+    row = _find_filing(company["cik"], accession_number, form, as_of, sources, warnings)
+    record = row["record"]
+    accession = str(record.get("accessionNumber"))
+    if not _ACCESSION.fullmatch(accession):
+        raise ToolError(f"UNSUPPORTED_DOCUMENT: the submissions row has no usable accessionNumber: {accession!r}")
+    folder = f"https://www.sec.gov/Archives/edgar/data/{int(company['cik'])}/{accession.replace('-', '')}/"
+    filing = {"accessionNumber": accession, "record": record, "source": row["source"], "folder": folder}
+    files = _xbrl_files(folder, accession, sources, unresolved)
+    common = {"cik": company["cik"], "filing": filing, "part": part, "warnings": warnings}
+
+    if part == "summary":
+        acceptance = _header_acceptance(folder, accession, record, sources)
+        return envelope("parsed_source", sources, **common, acceptance=acceptance,
+                        files={"input_files": files["input_files"], "instance": files["instance"],
+                               "schema": files["schema"]},
+                        filing_summary=xs.tree(files["summary"]), unresolved=unresolved)
+
+    if part == "instance":
+        entry = files["instance"]
+        if not entry["resolved"]:
+            raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: the instance is unresolved: {entry['reason']} "
+                            f"(candidates: {entry['candidates']})")
+        try:
+            instance = xs.read_instance(_archive(entry["url"], sources), entry["name"])
+        except xs.FilingDataError as e:
+            raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {e}") from e
+        unresolved += instance["unresolved"]
+        items, extra = instance["items"], {}
+        if concepts is not None:
+            items, matches, missing = xs.select_concepts(instance, concepts)
+            unresolved += missing
+            extra["concept_matches"] = matches
+        page = items[offset:offset + limit]
+        declarations = instance["declarations"]
+        return envelope("parsed_source", sources, **common, file=entry, namespaces=instance["namespaces"],
+                        namespace_declarations=declarations if any(d["seq"] for d in declarations) else None,
+                        **extra,
+                        page={"total": len(items), "offset": offset, "count": len(page),
+                              "next_offset": offset + limit if len(items) > offset + limit else None},
+                        items=page, unresolved=unresolved)
+
+    raise ValueError(f"part {part!r} is not available in this build yet")
 
 
 def _document_url(url: str) -> str:

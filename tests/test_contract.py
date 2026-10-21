@@ -18,6 +18,7 @@ import json
 import os
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEC = os.path.join(ROOT, "tests", "fixtures", "sec")
@@ -42,7 +43,7 @@ with open(os.path.join(ROOT, "tests", "fixtures", "outputs_0.8.0", "_about.json"
 # their 0.8 shape), and 0.8 tools not yet removed. Both shrink step by step;
 # in the release both are empty.
 PENDING = {"lookup_company", "get_submissions", "list_filings", "list_filing_documents", "get_filing_document",
-           "get_filing_text", "search_filings", "get_filing_xbrl"}
+           "get_filing_text", "search_filings"}
 NOT_YET_REMOVED = {"get_filed_statements", "get_segment_revenue", "search_companies"}
 # Files removed from the package, and the import names that must not come back.
 REMOVED_FILES = ["edgar_mcp/edgar/tag_classifier.py", "edgar_mcp/edgar/xbrl_parser.py",
@@ -88,7 +89,8 @@ def forbidden_keys(value, found=None):
         for k, v in value.items():
             if k in SCHEMA["x-forbidden-keys"]:
                 found.add(k)
-            if k not in ("payload", "record", "older_files"):  # SEC documents are returned as published
+            # SEC documents and the filer's own attributes are returned as published.
+            if k not in ("payload", "record", "older_files", "attributes"):
                 forbidden_keys(v, found)
     elif isinstance(value, list):
         for v in value:
@@ -199,6 +201,140 @@ def frames_checks(result, kwargs):
     check("get_frames: the payload is the SEC document unchanged", result["payload"] == frozen_json(ABOUT["frame"]))
 
 
+ACCESSION = ABOUT["accession_number"]
+FOLDER = f"https://www.sec.gov/Archives/edgar/data/908315/{ACCESSION.replace('-', '')}/"
+INSTANCE_URL = FOLDER + "wina-20251227x10k_htm.xml"
+SUBMISSIONS_URL = f"https://data.sec.gov/submissions/CIK{CIK}.json"
+XBRLI_NS, LINK_NS = "http://www.xbrl.org/2003/instance", "http://www.xbrl.org/2003/linkbase"
+XSI_NIL = "{http://www.w3.org/2001/XMLSchema-instance}nil"
+
+
+def raw_instance():
+    """The frozen instance read with the standard library alone, to compare against."""
+    root = ET.fromstring(frozen_bytes(INSTANCE_URL))
+    facts = [el for el in root if not el.tag.startswith(("{" + XBRLI_NS + "}", "{" + LINK_NS + "}"))]
+    contexts = {el.get("id"): el for el in root.iter("{%s}context" % XBRLI_NS)}
+    return root, facts, contexts
+
+
+def qname_of(el):
+    return tuple(el.tag[1:].split("}"))
+
+
+def xbrl_sources_checks(result, kwargs):
+    label = f"get_filing_xbrl {kwargs}"[:90]
+    bad = [s["url"] for s in result["sources"] if s["sha256"] != sha_of(s["url"]) or s["frozen"] is not True]
+    check(f"{label}: every source carries the hash of its frozen bytes", not bad, str(bad))
+    row = result["filing"]
+    recent = frozen_json(SUBMISSIONS_URL)["filings"]["recent"]
+    i = row["source"]["index"]
+    check(f"{label}: the filing record is the SEC row at its stated index, every column as published",
+          row["source"]["file"] == f"CIK{CIK}.json#filings.recent"
+          and row["record"] == {k: v[i] for k, v in recent.items()} and row["accessionNumber"] == ACCESSION)
+
+
+def xbrl_summary_checks(result, kwargs):
+    xbrl_sources_checks(result, kwargs)
+    files = result["files"]
+    check("get_filing_xbrl summary: the instance is the SEC extraction of the one doctype file",
+          files["instance"]["resolved"] and files["instance"]["url"] == INSTANCE_URL, str(files["instance"]))
+    check("get_filing_xbrl summary: the schema is the one .xsd in InputFiles",
+          files["schema"]["resolved"] and files["schema"]["name"].endswith(".xsd"), str(files["schema"]))
+    header = frozen_bytes(FOLDER + f"{ACCESSION}-index-headers.html").decode("latin-1")
+    raw = result["acceptance"]["header_acceptance_datetime"]
+    check("get_filing_xbrl summary: the header acceptance time is returned as written",
+          raw is not None and f"<ACCEPTANCE-DATETIME>{raw}" in header.replace("\n", ""), str(raw))
+    check("get_filing_xbrl summary: the submissions acceptanceDateTime is returned as published",
+          result["acceptance"]["submissions_acceptanceDateTime"] == result["filing"]["record"]["acceptanceDateTime"])
+    tree = result["filing_summary"]
+    summary = ET.fromstring(frozen_bytes(FOLDER + "FilingSummary.xml"))
+    check("get_filing_xbrl summary: FilingSummary.xml is returned as its element tree",
+          tree["tag"] == "FilingSummary" and len(tree["children"]) == len(list(summary)))
+    roles = [r.findtext("Role") for r in summary.find("MyReports").findall("Report")]
+    mine = next(c for c in tree["children"] if c["tag"] == "MyReports")
+    got = [next((g["text"] for g in c["children"] if g["tag"] == "Role"), None) for c in mine["children"]
+           if c["tag"] == "Report"]
+    check("get_filing_xbrl summary: every report is kept, in the file's order", got == roles and roles,
+          f"{len(got)} {len(roles)}")
+
+
+def xbrl_instance_checks(result, kwargs):
+    xbrl_sources_checks(result, kwargs)
+    root, facts, contexts = raw_instance()
+    items = result["items"]
+    got = [i for i in items if i["node"] == "fact"]
+    seqs = [i["seq"] for i in items]
+    check("get_filing_xbrl instance: items keep document order", seqs == sorted(seqs) and len(set(seqs)) == len(seqs))
+    if kwargs.get("concepts") is None and kwargs.get("limit") == 5000:
+        check("get_filing_xbrl instance: one item per fact element, none merged or dropped",
+              result["page"]["total"] == len(items) and len(got) == len(facts), f"{len(got)} vs {len(facts)}")
+        check("get_filing_xbrl instance: one item per context and unit element",
+              sum(i["node"] == "context" for i in items) == len(contexts)
+              and sum(i["node"] == "unit" for i in items) == len(root.findall("{%s}unit" % XBRLI_NS)))
+        nil = [f for f in facts if f.get(XSI_NIL) is not None]
+        got_nil = [f for f in got if f["nil"] is not None]
+        check("get_filing_xbrl instance: xsi:nil is kept as written, and a nil fact has no text",
+              len(got_nil) == len(nil) > 0 and all(f["nil"] == el.get(XSI_NIL) for f, el in zip(got, facts))
+              and all(not f["text"] for f in got_nil), f"{len(got_nil)} vs {len(nil)}")
+        check("get_filing_xbrl instance: concept, contextRef, unitRef, decimals and text as written",
+              all((f["concept"]["namespace"], f["concept"]["local_name"]) == qname_of(el)
+                  and f["contextRef"] == el.get("contextRef") and f["unitRef"] == el.get("unitRef")
+                  and f["decimals"] == el.get("decimals") and f["precision"] == el.get("precision")
+                  and (f["text"] or "") == (el.text or "") for f, el in zip(got, facts)))
+    wrong = []
+    for c in (i for i in items if i["node"] == "context"):
+        ident = contexts[c["id"]].find("{%s}entity/{%s}identifier" % (XBRLI_NS, XBRLI_NS))
+        if c["entity"] != {"scheme": ident.get("scheme"), "identifier": ident.text}:
+            wrong.append(c["id"])
+    check("get_filing_xbrl instance: each context keeps its entity identifier and scheme", not wrong, str(wrong[:3]))
+    if kwargs.get("concepts"):
+        matched = {(m["namespace"], m["local_name"]) for e in result["concept_matches"] for m in e["matches"]}
+        want = [el for el in facts if qname_of(el) in matched]
+        check(f"get_filing_xbrl concepts={kwargs['concepts']}: every fact of the matched concepts, and only those",
+              len(got) == len(want) > 0
+              and all((f["concept"]["namespace"], f["concept"]["local_name"]) in matched for f in got),
+              f"{len(got)} vs {len(want)}")
+        refs = {f["contextRef"] for f in got}
+        check(f"get_filing_xbrl concepts={kwargs['concepts']}: exactly the contexts the facts use",
+              {i["id"] for i in items if i["node"] == "context"} == refs)
+
+
+def xbrl_bare_name_checks(result, kwargs):
+    xbrl_instance_checks(result, kwargs)
+    _, facts, _ = raw_instance()
+    names = sorted({qname_of(el) for el in facts if qname_of(el)[1] == "Revenues"})
+    entry = result["concept_matches"][0]
+    check("get_filing_xbrl: a bare name matches that local name in every namespace the instance uses",
+          bool(names) and sorted((m["namespace"], m["local_name"]) for m in entry["matches"]) == names, str(entry))
+
+
+def xbrl_paging_checks(result, kwargs):
+    xbrl_instance_checks(result, kwargs)
+    full, error = call("get_filing_xbrl", cik_or_ticker="908315", accession_number=ACCESSION, part="instance",
+                       limit=5000)
+    pages, offset = [], 0
+    while offset is not None and error is None:
+        page, error = call("get_filing_xbrl", cik_or_ticker="908315", accession_number=ACCESSION, part="instance",
+                           offset=offset, limit=kwargs["limit"])
+        if error is None:
+            pages += page["items"]
+            offset = page["page"]["next_offset"]
+    check("get_filing_xbrl: pages put together give every item once, in order",
+          error is None and pages == full["items"] and result["page"]["count"] == kwargs["limit"], str(error))
+
+
+def xbrl_checks(result, kwargs):
+    """One dispatcher for the get_filing_xbrl calls in TOOL_CALLS."""
+    if kwargs.get("part", "summary") == "summary":
+        xbrl_summary_checks(result, kwargs)
+    elif kwargs.get("concepts") == ["Revenues"]:
+        xbrl_bare_name_checks(result, kwargs)
+    elif kwargs.get("limit") == 300:
+        xbrl_paging_checks(result, kwargs)
+    else:
+        xbrl_instance_checks(result, kwargs)
+
+
 TOOL_CALLS = [
     ("get_companyfacts", {"cik_or_ticker": "908315"}),
     ("get_companyfacts", {"cik_or_ticker": "908315", "taxonomy": "us-gaap", "concept": "Revenues"}),
@@ -208,9 +344,17 @@ TOOL_CALLS = [
     ("get_companyconcept", {"cik_or_ticker": "908315", "taxonomy": "us-gaap", "concept": "Revenues"}),
     ("get_frames", {"taxonomy": "us-gaap", "concept": "SalesTypeLeaseSellingProfitLoss", "unit": "USD",
                     "period": "CY2023"}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"]}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "form": "10-K", "as_of": "2026-03-01"}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "instance", "limit": 5000}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "instance",
+                         "concepts": ["us-gaap:Revenues", "dei:EntityCommonStockSharesOutstanding"]}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "instance",
+                         "concepts": ["Revenues"]}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "instance", "limit": 300}),
 ]
 EXTRA_CHECKS = {"get_companyfacts": [companyfacts_checks], "get_companyconcept": [companyconcept_checks],
-                "get_frames": [frames_checks]}
+                "get_frames": [frames_checks], "get_filing_xbrl": [xbrl_checks]}
 # Calls that must fail, with the code the message starts with.
 ERROR_CALLS = [
     ("get_companyfacts", {"cik_or_ticker": "908315", "concept": "Revenues"}, "INVALID_INPUT"),
@@ -222,6 +366,13 @@ ERROR_CALLS = [
      "INVALID_INPUT"),
     ("get_companyconcept", {"cik_or_ticker": "908315", "taxonomy": "us-gaap", "concept": "Rev/../x"},
      "INVALID_INPUT"),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": "0000908315-26-999999"}, "NOT_FOUND"),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "as_of": "2026-02-24"}, "NOT_FOUND"),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "form": "10-k"}, "NOT_FOUND"),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "as_of": "2026-02-25T00:00:00Z"}, "INVALID_INPUT"),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "concepts": ["Revenues"]}, "INVALID_INPUT"),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "part": "instance", "concepts": ["a b"]}, "INVALID_INPUT"),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "part": "instance", "concepts": []}, "INVALID_INPUT"),
 ]
 
 

@@ -49,6 +49,20 @@ def _format_cik(cik):
     return digits.zfill(10)
 
 
+def _rows(table, file_name, warnings):
+    """The rows of one column table ({column: [values]}), each value under its column's key."""
+    if not isinstance(table, dict):
+        raise SecError(f"{file_name} is not a table of filings")
+    columns = {k: v for k, v in table.items() if isinstance(v, list)}
+    lengths = {len(v) for v in columns.values()}
+    if len(lengths) > 1:
+        warnings.append(f"the columns of {file_name} have different lengths {sorted(lengths)}; "
+                        "a row lacks the columns that stop short of it")
+    for i in range(max(lengths, default=0)):
+        yield {"record": {k: v[i] for k, v in columns.items() if i < len(v)},
+               "source": {"file": file_name, "index": i}}
+
+
 class FilingRetrieval:
     """
     Class for retrieving SEC EDGAR filings and data.
@@ -72,6 +86,33 @@ class FilingRetrieval:
         except ValidationError as e:
             raise SecError(f"{url} is not in the expected submissions layout: {e.message}") from e
         return data, meta
+
+    def iter_filing_records(self, cik, sources, warnings, older=True):
+        """Every row of the submissions filing tables, in the SEC's order: the
+        recent table, then each file `filings.files` names, in the order it
+        names them. Each row is {"record", "source"}: `record` maps every
+        column, under the SEC's key, to the row's value; `source` is the file
+        and the row's index in it. Older files are read only when the caller
+        goes on past the recent table. The meta of every file read is appended
+        to `sources`; a column shorter than the others is reported in
+        `warnings` and left out of the rows it does not reach.
+        """
+        formatted_cik = _format_cik(cik)
+        submissions, meta = self.get_company_submissions(formatted_cik)
+        sources.append(meta)
+        name = f"CIK{formatted_cik}.json"
+        yield from _rows(submissions["filings"]["recent"], f"{name}#filings.recent", warnings)
+        if not older:
+            return
+        for entry in submissions["filings"]["files"]:
+            file_name = str(entry.get("name", "")) if isinstance(entry, dict) else repr(entry)
+            if not _HISTORY_FILE.fullmatch(file_name):
+                raise SecError(f"older filings file {file_name!r} has an unexpected name; "
+                               f"the filings of CIK {formatted_cik} cannot all be read")
+            data, older_meta = get_json(f"https://data.sec.gov/submissions/{file_name}", filing_cache,
+                                        f"historical_{file_name}")
+            sources.append(older_meta)
+            yield from _rows(data, file_name, warnings)
 
     def get_filing_metadata(self, cik, filing_type="10-K", end_date=None, limit=10,
                             include_amendments=False, strict=False):

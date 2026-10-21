@@ -664,6 +664,34 @@ def statements(folder, rows=None, **kwargs):
         server._resolve, server._filings.get_filing_metadata, server.fetch_response = real
 
 
+def xbrl_call(folder, **kwargs):
+    """get_filing_xbrl on one made-up folder; returns (result, code)."""
+    record = {"accessionNumber": "0000000001-26-000001", "filingDate": "2026-07-02", "reportDate": "2025-12-31",
+              "acceptanceDateTime": "2026-07-02T14:01:02.000Z", "form": "10-K",
+              "primaryDocument": "t-20251231.htm"}
+    real = (server._resolve, server._filings.iter_filing_records, server.fetch_response)
+    server._resolve = lambda s: {"cik": "0000000001", "matched_on": "cik"}
+
+    def rows(cik, sources, warnings, older=True):
+        sources.append({"source_url": "https://data.sec.gov/submissions/CIK0000000001.json",
+                        "retrieved_at": "2026-07-03T00:00:00Z", "frozen": False, "cache_hit": False, "sha256": None})
+        yield {"record": dict(record), "source": {"file": "CIK0000000001.json#filings.recent", "index": 0}}
+    server._filings.iter_filing_records = rows
+
+    def fetch(url, **k):
+        name = url.rsplit("/", 1)[1]
+        if name not in folder:
+            raise sec_client.SecNotFound(f"nothing at {url}")
+        return sec_client.Response(folder[name], "application/xml", "2026-07-03T00:00:00Z")
+    server.fetch_response = fetch
+    server._archive_cache.clear()
+    try:
+        return call(server.get_filing_xbrl, cik_or_ticker="1", **kwargs)
+    finally:
+        server._resolve, server._filings.iter_filing_records, server.fetch_response = real
+        server._archive_cache.clear()
+
+
 def face(result, kind):
     return next(s for s in result["statements"] if s["kind"] == kind and not s["parenthetical"])
 
@@ -806,35 +834,46 @@ def filed_cases():
     check("filed: closing cash the balance sheet shows is tied to it",
           len(rolls) == 2 and all(x["consistent"] and x["closing_on_balance_sheet"] is True for x in rolls), str(rolls))
 
-    # Facts asked for by name, wherever they are tagged.
-    r, code = statements(filed(), facts=["us-gaap:Cash", "LeasedAssetsNet", "us-gaap:Nothing"])
-    asked = r and r.get("requested_facts", {})
-    check("filed: a fact asked for by name returns its whole-company values",
-          code is None and [v["value"] for v in asked["us-gaap:Cash"]["values"]] == [10_000_000, 8_000_000], code or str(asked))
-    check("filed: a name without its prefix finds the element; one tagged only by member returns no value",
-          asked["LeasedAssetsNet"]["element"] == "t:LeasedAssetsNet" and not asked["LeasedAssetsNet"]["values"]
-          and asked["LeasedAssetsNet"]["tagged_by_member"] == 2, str(asked["LeasedAssetsNet"]))
-    check("filed: a fact tagged only by member returns each member's value with its dimensions",
-          len(asked["LeasedAssetsNet"]["by_member"]) == 2
-          and all(m["dimensions"] and isinstance(m["value"], (int, float)) for m in asked["LeasedAssetsNet"]["by_member"]),
-          str(asked["LeasedAssetsNet"]["by_member"]))
-    check("filed: an element the filing does not tag returns nothing",
-          asked["us-gaap:Nothing"] == {"element": "us-gaap:Nothing", "values": [], "tagged_by_member": 0, "by_member": []},
-          str(asked["us-gaap:Nothing"]))
+    # Replaced in 1.0 (step 4): the `facts` parameter of get_filed_statements and its `requested_facts` are
+    # gone (they chose whole-company values, split member values out and turned element identities into
+    # prefixed names). get_filing_xbrl part="instance" with `concepts` returns the facts as written instead.
+    r, code = xbrl_call(filed(), part="instance", concepts=["us-gaap:Cash", "LeasedAssetsNet", "us-gaap:Nothing"])
+    facts = [i for i in (r or {}).get("items", []) if i["node"] == "fact"]
+    check("xbrl: a concept asked for by name returns its facts with the text as written",
+          code is None and [(f["contextRef"], f["text"]) for f in facts if f["concept"]["local_name"] == "Cash"]
+          == [("I25", "10000000"), ("I24", "8000000")], code or str(facts)[:200])
+    matches = {m["name"]: m["matches"] for m in r["concept_matches"]}
+    check("xbrl: a name without its prefix matches the local name by namespace and local name",
+          matches["LeasedAssetsNet"] == [{"namespace": "http://t.example/2025", "local_name": "LeasedAssetsNet"}],
+          str(matches["LeasedAssetsNet"]))
+    leased = [f for f in facts if f["concept"]["local_name"] == "LeasedAssetsNet"]
+    members = {i["id"]: i["segment"]["explicit_members"] for i in r["items"] if i["node"] == "context" and i["segment"]}
+    check("xbrl: a fact tagged only under a member is returned with its context's member, nothing promoted",
+          [f["contextRef"] for f in leased] == ["V25", "V24"]
+          and all(members[f["contextRef"]][0]["member"]["local_name"] == "VehiclesMember" for f in leased),
+          str(leased)[:200])
+    check("xbrl: a concept the filing does not tag matches nothing and is not unresolved",
+          matches["us-gaap:Nothing"] == [] and not r["unresolved"], str(r["unresolved"]))
     listed = f"{US_GAAP}#OtherLiabilitiesNoncurrent http://t.example/2025#LeaseLiabilities"
-    r, code = statements(filed(lease_list=listed), facts=["OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"])
-    asked = r and r["requested_facts"]["OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"]
-    check("filed: a fact with no unit, the lines a lease liability is in, is returned once as its text and its elements",
-          code is None and asked["values"] == [{"period": "2025-12-31", "value": listed, "unit": None, "decimals": None,
-                                               "elements": ["us-gaap:OtherLiabilitiesNoncurrent", "t:LeaseLiabilities"]}],
-          code or str(asked))
-    r, _ = statements(filed(lease_list="http://unknown.example/x#Debt"),
-                      facts=["OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"])
-    asked = r["requested_facts"]["OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"]
-    check("filed: an identity in a namespace the instance does not declare gives no elements, only the text",
-          [v.get("elements") for v in asked["values"]] == [None], str(asked))
-    _, code = statements(filed(), facts=["not a name"])
-    check("filed: a malformed element name is INVALID_INPUT", code == "INVALID_INPUT", code)
+    r, code = xbrl_call(filed(lease_list=listed), part="instance",
+                        concepts=["us-gaap:OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"])
+    facts = [i for i in (r or {}).get("items", []) if i["node"] == "fact"]
+    check("xbrl: a text fact tagged twice is returned twice, as written, with no names derived from it",
+          code is None and [f["text"] for f in facts] == [listed, listed] and all("elements" not in f for f in facts),
+          code or str(facts)[:200])
+    r, code = xbrl_call(filed(duplicate=95), part="instance", concepts=["us-gaap:Revenues"])
+    d25 = [f["text"] for f in (r or {}).get("items", []) if f["node"] == "fact" and f["contextRef"] == "D25"]
+    check("xbrl: conflicting duplicates are both returned, none chosen", d25 == ["100000000", "95000000"],
+          code or str(d25))
+    _, code = xbrl_call(filed(), part="instance", concepts=["not a name"])
+    check("xbrl: a malformed concept name is INVALID_INPUT", code == "INVALID_INPUT", code)
+    r, code = xbrl_call(filed(inline=False))
+    check("xbrl: without a doctype entry, the one <name>-<YYYYMMDD>.xml in InputFiles is the instance",
+          code is None and r["files"]["instance"]["name"] == "t-20251231.xml"
+          and "InputFiles" in r["files"]["instance"]["found_by"], code or str(r["files"]["instance"]))
+    check("xbrl: the header acceptance time is returned as written",
+          r["acceptance"]["header_acceptance_datetime"] == "20260702060102"
+          and r["acceptance"]["submissions_acceptanceDateTime"] == "2026-07-02T14:01:02.000Z", str(r["acceptance"]))
 
     r, code = statements(filed(calc11=True))
     check("filed: Calculation 1.1 arcs are read", code is None and r["calculation_versions"] == ["1.1"]

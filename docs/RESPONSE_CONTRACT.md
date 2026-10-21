@@ -162,6 +162,31 @@ The frames document unchanged. `period` is `CY2023`, `CY2023Q4` or
 
 ### `get_filing_xbrl(cik_or_ticker, accession_number=None, form="10-K", as_of=None, part="summary", concepts=None, offset=0, limit=500)` — `parsed_source`
 
+The filing is `accession_number`, else the first row of the company's
+submissions, in the SEC's order (the recent table, then each older file in
+the order `filings.files` lists them), whose `form` equals `form` exactly.
+`as_of` is a date, YYYY-MM-DD, compared literally with the row's
+`filingDate`: rows filed after it are skipped, and an `accession_number`
+filed after it is not found. `filing` holds the `accessionNumber`, the
+submissions row as the SEC publishes it (`record`), where that row is
+(`source`: file and index) and the filing `folder`.
+
+Every item parsed from XML has `seq` and `node`, the kind of XML node it is
+(`context`, `unit`, `fact`, `loc`, `arc`, `resource`, `element`, ...); `node`
+names the XML construct, never a meaning. Attribute names in a namespace are
+written `{namespace}local`, so `xlink:role` is
+`{http://www.w3.org/1999/xlink}role`; attributes without a namespace keep
+their plain name. A QName in an attribute or in text is returned as written,
+with the namespace and local name it resolves to through the declarations in
+scope at that element, or `resolved: false` and a reason.
+
+The instance and the company schema are found from `FilingSummary.xml`: the
+one `InputFiles` entry with a `doctype` attribute is the instance (for an
+inline XBRL document, the instance the SEC extracted from it,
+`<document stem>_htm.xml`), and the one `.xsd` entry is the schema. Each
+`files` entry says how it was found (`found_by`); when that is not exactly
+one file, the entry is `resolved: false` with its candidates.
+
 The XBRL files of one filing, one `part` at a time:
 
 - `summary`: the filing's submissions record, its acceptance time as the

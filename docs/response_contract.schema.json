@@ -143,9 +143,25 @@
     "properties": {
      "representation": {"const": "parsed_source"},
      "part": {"enum": ["summary", "schema", "presentation", "calculation", "definition", "label", "reference", "instance"]},
-     "items": {"type": "array", "items": {"type": "object", "required": ["seq", "kind"],
-                                          "properties": {"seq": {"type": "integer", "minimum": 0}}}}
-    }}]
+     "filing": {"type": "object", "required": ["accessionNumber", "record", "source", "folder"],
+                "properties": {"accessionNumber": {"type": "string", "pattern": "^\\d{10}-\\d{2}-\\d{6}$"},
+                               "record": {"type": "object"},
+                               "source": {"type": "object", "required": ["file", "index"]},
+                               "folder": {"type": "string", "pattern": "^https://www\\.sec\\.gov/Archives/edgar/data/"}}},
+     "unresolved": {"type": "array", "items": {"type": "object"}},
+     "page": {"type": "object", "required": ["total", "offset", "count", "next_offset"],
+              "properties": {"total": {"type": "integer", "minimum": 0}, "offset": {"type": "integer", "minimum": 0},
+                             "count": {"type": "integer", "minimum": 0},
+                             "next_offset": {"type": ["integer", "null"]}}},
+     "items": {"type": "array", "items": {"type": "object", "required": ["seq", "node"],
+                                          "properties": {"seq": {"type": "integer", "minimum": 0},
+                                                         "node": {"type": "string"},
+                                                         "attributes": {"type": "object"}}}}
+    },
+    "allOf": [{"if": {"properties": {"part": {"const": "instance"}}},
+               "then": {"required": ["file", "namespaces", "page", "items"]}},
+              {"if": {"properties": {"part": {"const": "summary"}}},
+               "then": {"required": ["acceptance", "files", "filing_summary"]}}]}]
   }
  }
 }

@@ -8,7 +8,8 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCRIPTS = ["test_cases.py", "test_tools_offline.py", "test_frozen.py", "test_contract.py", "test_mcp_stdio.py"]
+SCRIPTS = ["test_cases.py", "test_tools_offline.py", "test_frozen.py", "test_contract.py", "test_xbrl_source.py",
+           "test_mcp_stdio.py"]
 
 
 def main():
