@@ -2,6 +2,15 @@
 
 Each entry is one JSON file named by the SHA-256 of its key. Entries are
 JSON only: nothing read from disk is ever executed.
+
+A read never removes anything. An expired entry is a miss and stays on disk
+until a write replaces it: deleting it during a read could remove a fresh
+entry another thread or process wrote in the meantime. Removal is explicit
+(`delete`), or clearing the cache folder.
+
+A read holds the file open only while it copies the bytes, and a write
+retries its rename briefly, because Windows refuses to replace a file that is
+open.
 """
 from __future__ import annotations
 
@@ -51,7 +60,7 @@ class Cache:
             handle, temp_path = tempfile.mkstemp(dir=self.cache_dir, suffix=".tmp")
             with os.fdopen(handle, 'w', encoding='utf-8') as f:
                 json.dump(entry, f)
-            os.replace(temp_path, self._get_cache_path(key))
+            self._replace(temp_path, self._get_cache_path(key))
         except (OSError, TypeError, ValueError):
             try:
                 if temp_path and os.path.exists(temp_path):
@@ -59,14 +68,29 @@ class Cache:
             except OSError:
                 pass
 
+    @staticmethod
+    def _replace(source, target, tries=20, pause=0.05):
+        for attempt in range(tries):
+            try:
+                os.replace(source, target)
+                return
+            except PermissionError:  # the target is open in another reader (Windows)
+                if attempt == tries - 1:
+                    raise
+                time.sleep(pause)
+
     def get_entry(self, key):
-        """The stored entry ({'data', 'meta', ...}), or None if absent, expired or unreadable."""
+        """The stored entry ({'data', 'meta', ...}), or None if absent, expired or unreadable.
+
+        Never deletes: an expired or unreadable entry is a miss and is left for
+        the next write to replace."""
         if not self.enabled:
             return None
         cache_path = self._get_cache_path(key)
         try:
-            with open(cache_path, encoding='utf-8') as f:
-                entry = json.load(f)
+            with open(cache_path, 'rb') as f:
+                raw = f.read()
+            entry = json.loads(raw.decode('utf-8'))
         except (OSError, ValueError):
             return None
         if (not isinstance(entry, dict) or 'data' not in entry
@@ -74,7 +98,6 @@ class Cache:
                 or not isinstance(entry.get('expires_at'), (int, float))):
             return None
         if time.time() > entry['expires_at']:
-            self.delete(key)
             return None
         return entry
 
@@ -84,6 +107,7 @@ class Cache:
         return entry['data'] if entry else None
 
     def delete(self, key):
+        """Remove an entry on purpose. Never called by a read."""
         if not self.enabled:
             return
         try:

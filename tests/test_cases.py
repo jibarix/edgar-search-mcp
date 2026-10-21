@@ -305,6 +305,7 @@ def cache_cases():
     check("cache returns what was stored", entry["data"] == {"a": [1, 2]} and entry["meta"]["source_url"] == "u")
     cache.set("old", 1, ttl=-1)
     check("an expired entry is not returned", cache.get("old") is None)
+    check("reading an expired entry does not remove it", os.path.exists(cache._get_cache_path("old")))
     with open(cache._get_cache_path("planted"), "wb") as handle:
         pickle.dump(Planted(), handle)
     check("a planted pickle file is ignored, not executed", cache.get("planted") is None)
@@ -321,6 +322,97 @@ def cache_cases():
         check("a cache that cannot be written does not fail the request", False, repr(e))
 
 
+def cache_race_cases():
+    """A reader holds an expired entry while a writer replaces it: the new entry must survive."""
+    import json as json_module
+    import threading
+    from edgar_mcp.utils import cache as cache_module
+
+    cache = Cache("race")
+    cache.set("k", "old", ttl=-1)
+    loaded, written = threading.Event(), threading.Event()
+    real_loads = json_module.loads
+    reader_thread = []
+
+    def paused_loads(text, *a, **k):
+        value = real_loads(text, *a, **k)
+        if threading.current_thread() in reader_thread:
+            loaded.set()                  # the reader has the expired entry in hand
+            written.wait(timeout=10)      # and finishes only after the writer is done
+        return value
+
+    results = {}
+
+    def reader():
+        results["read"] = cache.get_entry("k")
+
+    def writer():
+        loaded.wait(timeout=10)
+        cache.set("k", "new", ttl=3600)
+        written.set()
+
+    cache_module.json.loads = paused_loads
+    try:
+        r, w = threading.Thread(target=reader), threading.Thread(target=writer)
+        reader_thread.append(r)
+        r.start()
+        w.start()
+        r.join(timeout=20)
+        w.join(timeout=20)
+    finally:
+        cache_module.json.loads = real_loads
+    check("the interleaving ran: reader read, writer wrote, reader finished",
+          loaded.is_set() and written.is_set() and not r.is_alive() and not w.is_alive())
+    check("the reader of the expired entry got a miss", results.get("read") is None, str(results.get("read")))
+    entry = cache.get_entry("k")
+    check("the writer's new entry survives the reader", entry is not None and entry["data"] == "new", str(entry))
+
+    # An interrupted write: the old entry stays whole and no temporary file is left.
+    cache = Cache("interrupted")
+    cache.set("k", "whole", ttl=3600)
+    real_dump = json_module.dump
+
+    def failing_dump(value, handle, *a, **k):
+        handle.write('{"key": "k", "expires_at": 9e12, "da')  # half an entry, then the disk fails
+        raise OSError("disk full")
+
+    cache_module.json.dump = failing_dump
+    try:
+        cache.set("k", "replacement", ttl=3600)
+    finally:
+        cache_module.json.dump = real_dump
+    check("an interrupted write leaves the old entry whole", cache.get("k") == "whole", str(cache.get("k")))
+    check("an interrupted write leaves no temporary file",
+          not [n for n in os.listdir(cache.cache_dir) if n.endswith(".tmp")], str(os.listdir(cache.cache_dir)))
+    # A process killed mid-write leaves a temporary file behind; it is never read as an entry.
+    with open(os.path.join(cache.cache_dir, "leftover.tmp"), "w", encoding="utf-8") as handle:
+        handle.write('{"key": "k", "expires_at": 9e12, "data": "partial')
+    check("a temporary file left by a killed writer is never read", cache.get("k") == "whole")
+    cache.set("k", "next", ttl=3600)
+    check("a write after a killed writer succeeds", cache.get("k") == "next")
+
+    # Unreadable entries are misses, not errors, and the next write replaces them.
+    cache = Cache("unreadable")
+    for label, content in (("truncated JSON", b'{"key": "k", "expires_at": 9e12, "data": [1, 2'),
+                           ("bytes that are not UTF-8", b"\xff\xfe\x00garbage"),
+                           ("JSON that is not an entry", b'[1, 2, 3]'),
+                           ("an entry with no expiry", b'{"key": "k", "data": 1}'),
+                           ("an empty file", b"")):
+        os.makedirs(cache.cache_dir, exist_ok=True)
+        with open(cache._get_cache_path("k"), "wb") as handle:
+            handle.write(content)
+        try:
+            got = cache.get_entry("k")
+            check(f"an unreadable entry ({label}) is a miss", got is None, str(got))
+        except Exception as e:
+            check(f"an unreadable entry ({label}) is a miss", False, repr(e))
+        cache.set("k", "fresh", ttl=3600)
+        check(f"a write replaces an unreadable entry ({label})", cache.get("k") == "fresh")
+    os.remove(cache._get_cache_path("k"))
+    os.makedirs(cache._get_cache_path("k"))  # a folder where the entry should be
+    check("an entry path that cannot be opened is a miss", cache.get_entry("k") is None)
+
+
 if __name__ == "__main__":
     parser_cases()
     lookup_cases()
@@ -328,5 +420,6 @@ if __name__ == "__main__":
     filing_cases()
     address_cases()
     cache_cases()
+    cache_race_cases()
     print(f"problems: {len(problems)}")
     sys.exit(1 if problems else 0)
