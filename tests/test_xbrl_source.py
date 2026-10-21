@@ -6,7 +6,10 @@ Run from the repository root (no network):
 Each probe is a small made-up instance that a convenience parser would
 "fix": typed dimensions, nil against zero against absent, several entities,
 conflicting duplicates, one local name in two namespaces, sparse periods,
-names whose suffix suggests a meaning, undeclared and conflicting prefixes.
+names whose suffix suggests a meaning, undeclared and conflicting prefixes;
+and in schemas and linkbases: labels in several languages or none, one
+child under several calculation parents, prohibited and overriding arcs,
+equal orders, misleading role titles, duplicate ids, generic links.
 The reader must return each as written and say what it could not resolve.
 """
 from __future__ import annotations
@@ -233,6 +236,203 @@ def bad_documents():
             check(f"documents: {label} is refused with the file named", "x.xml" in str(e), str(e))
 
 
+# ── schema and linkbase probes ─────────────────────────────────────────────
+
+XL = "{http://www.w3.org/1999/xlink}"
+XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
+LB_NS = 'xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xlink="http://www.w3.org/1999/xlink"'
+
+
+def schema(body, extra_ns=""):
+    return (f'<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" {LB_NS} '
+            f'xmlns:xbrli="http://www.xbrl.org/2003/instance" {extra_ns} targetNamespace="{A}">{body}</xs:schema>'
+            ).encode()
+
+
+def linkbase(body, part, extra_ns=""):
+    doc = xs.XmlDoc(f'<link:linkbase {LB_NS} {extra_ns}>{body}</link:linkbase>'.encode(), "x_lab.xml")
+    seen = []
+
+    def target_of(href):
+        seen.append(href)
+        return {"resolved": False, "href_seen": href}
+    items, unresolved = xs.read_linkbase(doc, doc.root, "x_lab.xml", part, target_of)
+    return items, unresolved, seen
+
+
+def loc(label, href=None):
+    return f'<link:loc xlink:type="locator" xlink:href="{href or "a.xsd#a_" + label}" xlink:label="{label}"/>'
+
+
+def arc(kind, frm, to, attrs="", arcrole="http://www.xbrl.org/2003/arcrole/summation-item"):
+    return f'<link:{kind}Arc xlink:type="arc" xlink:arcrole="{arcrole}" xlink:from="{frm}" xlink:to="{to}" {attrs}/>'
+
+
+def ext(kind, body, role="http://a.example/role/R1"):
+    return f'<link:{kind}Link xlink:type="extended" xlink:role="{role}">{body}</link:{kind}Link>'
+
+
+def of(items, node):
+    return [i for i in items if i["node"] == node]
+
+
+def multilingual_and_missing_labels():
+    label = lambda key, lang, text, role="label": (
+        f'<link:label xlink:type="resource" xlink:label="{key}" '
+        + (f'xml:lang="{lang}" ' if lang is not None else "")
+        + f'xlink:role="http://www.xbrl.org/2003/role/{role}">{text}</link:label>')
+    concept_label = "http://www.xbrl.org/2003/arcrole/concept-label"
+    body = (loc("Sales") + label("l1", "de", "Umsatz") + label("l1", "en-US", "Net sales")
+            + label("l1", "fr", "Ventes") + label("l1", "en-US", "Total net sales", "totalLabel")
+            + label("l1", None, "No language")
+            + '<link:label xlink:type="resource" xlink:label="l1" xml:lang="en" '
+              'xlink:role="http://www.xbrl.org/2003/role/documentation">Sales <b>net</b> of returns</link:label>'
+            + arc("label", "Sales", "l1", arcrole=concept_label)
+            + loc("Unlabelled"))
+    items, unresolved, _ = linkbase(ext("label", body, "http://www.xbrl.org/2003/role/link"), "label")
+    labels = of(items, "resource")
+    check("labels: every language as written and in document order, none preferred",
+          [(x["attributes"].get(XML_LANG), x["text"]) for x in labels[:5]]
+          == [("de", "Umsatz"), ("en-US", "Net sales"), ("fr", "Ventes"), ("en-US", "Total net sales"),
+              (None, "No language")], str(labels)[:300])
+    check("labels: a label with markup keeps its markup as XML and its leading text",
+          labels[5]["text"] == "Sales " and "<b>net</b>" in labels[5]["xml"], str(labels[5]))
+    check("labels: a concept with no label is a locator with no arc, nothing filled in",
+          [l["attributes"][f"{XL}label"] for l in of(items, "loc")] == ["Sales", "Unlabelled"]
+          and len(of(items, "arc")) == 1 and not unresolved, str(of(items, "loc")))
+
+
+def multiple_calculation_parents():
+    body1 = (loc("Total") + loc("Sub") + loc("Part")
+             + arc("calculation", "Total", "Part", 'weight="1" order="1"')
+             + arc("calculation", "Sub", "Part", 'weight="-1" order="1"'))
+    body2 = loc("Other") + loc("Part") + arc("calculation", "Other", "Part", 'weight="0.5" order="2"')
+    items, _, _ = linkbase(ext("calculation", body1) + ext("calculation", body2, "http://a.example/role/R2"),
+                           "calculation")
+    parents = [(a["link_seq"], a["attributes"][f"{XL}from"], a["attributes"]["weight"])
+               for a in of(items, "arc") if a["attributes"][f"{XL}to"] == "Part"]
+    links = [l["seq"] for l in of(items, "extendedLink")]
+    check("calculation: one child under three parents in two links is three arcs, weights as written",
+          parents == [(links[0], "Total", "1"), (links[0], "Sub", "-1"), (links[1], "Other", "0.5")], str(parents))
+
+
+def prohibited_arcs():
+    body = (loc("P") + loc("C")
+            + arc("calculation", "P", "C", 'weight="1" order="1"')
+            + arc("calculation", "P", "C", 'weight="1" order="1" use="prohibited" priority="1"')
+            + arc("calculation", "P", "C", 'weight="-1" order="1" priority="2"'))
+    items, unresolved, _ = linkbase(ext("calculation", body), "calculation")
+    arcs = [(a["attributes"].get("use"), a["attributes"].get("priority"), a["attributes"]["weight"])
+            for a in of(items, "arc")]
+    check("prohibited: the arc, its prohibition and its override are all returned, none applied",
+          arcs == [(None, None, "1"), ("prohibited", "1", "1"), (None, "2", "-1")] and not unresolved, str(arcs))
+
+
+def equal_orders():
+    parent_child = "http://www.xbrl.org/2003/arcrole/parent-child"
+    body = (loc("H") + loc("Z") + loc("A") + loc("M")
+            + arc("presentation", "H", "Z", 'order="1"', parent_child)
+            + arc("presentation", "H", "A", 'order="1"', parent_child)
+            + arc("presentation", "H", "M", 'order="1.0"', parent_child)
+            + arc("presentation", "H", "A", "", parent_child))
+    items, _, _ = linkbase(ext("presentation", body), "presentation")
+    arcs = [(a["attributes"][f"{XL}to"], a["attributes"].get("order")) for a in of(items, "arc")]
+    check("orders: equal orders stay in document order, order text as written, a missing order stays missing",
+          arcs == [("Z", "1"), ("A", "1"), ("M", "1.0"), ("A", None)], str(arcs))
+    seqs = [i["seq"] for i in items]
+    check("orders: items come in document order", seqs == sorted(seqs), str(seqs))
+
+
+def same_fragment_two_schemas():
+    body = (loc("x1", "a.xsd#Revenue") + loc("x2", "https://b.example/b.xsd#Revenue")
+            + arc("definition", "x1", "x2", arcrole="http://xbrl.org/int/dim/arcrole/domain-member"))
+    items, _, seen = linkbase(ext("definition", body), "definition")
+    check("locators: the same fragment in two schemas is two locators, each href passed on as written",
+          seen == ["a.xsd#Revenue", "https://b.example/b.xsd#Revenue"]
+          and [l["target"]["href_seen"] for l in of(items, "loc")] == seen, str(seen))
+
+
+def other_links_and_children():
+    gen = 'xmlns:gen="http://xbrl.org/2008/generic"'
+    body = (ext("presentation", loc("P") + '<link:title xlink:type="title">A title</link:title>')
+            + ext("calculation", loc("P"))
+            + '<gen:link xlink:type="extended" xlink:role="http://a.example/role/G"><link:loc xlink:type="locator" '
+              'xlink:href="a.xsd#a_P" xlink:label="P"/></gen:link>')
+    items, unresolved, _ = linkbase(body, "presentation", gen)
+    check("links: a child of another xlink type is returned as XML",
+          [(i["node"], "A title" in i.get("xml", "")) for i in items if i["node"] == "other"] == [("other", True)],
+          str(items))
+    check("links: a generic link is reported unresolved, a link of another part is left to its part",
+          len(unresolved) == 1 and unresolved[0]["element"] == "{http://xbrl.org/2008/generic}link"
+          and all(i["file"] == "x_lab.xml" for i in items) and len(of(items, "extendedLink")) == 1, str(unresolved))
+    refs = '<link:roleRef roleURI="http://a.example/role/R1" xlink:type="simple" xlink:href="a.xsd#R1"/>'
+    items, _, _ = linkbase(refs + ext("calculation", loc("P")), "presentation")
+    check("links: a linkbase with no link of this part returns nothing, not its roleRefs", items == [], str(items))
+    items, _, _ = linkbase(refs + ext("presentation", loc("P")), "presentation")
+    check("links: with a link of this part, its roleRefs come first as written",
+          items[0]["node"] == "roleRef" and items[0]["href"] == "a.xsd#R1", str(items[0]))
+
+
+def schema_declarations():
+    body = ('<xs:import namespace="http://www.xbrl.org/2003/instance" '
+            'schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd"/>'
+            '<xs:annotation><xs:appinfo>'
+            '<link:roleType roleURI="http://a.example/role/BS" id="BS">'
+            '<link:definition>100 - Statement - BALANCE SHEET (Parenthetical)</link:definition>'
+            '<link:usedOn>link:calculationLink</link:usedOn><link:usedOn>undeclared:thing</link:usedOn></link:roleType>'
+            '<link:linkbaseRef xlink:type="simple" xlink:href="a_pre.xml"/>'
+            '</xs:appinfo></xs:annotation>'
+            '<xs:element name="TotalAssetsParenthetical" id="a_T" type="xbrli:monetaryItemType" '
+            'substitutionGroup="xbrli:item" xbrli:periodType="duration"/>'
+            '<xs:element name="Second" id="a_T" type="xbrli:stringItemType" substitutionGroup="xbrli:item"/>'
+            '<xs:element name="Typed" id="a_Ty" type="nope:thing" substitutionGroup="nope:item"/>'
+            '<xs:element name="Untyped" id="a_U"/>'
+            '<xs:complexType name="Cx"><xs:sequence/></xs:complexType>')
+    r = xs.read_schema(schema(body), "a.xsd")
+    nodes = [i["node"] for i in r["items"]]
+    check("schema: declarations in document order, each by its XML construct",
+          nodes == ["import", "roleType", "linkbaseRef", "element", "element", "element", "element", "other"], str(nodes))
+    role = r["items"][1]
+    check("schema: a role's definition is as written, a misleading title not classified",
+          role["definition"] == "100 - Statement - BALANCE SHEET (Parenthetical)"
+          and set(role) == {"seq", "attributes", "node", "definition", "usedOn"}, str(role))
+    check("schema: usedOn QNames resolved where written, an undeclared prefix unresolved",
+          role["usedOn"][0]["local_name"] == "calculationLink" and role["usedOn"][1]["resolved"] is False,
+          str(role["usedOn"]))
+    total = r["items"][3]
+    check("schema: a name that sounds like a total or a parenthetical gets no meaning, attributes as written",
+          total["name"] == "TotalAssetsParenthetical"
+          and total["attributes"]["{http://www.xbrl.org/2003/instance}periodType"] == "duration"
+          and "balance" not in total and "kind" not in total, str(total))
+    check("schema: a duplicate id is reported, and the first element keeps it",
+          r["ids"]["a_T"]["local_name"] == "TotalAssetsParenthetical"
+          and any(u.get("id") == "a_T" for u in r["unresolved"]), str(r["unresolved"]))
+    typed = r["items"][5]
+    check("schema: a type and substitution group with an undeclared prefix are unresolved, value kept",
+          typed["type"] == {"qname": "nope:thing", "resolved": False,
+                            "reason": "the prefix 'nope' is not declared where the value is written"}
+          and sum(1 for u in r["unresolved"] if u.get("element") == "Typed") == 2, str(typed))
+    check("schema: an element with no type has none, nothing filled in",
+          r["items"][6]["type"] is None and r["items"][6]["substitutionGroup"] is None, str(r["items"][6]))
+    check("schema: another top-level component is returned as XML", "complexType" in r["items"][7]["xml"],
+          str(r["items"][7]))
+    embedded = schema('<xs:annotation><xs:appinfo><link:linkbase>'
+                      + ext("presentation", loc("P")) + '</link:linkbase></xs:appinfo></xs:annotation>')
+    r = xs.read_schema(embedded, "a.xsd")
+    check("schema: a linkbase written inside the schema is listed and handed back to read",
+          [i["node"] for i in r["items"]] == ["linkbase"] and len(r["linkbases"]) == 1
+          and r["items"][0]["element_count"] == 2, str(r["items"]))
+    items, _ = xs.read_linkbase(r["doc"], r["linkbases"][0], "a.xsd", "presentation", lambda h: {"href": h})
+    check("schema: the embedded linkbase reads like any other", [i["node"] for i in items] == ["extendedLink", "loc"],
+          str(items))
+    for label, raw in (("a linkbase", f'<link:linkbase {LB_NS}/>'.encode()), ("not XML", b"<xs:schema")):
+        try:
+            xs.read_schema(raw, "a.xsd")
+            check(f"schema: {label} in place of a schema is refused", False)
+        except xs.FilingDataError as e:
+            check(f"schema: {label} in place of a schema is refused with the file named", "a.xsd" in str(e), str(e))
+
+
 def main():
     typed_dimensions()
     nil_zero_absent()
@@ -244,6 +444,13 @@ def main():
     undeclared_and_conflicting_prefixes()
     references_and_order()
     bad_documents()
+    multilingual_and_missing_labels()
+    multiple_calculation_parents()
+    prohibited_arcs()
+    equal_orders()
+    same_fragment_two_schemas()
+    other_links_and_children()
+    schema_declarations()
     print(f"problems: {len(problems)}")
     return 1 if problems else 0
 

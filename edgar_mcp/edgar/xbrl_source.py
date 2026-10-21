@@ -327,3 +327,126 @@ def select_concepts(instance: dict, names: list) -> tuple[list, list, list]:
              if id(i) in chosen_ids or (i["node"] == "context" and i["id"] in contexts)
              or (i["node"] == "unit" and i["id"] in units)]
     return items, matches, unresolved
+
+
+# ── schema ─────────────────────────────────────────────────────────────────
+
+def _definition_and_used_on(doc: XmlDoc, element) -> dict:
+    definition = element.find(f"{{{LINK}}}definition")
+    return {"definition": None if definition is None else definition.text,
+            "usedOn": [doc.qname(u.text, u) for u in element.findall(f"{{{LINK}}}usedOn")]}
+
+
+def read_schema(raw: bytes, name: str = "schema") -> dict:
+    """The declarations of a company schema, in document order.
+
+    `node` names the XML construct: "import", "include", "linkbaseRef",
+    "roleType", "arcroleType", "element" (a top-level xs:element), "linkbase"
+    (a linkbase written inside the schema), or "other" (any other top-level
+    schema component, as XML). Each keeps every attribute; QNames in `type`
+    and `substitutionGroup` are resolved where they are written. `ids` maps
+    each element id to the element's namespace and local name, which is how
+    a locator's href finds its concept.
+    """
+    doc = XmlDoc(raw, name)
+    if split(doc.root.tag) != (XS, "schema"):
+        raise FilingDataError(f"{name}: the document element is {doc.root.tag}, not xs:schema")
+    target = doc.root.get("targetNamespace")
+    items, ids, unresolved, linkbases = [], {}, list(doc.conflicts()), []
+    for element in doc.root.iter():
+        ns, local = split(element.tag)
+        base = {"seq": doc.seq(element), "attributes": dict(element.attrib)}
+        if (ns, local) in ((XS, "import"), (XS, "include")):
+            items.append({**base, "node": local})
+        elif (ns, local) == (LINK, "linkbaseRef"):
+            items.append({**base, "node": "linkbaseRef", "href": element.get(f"{{{XLINK}}}href")})
+        elif (ns, local) in ((LINK, "roleType"), (LINK, "arcroleType")):
+            items.append({**base, "node": local, **_definition_and_used_on(doc, element)})
+        elif (ns, local) == (LINK, "linkbase"):
+            items.append({**base, "node": "linkbase", "element_count": sum(1 for _ in element.iter()) - 1})
+            linkbases.append(element)
+    for element in doc.root:
+        ns, local = split(element.tag)
+        base = {"seq": doc.seq(element), "attributes": dict(element.attrib)}
+        if (ns, local) == (XS, "element"):
+            name_attr = element.get("name")
+            item = {**base, "node": "element", "namespace": target, "name": name_attr, "id": element.get("id"),
+                    "type": doc.qname(element.get("type"), element),
+                    "substitutionGroup": doc.qname(element.get("substitutionGroup"), element)}
+            if len(element):
+                item["xml"] = doc.to_xml(element)
+            items.append(item)
+            for key in ("type", "substitutionGroup"):
+                if item[key] is not None and not item[key]["resolved"]:
+                    unresolved.append({"seq": item["seq"], "element": name_attr, "value": item[key]["qname"],
+                                       "reason": item[key]["reason"]})
+            if item["id"] is not None:
+                if item["id"] in ids:
+                    unresolved.append({"seq": item["seq"], "id": item["id"],
+                                       "reason": "two elements of the schema have this id"})
+                ids.setdefault(item["id"], {"namespace": target, "local_name": name_attr, "seq": item["seq"]})
+        elif (ns, local) not in ((XS, "import"), (XS, "include"), (XS, "annotation")):
+            items.append({**base, "node": "other", "element": element_name(doc, element), "xml": doc.to_xml(element)})
+    items.sort(key=lambda i: i["seq"])
+    return {"target_namespace": target, "namespaces": doc.namespaces(), "items": items, "ids": ids,
+            "unresolved": unresolved, "linkbases": linkbases, "doc": doc}
+
+
+# ── linkbases ──────────────────────────────────────────────────────────────
+
+# The extended-link element each part returns, by its XBRL 2.1 element name.
+EXTENDED_LINKS = {"presentation": "presentationLink", "calculation": "calculationLink",
+                  "definition": "definitionLink", "label": "labelLink", "reference": "referenceLink"}
+_XLINK_TYPE = f"{{{XLINK}}}type"
+_XLINK_HREF = f"{{{XLINK}}}href"
+
+
+def read_linkbase(doc: XmlDoc, linkbase, file: str, part: str, target_of) -> tuple[list, list]:
+    """The extended links of one kind in one linkbase element, flattened in
+    document order to items, and what could not be resolved.
+
+    Every child of the extended link is an item by its xlink:type:
+    "loc" (with `href` as written and `target`, what `target_of(href)` says it
+    points to), "arc", "resource" (with its text, and its markup as XML) or
+    "other". Each keeps every attribute and the `seq` of its extended link
+    (`link_seq`). Arcs are never combined, overridden or dropped: priority,
+    use="prohibited", order and weight are attributes like any other.
+    The roleRef and arcroleRef elements of the linkbase are returned with
+    them when the linkbase holds at least one extended link of this kind.
+    """
+    wanted = EXTENDED_LINKS[part]
+    items, unresolved = [], []
+    for element in linkbase:
+        ns, local = split(element.tag)
+        base = {"seq": doc.seq(element), "file": file, "attributes": dict(element.attrib)}
+        if ns == LINK and local in ("roleRef", "arcroleRef"):
+            items.append({**base, "node": local, "href": element.get(_XLINK_HREF)})
+            continue
+        if element.get(_XLINK_TYPE) != "extended":
+            continue
+        if (ns, local) != (LINK, wanted):
+            if local not in EXTENDED_LINKS.values() or ns != LINK:
+                unresolved.append({"seq": base["seq"], "file": file, "element": element.tag,
+                                   "reason": "an extended link of an element no part returns (a generic link, say)"})
+            continue
+        link_seq = base["seq"]
+        items.append({**base, "node": "extendedLink", "element": element_name(doc, element)})
+        for child in element:
+            kind = child.get(_XLINK_TYPE)
+            entry = {"seq": doc.seq(child), "file": file, "link_seq": link_seq, "element": element_name(doc, child),
+                     "attributes": dict(child.attrib)}
+            if kind == "locator":
+                href = child.get(_XLINK_HREF)
+                entry.update(node="loc", href=href, target=target_of(href))
+            elif kind == "arc":
+                entry.update(node="arc")
+            elif kind == "resource":
+                entry.update(node="resource", text=child.text)
+                if len(child):
+                    entry["xml"] = doc.to_xml(child)
+            else:
+                entry.update(node="other", xml=doc.to_xml(child))
+            items.append(entry)
+    if not any(i["node"] == "extendedLink" for i in items):
+        items = []
+    return items, unresolved

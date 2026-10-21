@@ -38,9 +38,8 @@ REPLACED = {
                                   "classifier; get_companyfacts returns the SEC document unchanged",
     "get_concept": "removed in 1.0 (step 3): it chose a unit, filtered and re-sorted rows; "
                    "get_companyconcept returns the SEC document unchanged",
-    "get_filed_statements": "changed in 1.0 (step 4): the call used `facts`, which was removed with its "
-                            "requested_facts; get_filing_xbrl part=\"instance\" with `concepts` returns those "
-                            "facts as written",
+    "get_filed_statements": "removed in 1.0 (step 5): it chose statements, labels and values and checked "
+                            "calculations; get_filing_xbrl returns the instance, schema and linkbases as written",
 }
 # Fields that differ between a live answer and its replay by design. The
 # capture read some addresses more than once, and a frozen copy keeps the

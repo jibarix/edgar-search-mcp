@@ -44,11 +44,12 @@ with open(os.path.join(ROOT, "tests", "fixtures", "outputs_0.8.0", "_about.json"
 # in the release both are empty.
 PENDING = {"lookup_company", "get_submissions", "list_filings", "list_filing_documents", "get_filing_document",
            "get_filing_text", "search_filings"}
-NOT_YET_REMOVED = {"get_filed_statements", "get_segment_revenue", "search_companies"}
+NOT_YET_REMOVED = {"get_segment_revenue", "search_companies"}
 # Files removed from the package, and the import names that must not come back.
 REMOVED_FILES = ["edgar_mcp/edgar/tag_classifier.py", "edgar_mcp/edgar/xbrl_parser.py",
-                 "edgar_mcp/edgar/data/sec_tag_mapping.json"]
-REMOVED_NAMES = ["tag_classifier", "xbrl_parser", "TagClassifier", "XBRLParser", "sec_tag_mapping"]
+                 "edgar_mcp/edgar/data/sec_tag_mapping.json", "edgar_mcp/edgar/filed_statements.py"]
+REMOVED_NAMES = ["tag_classifier", "xbrl_parser", "TagClassifier", "XBRLParser", "sec_tag_mapping",
+                 "filed_statements", "get_filed_statements"]
 
 problems = []
 
@@ -323,10 +324,97 @@ def xbrl_paging_checks(result, kwargs):
           error is None and pages == full["items"] and result["page"]["count"] == kwargs["limit"], str(error))
 
 
+XLINK = "{http://www.w3.org/1999/xlink}"
+XS_NS = "http://www.w3.org/2001/XMLSchema"
+LINK_PARTS = {"presentation": "presentationLink", "calculation": "calculationLink", "definition": "definitionLink",
+              "label": "labelLink", "reference": "referenceLink"}
+
+
+def frozen_schema():
+    name = next(n for n in input_files() if n.endswith(".xsd"))
+    return name, ET.fromstring(frozen_bytes(FOLDER + name))
+
+
+def input_files():
+    summary = ET.fromstring(frozen_bytes(FOLDER + "FilingSummary.xml"))
+    return [f.text for f in summary.find("InputFiles")]
+
+
+def xbrl_schema_checks(result, kwargs):
+    xbrl_sources_checks(result, kwargs)
+    name, root = frozen_schema()
+    items = result["items"]
+    elements = [i for i in items if i["node"] == "element"]
+    raw = root.findall("{%s}element" % XS_NS)
+    check("get_filing_xbrl schema: one item per top-level xs:element, every attribute as written and in order",
+          len(elements) == len(raw) > 0 and all(list(i["attributes"].items()) == list(el.attrib.items())
+                                                for i, el in zip(elements, raw)), f"{len(elements)} vs {len(raw)}")
+    roles = [(i["attributes"].get("roleURI"), i["definition"]) for i in items if i["node"] == "roleType"]
+    raw_roles = [(r.get("roleURI"), r.findtext("{%s}definition" % LINK_NS)) for r in root.iter("{%s}roleType" % LINK_NS)]
+    check("get_filing_xbrl schema: every roleType with its definition as written, in order",
+          roles == raw_roles and roles, f"{len(roles)} vs {len(raw_roles)}")
+    imports = [i["attributes"].get("schemaLocation") for i in items if i["node"] == "import"]
+    outside = [u["schemaLocation"] for u in result["unresolved"] if "schemaLocation" in u]
+    check("get_filing_xbrl schema: every import is listed, and each outside the filing is unresolved",
+          imports == [i.get("schemaLocation") for i in root.findall("{%s}import" % XS_NS)] and outside == imports,
+          f"{len(imports)} {len(outside)}")
+    check("get_filing_xbrl schema: the target namespace is the schema's",
+          result["target_namespace"] == root.get("targetNamespace") and result["file"]["name"] == name)
+    seqs = [i["seq"] for i in items]
+    check("get_filing_xbrl schema: items keep document order", seqs == sorted(seqs))
+
+
+def xbrl_linkbase_checks(result, kwargs):
+    xbrl_sources_checks(result, kwargs)
+    part = kwargs["part"]
+    wanted = "{%s}%s" % (LINK_NS, LINK_PARTS[part])
+    schema_name, _ = frozen_schema()
+    label = f"get_filing_xbrl {part}"
+    check(f"{label}: names the extended-link element it returns", result["extended_link_element"] == wanted)
+    items = result["items"]
+    for entry in result["linkbases"]:
+        root = ET.fromstring(frozen_bytes(entry["url"]))
+        mine = [i for i in items if i["file"] == entry["name"]]
+        links = [l for l in root if l.tag == wanted and l.get(XLINK + "type") == "extended"]
+        children = [c for l in links for c in l]
+        check(f"{label} {entry['name']}: one item per extended link and per child, none dropped or merged",
+              entry["extended_links"] == len(links)
+              and sum(i["node"] == "extendedLink" for i in mine) == len(links)
+              and sum(i["node"] in ("loc", "arc", "resource", "other") for i in mine) == len(children),
+              f"{len(links)} links, {len(children)} children")
+        got = [i["attributes"] for i in mine if i["node"] in ("loc", "arc", "resource", "other")]
+        check(f"{label} {entry['name']}: every attribute of every child as written, in document order",
+              got == [dict(c.attrib) for c in children])
+        texts = [i["text"] for i in mine if i["node"] == "resource"]
+        check(f"{label} {entry['name']}: resource text as written",
+              texts == [c.text for c in children if c.get(XLINK + "type") == "resource"])
+    locs = [i for i in items if i["node"] == "loc"]
+    own = [l for l in locs if l["href"].split("#")[0] == schema_name]
+    check(f"{label}: every locator into the company schema resolves to one of its elements",
+          all(l["target"]["resolved"] for l in own), str([l["href"] for l in own if not l["target"]["resolved"]][:3]))
+    external = sum(u["locators"] for u in result["unresolved"] if "locators" in u)
+    check(f"{label}: every other locator is counted unresolved", external == len(locs) - len(own),
+          f"{external} vs {len(locs) - len(own)}")
+    if part == "label":
+        langs = {r["attributes"].get("{http://www.w3.org/XML/1998/namespace}lang")
+                 for r in items if r["node"] == "resource"}
+        raw_langs = {c.get("{http://www.w3.org/XML/1998/namespace}lang")
+                     for e in result["linkbases"] for c in ET.fromstring(frozen_bytes(e["url"])).iter()
+                     if c.get(XLINK + "type") == "resource"}
+        check(f"{label}: every language as written", langs == raw_langs and None not in langs, str(langs))
+    if part == "calculation":
+        arcroles = {a["attributes"][XLINK + "arcrole"] for a in items if a["node"] == "arc"}
+        check(f"{label}: arcroles as written", bool(arcroles), str(arcroles))
+
+
 def xbrl_checks(result, kwargs):
     """One dispatcher for the get_filing_xbrl calls in TOOL_CALLS."""
     if kwargs.get("part", "summary") == "summary":
         xbrl_summary_checks(result, kwargs)
+    elif kwargs["part"] == "schema":
+        xbrl_schema_checks(result, kwargs)
+    elif kwargs["part"] in LINK_PARTS:
+        xbrl_linkbase_checks(result, kwargs)
     elif kwargs.get("concepts") == ["Revenues"]:
         xbrl_bare_name_checks(result, kwargs)
     elif kwargs.get("limit") == 300:
@@ -352,6 +440,12 @@ TOOL_CALLS = [
     ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "instance",
                          "concepts": ["Revenues"]}),
     ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "instance", "limit": 300}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "schema", "limit": 5000}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "presentation", "limit": 5000}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "calculation", "limit": 5000}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "definition", "limit": 5000}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "label", "limit": 5000}),
+    ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "reference"}),
 ]
 EXTRA_CHECKS = {"get_companyfacts": [companyfacts_checks], "get_companyconcept": [companyconcept_checks],
                 "get_frames": [frames_checks], "get_filing_xbrl": [xbrl_checks]}

@@ -26,7 +26,7 @@ import httpx  # noqa: E402
 
 from edgar_mcp import server  # noqa: E402
 from edgar_mcp.config import settings  # noqa: E402
-from edgar_mcp.edgar import company_classifier, company_lookup, filed_statements, filing_retrieval  # noqa: E402
+from edgar_mcp.edgar import company_classifier, company_lookup, filing_retrieval  # noqa: E402
 from edgar_mcp.utils import sec_client  # noqa: E402
 
 problems = []
@@ -421,7 +421,7 @@ def segment_cases():
     check("segments: a live answer says it was not frozen", r["frozen"] is False)
 
 
-# ── get_filed_statements ────────────────────────────────────────────────────
+# ── get_filing_xbrl on made-up filings ──────────────────────────────────────
 
 def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=False, prohibit=False,
           duplicate=None, member_total=False, header="20260702060102", cash_flow=None, opening_2024=7,
@@ -643,27 +643,6 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
     return folder
 
 
-def statements(folder, rows=None, **kwargs):
-    """get_filed_statements on one made-up folder; returns (result, code)."""
-    rows = rows or [{"accession_number": "0000000001-26-000001", "form": "10-K", "filing_date": "2026-07-02",
-                     "acceptance_datetime": "2026-07-02T14:01:02.000Z", "reporting_date": "2025-12-31",
-                     "url": "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/t-20251231.htm"}]
-    real = (server._resolve, server._filings.get_filing_metadata, server.fetch_response)
-    server._resolve = lambda s: {"cik": "0000000001", "matched_on": "cik"}
-    server._filings.get_filing_metadata = lambda *a, **k: ([dict(r) for r in rows], [], {})
-
-    def fetch(url, **k):
-        name = url.rsplit("/", 1)[1]
-        if name not in folder:
-            raise sec_client.SecNotFound(f"nothing at {url}")
-        return sec_client.Response(folder[name], "application/xml", "2026-07-03T00:00:00Z")
-    server.fetch_response = fetch
-    try:
-        return call(server.get_filed_statements, cik_or_ticker="1", **kwargs)
-    finally:
-        server._resolve, server._filings.get_filing_metadata, server.fetch_response = real
-
-
 def xbrl_call(folder, **kwargs):
     """get_filing_xbrl on one made-up folder; returns (result, code)."""
     record = {"accessionNumber": "0000000001-26-000001", "filingDate": "2026-07-02", "reportDate": "2025-12-31",
@@ -692,153 +671,26 @@ def xbrl_call(folder, **kwargs):
         server._archive_cache.clear()
 
 
-def face(result, kind):
-    return next(s for s in result["statements"] if s["kind"] == kind and not s["parenthetical"])
+XL = "{http://www.w3.org/1999/xlink}"
+XBRLI = "{http://www.xbrl.org/2003/instance}"
+FOLDER_URL = "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/"
 
 
-def line(result, kind, element):
-    return next(l for l in face(result, kind)["lines"] if l["element"] == element)
+def nodes(result, node):
+    return [i for i in (result or {}).get("items", []) if i["node"] == node]
 
 
-def filed_cases():
-    r, code = statements(filed())
-    check("filed: reads the statements of a filing", code is None, code)
-    if code:
-        return
-    kinds = sorted((s["kind"], s["parenthetical"]) for s in r["statements"])
-    check("filed: statements by the summary's menu, notes left out, parenthetical marked",
-          kinds == [("balance_sheet", False), ("balance_sheet", True), ("income_statement", False)], str(kinds))
-    own = line(r, "income_statement", "t:FulfillmentExpense")
-    check("filed: an own element comes with its label, definition and documentation",
-          own["extension"] and own["label"] == "Fulfillment" and own["definition"]["balance"] == "debit"
-          and own["documentation"] == "Costs of fulfillment centers.", str(own))
-    check("filed: an own element names the total it adds into",
-          own["calculation_parent"] == "us-gaap:CostsAndExpenses" and own["weight"] == 1, str(own))
-    check("filed: definition links of an own element are kept",
-          bool(own.get("related")) and own["related"][0]["arcrole"].endswith("general-special"),
-          str(own.get("related")))
-    total = line(r, "income_statement", "us-gaap:CostsAndExpenses")
-    check("filed: a preferred label is used", total["label"] == "Total costs and expenses"
-          and total["label_role"] == "totalLabel", str(total))
-    check("filed: values are exact and newest first",
-          [v["value"] for v in total["values"]] == [70_000_000, 60_000_000], str(total["values"]))
-    order = [l["element"] for l in face(r, "income_statement")["lines"] if not l.get("structure")]
-    check("filed: lines keep the company's order", order ==
-          ["us-gaap:Revenues", "us-gaap:CostOfRevenue", "t:FulfillmentExpense", "us-gaap:CostsAndExpenses",
-           "us-gaap:OperatingIncomeLoss"], str(order))
-    every = [c for s in r["statements"] for c in s["calculation_checks"]]
-    check("filed: every total ties", bool(every) and all(c["consistent"] for c in every), str(every))
-    vehicles = line(r, "balance_sheet", "t:LeasedAssetsNet")
-    check("filed: a face line tagged only under a member takes the member's value",
-          bool(vehicles.get("values_from_member"))
-          and [v["value"] for v in vehicles["values"]] == [5_000_000, 4_000_000], str(vehicles))
-    check("filed: the acceptance time is the header's, in UTC, and a feed that disagrees is flagged",
-          r["filing"]["acceptance"] == {"header_eastern": "20260702060102", "utc": "2026-07-02T10:01:02Z",
-                                        "submissions_feed": "2026-07-02T14:01:02.000Z", "agree": False},
-          str(r["filing"]["acceptance"]))
-    check("filed: the cover facts are read", r["document_facts"].get("DocumentType") == "10-K",
-          str(r["document_facts"]))
-    sec = sorted((s.get("trading_symbol"), s.get("title"), s.get("registrant_cik")) for s in r["registered_securities"])
-    check("filed: the cover's registered securities are read, a combined filer's with the registrant's CIK",
-          sec == [("TT", "Common Stock", None), ("TTB", "Mortgage Bonds due 2066", "2")], str(sec))
-    shares = sorted((c["share_class"], c["value"], c["date"]) for c in r["cover_shares"])
-    check("filed: the cover's shares outstanding are read per class",
-          shares == [("t:ClassAMember", 700, "2026-02-01"), ("t:ClassBMember", 300, "2026-02-01")], str(shares))
-    dei = "http://xbrl.sec.gov/dei/2025"
-    cls = lambda m: {"us-gaap:StatementClassOfStockAxis": m}
-    fact = lambda v, dims, unit="shares": {"namespace": dei, "local": "EntityCommonStockSharesOutstanding", "value": v,
-                                           "period": "2026-02-01", "dimensions": dims, "unit": unit}
-    rows = filed_statements.cover_shares({"facts": [fact(95, cls("t:ClassAMember")), fact(5, cls("t:ClassBMember")),
-                                                    fact(5, cls("t:ClassBMember"))]})
-    check("filed: a cover share fact tagged twice alike is one row",
-          sorted((c["share_class"], c["value"]) for c in rows) == [("t:ClassAMember", 95), ("t:ClassBMember", 5)], str(rows))
-    rows = filed_statements.cover_shares({"facts": [fact(95, cls("t:ClassAMember")), fact(5, cls("t:ClassBMember")),
-                                                    fact(6, cls("t:ClassBMember"))]})
-    b = [c for c in rows if c["share_class"] == "t:ClassBMember"]
-    check("filed: a cover share fact tagged twice with two values is one row with no value and both figures",
-          len(b) == 1 and b[0]["value"] is None and b[0]["conflicting_values"] == [5, 6], str(rows))
-    rows = filed_statements.cover_shares({"facts": [fact(129_563_390, cls("us-gaap:CommonStockMember")),
-                                                    fact(149_425, cls("us-gaap:PreferredStockMember"))]})
-    check("filed: a preferred class on the cover is kept as tagged, for the reader to classify",
-          sorted(c["share_class"] for c in rows) == ["us-gaap:CommonStockMember", "us-gaap:PreferredStockMember"], str(rows))
-    check("filed: every file read is named with its hash", all(s.get("sha256") for s in r["sources"])
-          and any(s["url"].endswith("t-20251231_pre.xml") for s in r["sources"]), str(r["sources"]))
-    check("filed: the result says it is the filer's data", r["data_kind"].startswith("filer data"))
+def arcs_between(result, parent, child):
+    return [a for a in nodes(result, "arc")
+            if a["attributes"].get(f"{XL}from") == parent and a["attributes"].get(f"{XL}to") == child]
 
-    r, _ = statements(filed(member_total=True))
-    check("filed: a member with its own total is a sub-statement, not the line's value",
-          not line(r, "balance_sheet", "t:LeasedAssetsNet")["values"])
-    bs = face(r, "balance_sheet")["calculation_checks"]
-    check("filed: then the gap is not checkable, not inconsistent",
-          bool(bs) and all(c["consistent"] is None for c in bs), str(bs))
 
-    # Mutations: a wrong figure must show.
-    r, _ = statements(filed(revenue=1000))
-    off = [c for c in face(r, "income_statement")["calculation_checks"] if c["consistent"] is False]
-    check("filed: a wrong figure (x10) breaks its total",
-          len(off) == 1 and off[0]["total"] == "us-gaap:OperatingIncomeLoss", str(off))
-    r, _ = statements(filed(duplicate=103))
-    check("filed: a figure tagged twice with two values is a conflict", len(r["conflicts"]) == 1, str(r["conflicts"]))
-    r, _ = statements(filed(duplicate=100))
-    check("filed: a figure tagged twice alike is one figure", not r["conflicts"]
-          and len(line(r, "income_statement", "us-gaap:Revenues")["values"]) == 2, str(r["conflicts"]))
-    r, _ = statements(filed(prohibit=True))
-    checks = face(r, "income_statement")["calculation_checks"]
-    check("filed: a prohibited arc removes the relationship", all(c["consistent"] for c in checks)
-          and not any("us-gaap:Cash" in c["missing"] for c in checks), str(checks))
-
-    r, _ = statements(filed(missing_child=True))
-    costs = [c for c in face(r, "income_statement")["calculation_checks"]
-             if c["total"] == "us-gaap:CostsAndExpenses" and c["period"] == "2025-01-01/2025-12-31"]
-    check("filed: a sum that agrees with a line missing is consistent but not complete",
-          len(costs) == 1 and costs[0]["consistent"] is True and costs[0]["complete"] is False
-          and costs[0]["missing"] == ["t:FulfillmentExpense"] and costs[0]["missing_in_every_column"] == [], str(costs))
-    r, _ = statements(filed())
-    every = [c for s in r["statements"] for c in s["calculation_checks"] if s["kind"] == "income_statement"]
-    check("filed: a sum with every line is complete", bool(every) and all(c["complete"] for c in every), str(every))
-    r, _ = statements(filed(duplicate=103))
-    cell = line(r, "income_statement", "us-gaap:Revenues")["values"][0]
-    check("filed: a conflicting figure carries the conflict on its cell", cell.get("conflict") == [100_000_000, 103_000_000],
-          str(cell))
-
-    # Opening and closing balances, per column.
-    r, code = statements(filed(cash_flow="us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"))
-    check("filed: a cash flow statement is read", code is None, code)
-    if code:
-        return
-    cf = face(r, "cash_flow")
-    check("filed: the cash flow statement's columns are its durations", cf["columns"] ==
-          ["2025-01-01/2025-12-31", "2024-01-01/2024-12-31"], str(cf["columns"]))
-    bounds = [(l["label_role"], [(v["period"][:4], v["instant"], v["value"]) for v in l["values"]])
-              for l in cf["lines"] if l.get("label_role", "").startswith("period")]
-    check("filed: the opening line holds each column's opening balance and the closing line its closing one",
-          bounds == [("periodStartLabel", [("2025", "2024-12-31", 8_000_000), ("2024", "2023-12-31", 7_000_000)]),
-                     ("periodEndLabel", [("2025", "2025-12-31", 10_000_000), ("2024", "2024-12-31", 8_000_000)])],
-          str(bounds))
-    rolls = cf["roll_forward_checks"]
-    check("filed: opening cash plus the change is closing cash, each year",
-          len(rolls) == 2 and all(x["consistent"] for x in rolls) and rolls[0]["exchange_rate_element"] is None,
-          str(rolls))
-    check("filed: cash of another scope than the balance sheet's is not tied to it",
-          all(x["closing_on_balance_sheet"] is None for x in rolls), str(rolls))
-    check("filed: the opening and closing lines are left out of the sum checks",
-          all(c["total"].endswith("IncludingExchangeRateEffect") for c in cf["calculation_checks"])
-          and all(c["consistent"] and c["complete"] for c in cf["calculation_checks"]), str(cf["calculation_checks"]))
-    r, _ = statements(filed(cash_flow="us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
-                            opening_2024=4))
-    off = [x for x in face(r, "cash_flow")["roll_forward_checks"] if x["consistent"] is False]
-    check("filed: a wrong opening balance breaks the roll-forward",
-          [x["period"] for x in off] == ["2024-01-01/2024-12-31"] and off[0]["difference"] == 3_000_000, str(off))
-    r, _ = statements(filed(cash_flow="us-gaap_Cash"))
-    rolls = face(r, "cash_flow")["roll_forward_checks"]
-    check("filed: closing cash the balance sheet shows is tied to it",
-          len(rolls) == 2 and all(x["consistent"] and x["closing_on_balance_sheet"] is True for x in rolls), str(rolls))
-
+def instance_cases():
     # Replaced in 1.0 (step 4): the `facts` parameter of get_filed_statements and its `requested_facts` are
     # gone (they chose whole-company values, split member values out and turned element identities into
     # prefixed names). get_filing_xbrl part="instance" with `concepts` returns the facts as written instead.
     r, code = xbrl_call(filed(), part="instance", concepts=["us-gaap:Cash", "LeasedAssetsNet", "us-gaap:Nothing"])
-    facts = [i for i in (r or {}).get("items", []) if i["node"] == "fact"]
+    facts = nodes(r, "fact")
     check("xbrl: a concept asked for by name returns its facts with the text as written",
           code is None and [(f["contextRef"], f["text"]) for f in facts if f["concept"]["local_name"] == "Cash"]
           == [("I25", "10000000"), ("I24", "8000000")], code or str(facts)[:200])
@@ -857,16 +709,22 @@ def filed_cases():
     listed = f"{US_GAAP}#OtherLiabilitiesNoncurrent http://t.example/2025#LeaseLiabilities"
     r, code = xbrl_call(filed(lease_list=listed), part="instance",
                         concepts=["us-gaap:OperatingLeaseLiabilityNoncurrentStatementOfFinancialPositionExtensibleList"])
-    facts = [i for i in (r or {}).get("items", []) if i["node"] == "fact"]
+    facts = nodes(r, "fact")
     check("xbrl: a text fact tagged twice is returned twice, as written, with no names derived from it",
           code is None and [f["text"] for f in facts] == [listed, listed] and all("elements" not in f for f in facts),
           code or str(facts)[:200])
     r, code = xbrl_call(filed(duplicate=95), part="instance", concepts=["us-gaap:Revenues"])
-    d25 = [f["text"] for f in (r or {}).get("items", []) if f["node"] == "fact" and f["contextRef"] == "D25"]
+    d25 = [f["text"] for f in nodes(r, "fact") if f["contextRef"] == "D25"]
     check("xbrl: conflicting duplicates are both returned, none chosen", d25 == ["100000000", "95000000"],
+          code or str(d25))
+    r, code = xbrl_call(filed(duplicate=100), part="instance", concepts=["us-gaap:Revenues"])
+    d25 = [f["text"] for f in nodes(r, "fact") if f["contextRef"] == "D25"]
+    check("xbrl: identical duplicates are both returned, none merged", d25 == ["100000000", "100000000"],
           code or str(d25))
     _, code = xbrl_call(filed(), part="instance", concepts=["not a name"])
     check("xbrl: a malformed concept name is INVALID_INPUT", code == "INVALID_INPUT", code)
+    _, code = xbrl_call(filed(), part="schema", concepts=["us-gaap:Cash"])
+    check("xbrl: `concepts` with another part than the instance is INVALID_INPUT", code == "INVALID_INPUT", code)
     r, code = xbrl_call(filed(inline=False))
     check("xbrl: without a doctype entry, the one <name>-<YYYYMMDD>.xml in InputFiles is the instance",
           code is None and r["files"]["instance"]["name"] == "t-20251231.xml"
@@ -874,36 +732,144 @@ def filed_cases():
     check("xbrl: the header acceptance time is returned as written",
           r["acceptance"]["header_acceptance_datetime"] == "20260702060102"
           and r["acceptance"]["submissions_acceptanceDateTime"] == "2026-07-02T14:01:02.000Z", str(r["acceptance"]))
+    r, _ = xbrl_call(filed(header="20260115093000"))
+    check("xbrl: the header's Eastern time is also given in UTC, winter time as standard time",
+          r["acceptance"]["header_utc"] == "2026-01-15T14:30:00Z", str(r["acceptance"]))
 
-    r, code = statements(filed(calc11=True))
-    check("filed: Calculation 1.1 arcs are read", code is None and r["calculation_versions"] == ["1.1"]
-          and bool(face(r, "income_statement")["calculation_checks"]), code or str(r["calculation_versions"]))
-    r, code = statements(filed(embedded=True))
-    check("filed: linkbases inside the schema are read", code is None and
-          line(r, "income_statement", "t:FulfillmentExpense")["calculation_parent"] == "us-gaap:CostsAndExpenses",
-          code)
-    r, code = statements(filed(inline=False))
-    check("filed: an instance from before inline XBRL is read", code is None and not r["filing"]["inline_xbrl"]
-          and bool(line(r, "income_statement", "us-gaap:Revenues")["values"]), code)
-    r, code = statements(filed(summary_menu=False))
-    check("filed: without the summary's menu the schema's role category decides",
-          code is None and len([s for s in r["statements"] if not s["parenthetical"]]) == 2, code)
-    r, _ = statements(filed(header="20260115093000"))
-    check("filed: winter acceptance is Eastern standard time",
-          r["filing"]["acceptance"]["utc"] == "2026-01-15T14:30:00Z", str(r["filing"]["acceptance"]))
 
-    _, code = statements(filed(), as_of="2026-07-02T09:00:00Z")
-    check("filed: as_of with a time leaves out a filing accepted later", code == "NOT_FOUND", code)
-    _, code = statements(filed(), as_of="2026-07-02T10:30:00Z")
-    check("filed: as_of with a time keeps a filing accepted before", code is None, code)
-    _, code = statements({})
-    check("filed: a filing without XBRL is UNSUPPORTED_DOCUMENT", code == "UNSUPPORTED_DOCUMENT", code)
-    _, code = statements(filed(), accession_number="12-34")
-    check("filed: a malformed accession number is INVALID_INPUT", code == "INVALID_INPUT", code)
+def xbrl_link_cases():
+    # Replaced in 1.0 (step 5): get_filed_statements is gone. Its tests asserted statement kinds from the
+    # FilingSummary menu and role titles, parenthetical flags, chosen English labels, values promoted from
+    # members, opening and closing balances reassigned per column, calculation and roll-forward checks,
+    # prohibited arcs applied, and the reshaped cover (document_facts, registered_securities, cover_shares).
+    # get_filing_xbrl returns the schema and every linkbase as written instead; these tests say so.
+    r, code = xbrl_call(filed(), part="schema")
+    check("xbrl schema: the company schema is read", code is None, code)
+    if code:
+        return
+    elements = {i["name"]: i for i in nodes(r, "element")}
+    own = elements.get("FulfillmentExpense", {})
+    check("xbrl schema: an own element keeps every declared attribute as written",
+          own.get("attributes", {}).get(f"{XBRLI}balance") == "debit"
+          and own["attributes"].get(f"{XBRLI}periodType") == "duration" and own["attributes"].get("abstract") == "false"
+          and own["namespace"] == "http://t.example/2025" and own["id"] == "t_FulfillmentExpense", str(own))
+    check("xbrl schema: an element's type is resolved where it is written",
+          own["type"] == {"qname": "xbrli:monetaryItemType", "resolved": True,
+                          "namespace": "http://www.xbrl.org/2003/instance", "local_name": "monetaryItemType"},
+          str(own.get("type")))
+    vehicles = elements.get("VehiclesMember", {})
+    check("xbrl schema: a type whose prefix the schema does not declare is unresolved, not guessed",
+          vehicles.get("type", {}).get("resolved") is False
+          and any(u.get("element") == "VehiclesMember" for u in r["unresolved"]), str(r["unresolved"]))
+    roles = [(i["attributes"]["roleURI"], i["definition"]) for i in nodes(r, "roleType")]
+    check("xbrl schema: role definitions are returned as written, a parenthetical title included, none classified",
+          ("http://t.example/role/BalanceParenthetical",
+           "0000004 - Statement - CONSOLIDATED BALANCE SHEETS (Parenthetical)") in roles
+          and all("kind" not in i and "parenthetical" not in i for i in r["items"]), str(roles))
+    check("xbrl schema: usedOn is a resolved QName", nodes(r, "roleType")[0]["usedOn"][0]["local_name"]
+          == "presentationLink", str(nodes(r, "roleType")[0]))
+    check("xbrl schema: the linkbase references are in document order",
+          [i["href"] for i in nodes(r, "linkbaseRef")]
+          == ["t-20251231_pre.xml", "t-20251231_cal.xml", "t-20251231_lab.xml", "t-20251231_def.xml"],
+          str(nodes(r, "linkbaseRef")))
+
+    r, code = xbrl_call(filed(), part="presentation")
+    check("xbrl presentation: read from the referenced linkbase", code is None
+          and [(f["name"], f["read"], f["extended_links"]) for f in r["linkbases"]] ==
+          [("t-20251231_pre.xml", True, 4), ("t-20251231_cal.xml", True, 0), ("t-20251231_lab.xml", True, 0),
+           ("t-20251231_def.xml", True, 0)], code or str(r["linkbases"]))
+    links = [i["attributes"][f"{XL}role"] for i in nodes(r, "extendedLink")]
+    check("xbrl presentation: every extended link in document order, the parenthetical one as any other",
+          links == ["http://t.example/role/Income", "http://t.example/role/Balance",
+                    "http://t.example/role/BalanceParenthetical", "http://t.example/role/Policies"], str(links))
+    total = arcs_between(r, "us-gaap_CostsAndExpensesAbstract", "us-gaap_CostsAndExpenses")
+    check("xbrl presentation: an arc keeps order and preferredLabel as written",
+          len(total) == 1 and total[0]["attributes"]["order"] == "3"
+          and total[0]["attributes"]["preferredLabel"] == "http://www.xbrl.org/2003/role/totalLabel", str(total))
+    own = [l for l in nodes(r, "loc") if l["href"] == "t-20251231.xsd#t_FulfillmentExpense"]
+    check("xbrl presentation: a locator into the company schema resolves to its element",
+          own and own[0]["target"] == {"resolved": True, "namespace": "http://t.example/2025",
+                                       "local_name": "FulfillmentExpense", "schema_seq": own[0]["target"]["schema_seq"]},
+          str(own))
+    gaap = [l for l in nodes(r, "loc") if l["href"].endswith("#us-gaap_Revenues")]
+    check("xbrl presentation: a locator into a schema outside the filing is unresolved, href and fragment kept",
+          gaap and all(l["target"]["resolved"] is False and l["target"]["fragment"] == "us-gaap_Revenues"
+                       for l in gaap), str(gaap))
+    external = [u for u in r["unresolved"] if u.get("schema", "").endswith("us-gaap-2024.xsd")]
+    check("xbrl presentation: the outside schema is counted once in `unresolved`",
+          len(external) == 1 and external[0]["locators"] == len([l for l in nodes(r, "loc")
+                                                                 if "us-gaap-2024.xsd" in l["href"]]), str(external))
+    check("xbrl presentation: no calculation or label item comes with it",
+          {i["node"] for i in r["items"]} <= {"roleRef", "arcroleRef", "extendedLink", "loc", "arc"}
+          and all(i["file"] == "t-20251231_pre.xml" for i in r["items"]), str({i["file"] for i in r["items"]}))
+    check("xbrl presentation: every file read is named with its hash",
+          all(s.get("sha256") for s in r["sources"] if s["url"].startswith(FOLDER_URL))
+          and any(s["url"].endswith("t-20251231_pre.xml") for s in r["sources"]), str(r["sources"]))
+
+    r, _ = xbrl_call(filed(cash_flow="us-gaap_Cash"), part="presentation")
+    twice = arcs_between(r, "us-gaap_StatementOfCashFlowsAbstract", "us-gaap_Cash")
+    check("xbrl presentation: two arcs to one element are two items, labels as written, no balance reassigned",
+          [a["attributes"]["preferredLabel"].rsplit("/", 1)[1] for a in twice] == ["periodStartLabel", "periodEndLabel"]
+          and all("columns" not in i and "values" not in i for i in r["items"]), str(twice))
+
+    r, code = xbrl_call(filed(prohibit=True), part="calculation")
+    wrong = arcs_between(r, "us-gaap_OperatingIncomeLoss", "us-gaap_Cash")
+    check("xbrl calculation: a prohibiting arc and the arc it prohibits are both returned, nothing applied",
+          code is None and len(wrong) == 2 and wrong[1]["attributes"].get("use") == "prohibited"
+          and wrong[1]["attributes"].get("priority") == "1" and "use" not in wrong[0]["attributes"], code or str(wrong))
+    weights = [a["attributes"]["weight"] for a in arcs_between(r, "us-gaap_OperatingIncomeLoss", "us-gaap_CostsAndExpenses")]
+    check("xbrl calculation: weights as written", weights == ["-1"], str(weights))
+    check("xbrl calculation: no check is computed", all("consistent" not in i for i in r["items"])
+          and "calculation_checks" not in r)
+    r, _ = xbrl_call(filed(calc11=True), part="calculation")
+    arcroles = {a["attributes"][f"{XL}arcrole"] for a in nodes(r, "arc")}
+    check("xbrl calculation: a Calculation 1.1 arcrole is returned as written",
+          arcroles == {"https://xbrl.org/2023/arcrole/summation-item"}, str(arcroles))
+
+    r, _ = xbrl_call(filed(), part="definition")
+    special = arcs_between(r, "us-gaap_CostsAndExpenses", "t_FulfillmentExpense")
+    check("xbrl definition: every definition arc is returned, whatever its arcrole",
+          len(special) == 1 and special[0]["attributes"][f"{XL}arcrole"].endswith("general-special"), str(special))
+
+    folder = filed()
+    folder["t-20251231_lab.xml"] = folder["t-20251231_lab.xml"].replace(
+        b"</link:labelLink>",
+        b'<link:label xlink:type="resource" xlink:label="l0" xml:lang="fr" '
+        b'xlink:role="http://www.xbrl.org/2003/role/label">Ventes nettes</link:label></link:labelLink>')
+    r, code = xbrl_call(folder, part="label")
+    labels = nodes(r, "resource")
+    check("xbrl label: every label in every language and role, in document order, none preferred",
+          code is None and [(x["attributes"]["{http://www.w3.org/XML/1998/namespace}lang"], x["text"])
+                            for x in labels if x["attributes"][f"{XL}label"] == "l0"]
+          == [("en-US", "Net sales"), ("fr", "Ventes nettes")], code or str(labels)[:300])
+    roles = {x["attributes"][f"{XL}role"].rsplit("/", 1)[1] for x in labels}
+    check("xbrl label: label roles as written", roles == {"label", "totalLabel", "documentation"}, str(roles))
+    check("xbrl label: no label chosen or attached to a concept", all("label" not in i for i in r["items"]))
+
+    r, code = xbrl_call(filed(embedded=True), part="calculation")
+    check("xbrl calculation: linkbases written inside the schema are read",
+          code is None and r["linkbases"][1]["embedded_in"] == "t-20251231.xsd"
+          and len(arcs_between(r, "us-gaap_CostsAndExpenses", "t_FulfillmentExpense")) == 1, code or str(r["linkbases"]))
+    r, code = xbrl_call(filed(), part="reference")
+    check("xbrl reference: a filing without reference links returns no items", code is None and r["items"] == []
+          and r["page"]["total"] == 0, code or str(r["page"]))
+
+    folder = filed()
+    del folder["t-20251231_def.xml"]
+    r, code = xbrl_call(folder, part="definition")
+    check("xbrl definition: a referenced linkbase the filing lacks is unresolved, the others still read",
+          code is None and [f["read"] for f in r["linkbases"]] == [True, True, True, False]
+          and any(u.get("href") == "t-20251231_def.xml" for u in r["unresolved"]), code or str(r["linkbases"]))
     broken = filed()
     broken["t-20251231_pre.xml"] = b"<link:linkbase"
-    _, code = statements(broken)
-    check("filed: an unreadable linkbase is UNSUPPORTED_DOCUMENT", code == "UNSUPPORTED_DOCUMENT", code)
+    _, code = xbrl_call(broken, part="presentation")
+    check("xbrl presentation: an unreadable linkbase is UNSUPPORTED_DOCUMENT", code == "UNSUPPORTED_DOCUMENT", code)
+    _, code = xbrl_call({}, part="schema")
+    check("xbrl schema: a filing without XBRL is UNSUPPORTED_DOCUMENT", code == "UNSUPPORTED_DOCUMENT", code)
+    _, code = xbrl_call(filed(), part="schema", accession_number="12-34")
+    check("xbrl schema: a malformed accession number is INVALID_INPUT", code == "INVALID_INPUT", code)
+    _, code = xbrl_call(filed(), part="balance_sheet")
+    check("xbrl: an unknown part is INVALID_INPUT", code == "INVALID_INPUT", code)
 
 
 def text_cases():
@@ -1042,7 +1008,8 @@ if __name__ == "__main__":
     lookup_cases()
     history_cases()
     segment_cases()
-    filed_cases()
+    instance_cases()
+    xbrl_link_cases()
     text_cases()
     index_cases()
     path_cases()

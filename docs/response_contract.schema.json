@@ -161,7 +161,17 @@
     "allOf": [{"if": {"properties": {"part": {"const": "instance"}}},
                "then": {"required": ["file", "namespaces", "page", "items"]}},
               {"if": {"properties": {"part": {"const": "summary"}}},
-               "then": {"required": ["acceptance", "files", "filing_summary"]}}]}]
+               "then": {"required": ["acceptance", "files", "filing_summary"]}},
+              {"if": {"properties": {"part": {"const": "schema"}}},
+               "then": {"required": ["file", "target_namespace", "namespaces", "page", "items"]}},
+              {"if": {"properties": {"part": {"enum": ["presentation", "calculation", "definition", "label",
+                                                       "reference"]}}},
+               "then": {"required": ["file", "linkbases", "extended_link_element", "page", "items"],
+                        "properties": {"linkbases": {"type": "array", "items": {
+                                           "type": "object", "required": ["seq", "read"]}},
+                                       "items": {"items": {"properties": {
+                                           "node": {"enum": ["roleRef", "arcroleRef", "extendedLink", "loc",
+                                                             "arc", "resource", "other"]}}}}}}}]}]
   }
  }
 }

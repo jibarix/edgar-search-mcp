@@ -193,24 +193,48 @@ The XBRL files of one filing, one `part` at a time:
   filing header states it, the files read and how each was found, and the
   SEC's `FilingSummary.xml` as an element tree (every report with its `Role`,
   `LongName`, `MenuCategory`, `HtmlFileName` and `Position` as written).
-- `schema`: the company schema's declarations in document order: elements with
-  every attribute (`name`, `id`, `type`, `substitutionGroup`, `abstract`,
-  `nillable`, `xbrli:periodType`, `xbrli:balance`, ...), role types with their
-  `definition` and `usedOn`, arcrole types, imports and linkbase references.
-  Namespaces whose declarations are outside the filing are listed in
-  `unresolved`.
+- `schema`: the company schema's declarations in document order, each by its
+  XML construct (`import`, `include`, `linkbaseRef`, `roleType`,
+  `arcroleType`, `element`, `linkbase` for one written inside the schema,
+  `other` as XML): elements with every attribute (`name`, `id`, `type`,
+  `substitutionGroup`, `abstract`, `nillable`, `xbrli:periodType`,
+  `xbrli:balance`, ...) and `type` and `substitutionGroup` resolved as QNames;
+  role and arcrole types with their `definition` as written and `usedOn`.
+  `target_namespace` and `namespaces` are the schema's. Imported schemas
+  outside the filing, a QName that does not resolve and an id two elements
+  share are listed in `unresolved`.
 - `presentation`, `calculation`, `definition`, `label`, `reference`: every
-  extended link of that kind, flattened to its locators, resources and arcs in
-  document order. Each keeps every attribute (`xlink:role`, `xlink:arcrole`,
-  `order`, `weight`, `priority`, `use`, `preferredLabel`, `xml:lang`, ...).
-  Prohibited arcs, repeated arcs and several parents of one concept are all
-  returned. Label resources keep their language, role and text; no language is
-  preferred and no label is invented.
+  extended link of that element (`extended_link_element`, for instance
+  `{http://www.xbrl.org/2003/linkbase}calculationLink`) in every linkbase the
+  schema references inside the filing or contains, in the schema's order.
+  `linkbases` lists each with `seq`, `href`, `url`, `name`, `read`, its
+  namespaces and how many extended links of this kind it holds (or, for one
+  inside the schema, `embedded_in`); one the filing lacks is `read: false`
+  and unresolved. Items are flattened in document order: the linkbase's
+  `roleRef` and `arcroleRef` (only from a linkbase holding a link of this
+  kind), each `extendedLink`, then its children by `xlink:type`: `loc` (with
+  `href` as written), `arc`, `resource` (with `text`, and `xml` when it holds
+  markup) or `other` (as XML). Each child has `file` and `link_seq`, the
+  `seq` of its extended link. Every attribute is kept (`xlink:role`,
+  `xlink:arcrole`, `order`, `weight`, `priority`, `use`, `preferredLabel`,
+  `xml:lang`, ...). Prohibited and overriding arcs, repeated arcs, equal
+  orders and several parents of one concept are all returned as written;
+  nothing is applied, combined or sorted. Label resources keep their
+  language, role and text; no language is preferred and no label is
+  invented. A locator's `target` is the company-schema element whose `id`
+  its href fragment names (`namespace`, `local_name`, `schema_seq`); a
+  locator into a schema outside the filing (the US GAAP taxonomy, say) is
+  `resolved: false` with `schema` and `fragment`, and each such schema is
+  listed once in `unresolved` with its count of locators. The fragment is
+  the schema's own element id, which the filer and the taxonomy write;
+  this server does not read external taxonomies, so it does not turn a
+  fragment into a concept name. An extended link of an element no part
+  returns (a generic link, say) is listed in `unresolved`.
 - `instance`: the instance in document order: contexts (entity identifier and
   scheme, period as written, explicit members, typed members as XML), units
   (measures, divide) and facts (concept as namespace URI plus local name,
-  `contextRef`, `unitRef`, `decimals`, `precision`, `nil`, the text exactly as
-  written). Duplicates are all returned; none is chosen.
+  `contextRef`, `unitRef`, `decimals`, `precision`, `nil` as written in
+  `xsi:nil`, the text exactly as written). Duplicates are all returned; none is chosen.
 
 `concepts` (with `part="instance"`) keeps only facts of the named concepts and
 the contexts and units they use. A name is `prefix:local` (prefix resolved

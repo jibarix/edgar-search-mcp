@@ -8,9 +8,8 @@ Tools:
     list_filings         - filings with accession number, dates and document URL
     list_filing_documents - every document of one filing: main document, exhibits, data files
     get_filing_text      - plain text of a filing document (main document or exhibit), in pages
-    get_filed_statements - the primary statements of one filing as filed: lines, labels, own elements, calculations
     get_segment_revenue  - revenue by business segment, product and geography from the annual report's XBRL data
-    get_filing_xbrl      - one filing's XBRL files as written, one part at a time (summary, instance)
+    get_filing_xbrl      - one filing's XBRL files as written, one part at a time
     search_filings       - filings whose text contains given words (SEC full-text search)
     search_companies     - filter the local SIC/country index (discovery only)
 
@@ -31,7 +30,7 @@ import threading
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 from typing import Literal
-from urllib.parse import parse_qs, quote, urlsplit
+from urllib.parse import parse_qs, quote, urljoin, urlsplit
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -39,7 +38,6 @@ from mcp_types import ToolAnnotations
 
 from edgar_mcp import __version__
 from edgar_mcp.contract import envelope, source, source_of_response
-from edgar_mcp.edgar import filed_statements as fs
 from edgar_mcp.edgar import xbrl_source as xs
 from edgar_mcp.edgar.company_lookup import find_company, format_cik, get_company_tickers
 from edgar_mcp.edgar.filing_retrieval import FilingRetrieval
@@ -546,9 +544,7 @@ def _segment_facts(raw: bytes, document: str) -> list:
     return facts
 
 
-_FILED_FORMS = ("10-K", "10-Q", "20-F", "40-F", "10-K/A", "10-Q/A", "20-F/A", "40-F/A")
 _ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")
-_AS_OF_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 _HEADER_ACCEPTED = re.compile(r"<ACCEPTANCE-DATETIME>\s*(\d{14})")
 
 
@@ -565,169 +561,6 @@ def _eastern_to_utc(stamp: str) -> str:
 
     offset = 4 if sunday(3, 2) <= local < sunday(11, 1) else 5
     return (local + timedelta(hours=offset)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _acceptance(cik: str, filing: dict) -> dict:
-    """When the SEC accepted a filing: the header's Eastern time, that time in
-    UTC, and the submissions feed's value. The feed's value can disagree with
-    the header, so both are kept; `utc` is the header's, else the feed's."""
-    feed = filing.get("acceptance_datetime") or None
-    url = (f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{filing['accession_number'].replace('-', '')}/"
-           f"{filing['accession_number']}-index-headers.html")
-    header = None
-    try:
-        m = _HEADER_ACCEPTED.search(fetch_response(url, max_bytes=_MAX_DOCUMENT_BYTES).body.decode("latin-1"))
-        header = m.group(1) if m else None
-    except SecNotFound:
-        pass
-    utc = _eastern_to_utc(header) if header else (feed[:19] + "Z" if feed else None)
-    return {"header_eastern": header, "utc": utc, "submissions_feed": feed,
-            "agree": None if not (header and feed) else utc[:19] == feed[:19]}
-
-
-@_tool
-def get_filed_statements(
-    cik_or_ticker: str,
-    form: Literal["10-K", "10-Q", "20-F", "40-F", "10-K/A", "10-Q/A", "20-F/A", "40-F/A"] = "10-K",
-    accession_number: str | None = None,
-    as_of: str | None = None,
-) -> dict:
-    """The primary financial statements of one filing, as the company filed them.
-
-    Read from the XBRL files inside the filing, not from Company Facts: each
-    statement the company's schema names as a statement, with its lines in
-    the company's order and nesting, the company's own labels, and the
-    element behind each line, a standard one or one the company defined
-    (`extension`: true). The company's own elements carry their definition
-    (type, period type, debit or credit, documentation) and any definition
-    links the company gave them. `calculation_parent` and `weight` say which
-    total a line adds into, as the company's calculation linkbase states.
-
-    This is the company's data, not a standard layout: no line is mapped to a
-    category here. `values` are the whole-company figures for the statement's
-    `columns`, exactly as tagged (signs as the element defines them, not as
-    printed; a label whose `label_role` is "negatedLabel" is printed with the
-    opposite sign). `by_member` holds figures split along an axis the statement
-    itself shows (equity components, share classes). `calculation_checks`
-    compares each total with the weighted sum of its lines per column, within
-    the rounding the figures allow; `complete` is false when a line that adds
-    into the total has no value. `conflicts` lists any figure tagged twice with
-    different values, and the cell itself carries them (`conflict`).
-
-    A line with a period-start or period-end label (opening and closing cash,
-    equity at the start and end of the year) has one value per duration column,
-    the balance at the column's start or end (`instant`; an opening on 1 January
-    is the balance of 31 December). `roll_forward_checks` adds the change for
-    the period to the opening balance and compares it with the closing one, and
-    says whether the balance sheet shows the same element at that date.
-
-    The filing is the latest `form` on file, or `accession_number` (of this
-    company). `as_of`, YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ, leaves out filings
-    filed (or accepted by the SEC) after it.
-    """
-    if as_of is not None and not _AS_OF_TIME.fullmatch(as_of):
-        iso_date(as_of)
-    if accession_number is not None and not _ACCESSION.fullmatch(accession_number):
-        raise ValueError(f"accession_number must look like 0000320193-24-000123, got {accession_number!r}")
-    company = _resolve(cik_or_ticker)
-    cutoff = as_of[:10] if as_of else None
-    if accession_number:
-        rows, _, _ = _filings.get_filing_metadata(company["cik"], filing_type="ALL", limit=100_000, strict=True)
-        rows = [r for r in rows if r["accession_number"] == accession_number]
-        if not rows:
-            raise ToolError(f"NOT_FOUND: {accession_number} is not a filing of CIK {company['cik']}")
-        if cutoff and rows[0]["filing_date"] > cutoff:
-            raise ToolError(f"NOT_FOUND: {accession_number} was filed after {as_of}")
-    else:
-        rows, _, _ = _filings.get_filing_metadata(company["cik"], filing_type=form, end_date=cutoff, limit=10,
-                                                  strict=True)
-        rows = [r for r in rows if r["form"].upper() == form]
-        if not rows:
-            raise ToolError(f"NOT_FOUND: no {form} on file for CIK {company['cik']}"
-                            + (f" as of {as_of}" if as_of else ""))
-    if as_of and len(as_of) > 10:
-        # By the acceptance time in the filing's own header, read for each candidate, newest first.
-        for row in rows:
-            row["acceptance"] = _acceptance(company["cik"], row)
-        rows = [r for r in rows if (r["acceptance"]["utc"] or r["filing_date"]) <= as_of]
-        if not rows:
-            raise ToolError(f"NOT_FOUND: no {form} of CIK {company['cik']} was accepted by {as_of}")
-    filing = rows[0]
-    acceptance = filing.get("acceptance") or _acceptance(company["cik"], filing)
-    folder = f"https://www.sec.gov/Archives/edgar/data/{int(company['cik'])}/{filing['accession_number'].replace('-', '')}/"
-
-    sources = []
-
-    def read(name):
-        answer = fetch_response(folder + name, max_bytes=_MAX_DOCUMENT_BYTES)
-        sources.append({"file": name, "url": folder + name, "sha256": hashlib.sha256(answer.body).hexdigest(),
-                        "retrieved_at": answer.retrieved_at, "frozen": answer.frozen})
-        return answer.body
-
-    try:
-        summary = read("FilingSummary.xml")
-    except SecNotFound:
-        raise ToolError(f"UNSUPPORTED_DOCUMENT: {filing['accession_number']} has no XBRL financial data "
-                        "(no FilingSummary.xml in its folder)") from None
-    try:
-        files = fs.input_files(summary)
-        if not (files["instance"] and files["schema"]):
-            listing, meta = get_json(folder + "index.json")
-            sources.append({"file": "index.json", "url": folder + "index.json", "retrieved_at": meta["retrieved_at"],
-                            "frozen": meta["frozen"]})
-            files = fs.files_from_folder([i.get("name", "") for i in listing.get("directory", {}).get("item", [])],
-                                         files)
-        missing = [k for k in ("instance", "schema") if not files[k]]
-        if missing:
-            raise ToolError(f"UNSUPPORTED_DOCUMENT: {filing['accession_number']} lacks its XBRL {', '.join(missing)}")
-        schema_raw = read(files["schema"])
-        schema = fs.read_schema(schema_raw)
-
-        # Each linkbase is a file the summary lists, else one the schema names, else inside the schema.
-        def linkbase(kind):
-            name = files[kind] or schema["linkbase_refs"].get(kind)
-            if name:
-                return read(name)
-            return schema_raw if kind in schema["embedded"] else None
-
-        pre = linkbase("presentation")
-        if pre is None:
-            raise ToolError(f"UNSUPPORTED_DOCUMENT: {filing['accession_number']} has no presentation linkbase")
-        presentation = fs.read_presentation(pre)
-        calculation, versions = fs.read_calculation(linkbase("calculation"))
-        labels = fs.read_labels(linkbase("label"))
-        definition = fs.read_definition(linkbase("definition"))
-        instance = fs.read_instance(read(files["instance"]))
-        statements, conflicts = fs.build_statements(schema, presentation, calculation, labels, definition,
-                                                    instance, files["reports"])
-    except fs.FilingDataError as e:
-        raise ToolError(f"UNSUPPORTED_DOCUMENT: {filing['accession_number']}: {e}") from e
-    if not statements:
-        raise ToolError(f"NOT_FOUND: the schema of {filing['accession_number']} names no statement roles")
-    for s in statements:
-        page = files["reports"].get(s["role"], {}).get("page")
-        s["report_page"] = page and folder + page
-    entities = sorted({f["entity"] for f in instance["facts"]})
-    return {
-        "cik": company["cik"],
-        "matched_on": company["matched_on"],
-        "as_of": as_of,
-        "data_kind": "filer data: the company's statements as filed, not mapped to any standard layout",
-        "filing": {"accession_number": filing["accession_number"], "form": filing["form"],
-                   "filing_date": filing["filing_date"], "acceptance": acceptance,
-                   "reporting_date": filing["reporting_date"], "document": files["document"] and folder + files["document"],
-                   "inline_xbrl": files["inline"]},
-        "document_facts": fs.document_facts(instance),
-        "registered_securities": fs.registered_securities(instance),
-        "cover_shares": fs.cover_shares(instance),
-        "company_namespace": schema["namespace"],
-        "calculation_versions": sorted(versions),
-        "entities": entities,
-        "statements": statements,
-        "conflicts": conflicts,
-        "sources": sources,
-        "returned_at": _now(),
-    }
 
 
 # ── get_filing_xbrl ─────────────────────────────────────────────────────────
@@ -896,10 +729,22 @@ def get_filing_xbrl(
     - "summary": the submissions row, the acceptance time as the filing header
       states it, the instance and schema files and how each was found, and the
       SEC's FilingSummary.xml as an element tree.
+    - "schema": the company schema's declarations in document order: imports,
+      linkbase references, role and arcrole types (definition and usedOn as
+      written) and elements with every attribute. Imported schemas outside
+      the filing are listed in `unresolved`.
+    - "presentation", "calculation", "definition", "label", "reference": the
+      extended links of that element in every linkbase the schema references
+      or contains, flattened in document order to locators, arcs and
+      resources. Every attribute is kept (order, weight, priority,
+      use="prohibited", preferredLabel, xml:lang, ...); no arc is combined,
+      overridden or dropped, and no label or language is preferred. A
+      locator's `target` is the company-schema element its href names, or
+      unresolved with the reason (a schema outside the filing, say).
     - "instance": the instance in document order: contexts (entity identifier
       and scheme, period as written, explicit members, typed members as XML),
       units and facts (concept as namespace URI and local name, contextRef,
-      unitRef, decimals, precision, nil, the text as written). Every
+      unitRef, decimals, precision, xsi:nil, the text as written). Every
       duplicate is returned; none is chosen.
 
     `concepts` (with "instance", up to 50) keeps the facts of the named
@@ -963,16 +808,112 @@ def get_filing_xbrl(
             items, matches, missing = xs.select_concepts(instance, concepts)
             unresolved += missing
             extra["concept_matches"] = matches
-        page = items[offset:offset + limit]
         declarations = instance["declarations"]
         return envelope("parsed_source", sources, **common, file=entry, namespaces=instance["namespaces"],
                         namespace_declarations=declarations if any(d["seq"] for d in declarations) else None,
-                        **extra,
-                        page={"total": len(items), "offset": offset, "count": len(page),
-                              "next_offset": offset + limit if len(items) > offset + limit else None},
-                        items=page, unresolved=unresolved)
+                        **extra, **_page(items, offset, limit), unresolved=unresolved)
 
-    raise ValueError(f"part {part!r} is not available in this build yet")
+    schema_entry = files["schema"]
+    if not schema_entry["resolved"]:
+        raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: the company schema is unresolved: "
+                        f"{schema_entry['reason']} (candidates: {schema_entry['candidates']})")
+    try:
+        schema = xs.read_schema(_archive(schema_entry["url"], sources), schema_entry["name"])
+    except xs.FilingDataError as e:
+        raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {e}") from e
+    unresolved += schema["unresolved"]
+
+    if part == "schema":
+        for item in schema["items"]:
+            if item["node"] == "import":
+                location = item["attributes"].get("schemaLocation") or ""
+                if not urljoin(schema_entry["url"], location).startswith(folder):
+                    unresolved.append({"seq": item["seq"], "namespace": item["attributes"].get("namespace"),
+                                       "schemaLocation": location or None,
+                                       "reason": "the imported schema is outside the filing; its declarations "
+                                                 "are not read"})
+        items = schema["items"]
+        return envelope("parsed_source", sources, **common, file=schema_entry,
+                        target_namespace=schema["target_namespace"], namespaces=schema["namespaces"],
+                        **_page(items, offset, limit), unresolved=unresolved)
+
+    # A linkbase part: every linkbase the schema references inside the filing, and every one written in it,
+    # in the schema's document order; the extended links of this part's element are returned.
+    linkbase_files, items, external = [], [], {}
+
+    def target_of(base_url):
+        def resolve(href):
+            if not href:
+                return {"resolved": False, "reason": "the locator has no href"}
+            url, _, fragment = urljoin(base_url, href).partition("#")
+            if url != schema_entry["url"]:
+                if url.startswith(folder):
+                    return {"resolved": False, "schema": url, "fragment": fragment,
+                            "reason": "the href points to a file of the filing other than the company schema"}
+                external[url] = external.get(url, 0) + 1
+                return {"resolved": False, "schema": url, "fragment": fragment,
+                        "reason": "the schema is outside the filing"}
+            concept = schema["ids"].get(fragment)
+            if concept is None:
+                return {"resolved": False, "schema": url, "fragment": fragment,
+                        "reason": "no element of the company schema has this id"}
+            return {"resolved": True, "namespace": concept["namespace"], "local_name": concept["local_name"],
+                    "schema_seq": concept["seq"]}
+        return resolve
+
+    embedded = iter(schema["linkbases"])
+    for item in schema["items"]:
+        if item["node"] == "linkbase":
+            element = next(embedded)
+            found, missing = xs.read_linkbase(schema["doc"], element, schema_entry["name"], part,
+                                              target_of(schema_entry["url"]))
+            linkbase_files.append({"seq": item["seq"], "embedded_in": schema_entry["name"], "read": True,
+                                   "extended_links": sum(1 for i in found if i["node"] == "extendedLink")})
+            items += found
+            unresolved += missing
+            continue
+        if item["node"] != "linkbaseRef":
+            continue
+        href = item["href"] or ""
+        url = urljoin(schema_entry["url"], href)
+        entry = {"seq": item["seq"], "href": item["href"], "url": url, "attributes": item["attributes"]}
+        if not url.startswith(folder) or "#" in url:
+            entry.update(read=False, reason="the linkbase is outside the filing")
+            unresolved.append({"seq": item["seq"], "href": item["href"], "reason": entry["reason"]})
+        else:
+            name = url[len(folder):]
+            try:
+                doc = xs.XmlDoc(_archive(url, sources), name)
+            except SecNotFound:
+                entry.update(read=False, reason="the filing has no file at this address")
+                unresolved.append({"seq": item["seq"], "href": item["href"], "reason": entry["reason"]})
+                doc = None
+            except xs.FilingDataError as e:
+                raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {e}") from e
+            if doc is not None:
+                if xs.split(doc.root.tag) != (xs.LINK, "linkbase"):
+                    raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {name}: the document element is "
+                                    f"{doc.root.tag}, not link:linkbase")
+                found, missing = xs.read_linkbase(doc, doc.root, name, part, target_of(url))
+                unresolved += doc.conflicts() + missing
+                items += found
+                entry.update(read=True, name=name, namespaces=doc.namespaces(),
+                             extended_links=sum(1 for i in found if i["node"] == "extendedLink"))
+        linkbase_files.append(entry)
+    for url, count in external.items():
+        unresolved.append({"schema": url, "locators": count,
+                           "reason": "the schema is outside the filing: these locators keep their href and "
+                                     "fragment as written, and their concept is not resolved here"})
+    return envelope("parsed_source", sources, **common, file=schema_entry, linkbases=linkbase_files,
+                    extended_link_element=f"{{{xs.LINK}}}{xs.EXTENDED_LINKS[part]}",
+                    **_page(items, offset, limit), unresolved=unresolved)
+
+
+def _page(items: list, offset: int, limit: int) -> dict:
+    page = items[offset:offset + limit]
+    return {"page": {"total": len(items), "offset": offset, "count": len(page),
+                     "next_offset": offset + limit if len(items) > offset + limit else None},
+            "items": page}
 
 
 def _document_url(url: str) -> str:
