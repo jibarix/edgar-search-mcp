@@ -371,14 +371,15 @@ US_GAAP = "http://fasb.org/us-gaap/2024"
 
 def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=False, prohibit=False,
           duplicate=None, member_total=False, header="20260702060102", cash_flow=None, opening_2024=7,
-          missing_child=False, lease_list=None):
+          missing_child=False, lease_list=None, index_rows=None):
     """A made-up filing folder: name -> bytes. Statements: an income statement
     with an own element that adds into costs, a balance sheet with a line
     tagged only under a member, and a parenthetical page. `cash_flow` adds a
     cash flow statement whose opening and closing balance is that element
     ("us-gaap_Cash", on the balance sheet too, or one of restricted cash);
     `opening_2024` is its balance at the end of 2023. `lease_list` is the text of
-    the extensible list naming the lines operating leases are in, at the end of 2025."""
+    the extensible list naming the lines operating leases are in, at the end of 2025. The folder has the
+    SEC's filing index page; `index_rows` replaces its rows, as (sequence, description, document, type)."""
     ns = 'xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xlink="http://www.w3.org/1999/xlink"'
     gaap = "https://xbrl.fasb.org/us-gaap/2024/elts/us-gaap-2024.xsd"
     roles = {"IS": "http://t.example/role/Income", "BS": "http://t.example/role/Balance",
@@ -563,9 +564,10 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
                  + ctx("E2", ("2025-01-01", "2025-12-31"), [("dei:EntityAxis", "t:SubMember")])
                  + ctx("SA", "2026-02-01", [("us-gaap:StatementClassOfStockAxis", "t:ClassAMember")])
                  + ctx("SB", "2026-02-01", [("us-gaap:StatementClassOfStockAxis", "t:ClassBMember")]))
-    instance_xml = (f'<xbrli:xbrl {xbrli_ns} xmlns:xbrldi="http://xbrl.org/2006/xbrldi" '
+    instance_xml = (f'<xbrli:xbrl {xbrli_ns} {ns} xmlns:xbrldi="http://xbrl.org/2006/xbrldi" '
                     f'xmlns:us-gaap="{US_GAAP}" xmlns:iso4217="http://www.xbrl.org/2003/iso4217" '
                     'xmlns:t="http://t.example/2025" xmlns:dei="http://xbrl.sec.gov/dei/2024">'
+                    '<link:schemaRef xlink:type="simple" xlink:href="t-20251231.xsd"/>'
                     f'{contexts}<xbrli:unit id="usd"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>'
                     '<xbrli:unit id="shares"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>'
                     f"{body}</xbrli:xbrl>").encode()
@@ -580,9 +582,22 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
         + "</Report>" for i, k in enumerate(roles, 2))
     summary = (f"<FilingSummary><MyReports>{reports}</MyReports>"
                f"<InputFiles>{''.join(listed)}</InputFiles></FilingSummary>")
+    if index_rows is None:
+        index_rows = [("1", "10-K", "t-20251231.htm", "10-K"),
+                      ("2", "XBRL INSTANCE DOCUMENT", "t-20251231.xml", "EX-101.INS")] if not inline else [
+                      ("1", "10-K", "t-20251231.htm", "10-K")]
+        index_rows += [("3", "XBRL TAXONOMY EXTENSION SCHEMA DOCUMENT", "t-20251231.xsd", "EX-101.SCH")]
+        if not embedded:
+            index_rows += [(str(4 + i), f"XBRL TAXONOMY EXTENSION {k} LINKBASE DOCUMENT", f"t-20251231_{s}.xml",
+                            f"EX-101.{s.upper()}") for i, (k, s) in
+                           enumerate((("CALCULATION", "cal"), ("DEFINITION", "def"), ("LABEL", "lab"),
+                                      ("PRESENTATION", "pre")))]
+        if inline:
+            index_rows += [("9", "<b>EXTRACTED</b> XBRL INSTANCE DOCUMENT", "t-20251231_htm.xml", "XML")]
     folder = {"FilingSummary.xml": summary.encode(), "t-20251231.xsd": xsd, instance_name: instance_xml,
               "0000000001-26-000001-index-headers.html":
-                  f"<SEC-HEADER><ACCEPTANCE-DATETIME>{header}</SEC-HEADER>".encode()}
+                  f"<SEC-HEADER><ACCEPTANCE-DATETIME>{header}</SEC-HEADER>".encode(),
+              "0000000001-26-000001-index.htm": index_page(index_rows)}
     if not embedded:
         folder.update({"t-20251231_pre.xml": linkbase(pre), "t-20251231_cal.xml": linkbase(cal),
                        "t-20251231_lab.xml": linkbase(lab), "t-20251231_def.xml": linkbase(definition)})
@@ -591,6 +606,14 @@ def filed(embedded=False, inline=True, revenue=100, summary_menu=True, calc11=Fa
 
 RECORD = {"accessionNumber": "0000000001-26-000001", "filingDate": "2026-07-02", "reportDate": "2025-12-31",
           "acceptanceDateTime": "2026-07-02T14:01:02.000Z", "form": "10-K", "primaryDocument": "t-20251231.htm"}
+
+
+def index_page(rows):
+    """The SEC's filing index page with these (sequence, description, document, type) rows."""
+    body = "".join(f'<tr><td scope="row">{q}</td><td scope="row">{d}</td><td scope="row">'
+                   f'<a href="/Archives/edgar/data/1/000000000126000001/{f}">{f}</a></td>'
+                   f'<td scope="row">{t}</td><td scope="row">100</td></tr>' for q, d, f, t in rows)
+    return f'<html><body><table class="tableFile">{body}</table></body></html>'.encode()
 
 
 def xbrl_call(folder, records=None, **kwargs):
@@ -676,9 +699,9 @@ def instance_cases():
     _, code = xbrl_call(filed(), part="schema", concepts=["us-gaap:Cash"])
     check("xbrl: `concepts` with another part than the instance is INVALID_INPUT", code == "INVALID_INPUT", code)
     r, code = xbrl_call(filed(inline=False))
-    check("xbrl: without a doctype entry, the one <name>-<YYYYMMDD>.xml in InputFiles is the instance",
+    check("xbrl: the instance is the one document the filing index lists with type EX-101.INS",
           code is None and r["files"]["instance"]["name"] == "t-20251231.xml"
-          and "InputFiles" in r["files"]["instance"]["found_by"], code or str(r["files"]["instance"]))
+          and "EX-101.INS" in r["files"]["instance"]["found_by"], code or str(r and r["files"]["instance"]))
     check("xbrl: the header acceptance time is returned as written",
           r["acceptance"]["header_acceptance_datetime"] == "20260702060102"
           and r["acceptance"]["submissions_acceptanceDateTime"] == "2026-07-02T14:01:02.000Z", str(r["acceptance"]))
@@ -940,8 +963,99 @@ def no_implicit_filter_cases():
     check("b1 xbrl: without as_of the same accession number is returned", code is None, code)
 
 
+# ── Round 2, blocker 2: documents found only from published references ─────
+
+def discovery_cases():
+    folder = filed()
+    folder["t-extracted.xml"] = folder.pop("t-20251231_htm.xml")
+    folder["0000000001-26-000001-index.htm"] = index_page(
+        [("1", "10-K", "t-20251231.htm", "10-K"), ("3", "SCHEMA", "t-20251231.xsd", "EX-101.SCH"),
+         ("9", "<b>EXTRACTED</b> XBRL INSTANCE DOCUMENT", "t-extracted.xml", "XML")])
+    r, code = xbrl_call(folder)
+    check("b2: the instance is the document the index lists as the extracted instance, no name is derived",
+          code is None and r["files"]["instance"].get("name") == "t-extracted.xml"
+          and r["files"]["instance"].get("index_row", {}).get("type") == "XML",
+          code or str(r["files"]["instance"]))
+    r, code = xbrl_call(folder, part="instance", concepts=["us-gaap:Cash"])
+    check("b2: and it is the file read for the instance", code is None and r["file"]["name"] == "t-extracted.xml",
+          code)
+
+    folder = filed()
+    folder["FilingSummary.xml"] = folder["FilingSummary.xml"].replace(
+        b"<File>t-20251231.xsd</File>", b"<File>t-20251231.xsd</File><File>t-other.xsd</File>")
+    r, code = xbrl_call(folder)
+    check("b2: with two schemas in InputFiles the schema is the instance's schemaRef",
+          code is None and r["files"]["schema"].get("name") == "t-20251231.xsd"
+          and "schemaRef" in r["files"]["schema"].get("found_by", ""), code or str(r and r["files"]["schema"]))
+
+    folder = filed()
+    folder["0000000001-26-000001-index.htm"] = index_page(
+        [("1", "10-K", "t-20251231.htm", "10-K"), ("3", "SCHEMA", "t-20251231.xsd", "EX-101.SCH"),
+         ("8", "EXTRACTED XBRL INSTANCE DOCUMENT", "t-20251231_htm.xml", "XML"),
+         ("9", "EXTRACTED XBRL INSTANCE DOCUMENT", "t-b_htm.xml", "XML")])
+    r, code = xbrl_call(folder)
+    instance = r["files"]["instance"] if r else {}
+    check("b2: two documents the index lists as the instance leave it unresolved, both named, none chosen",
+          code is None and instance.get("resolved") is False
+          and instance.get("candidates") == ["t-20251231_htm.xml", "t-b_htm.xml"]
+          and any(u.get("file") == "instance" for u in r["unresolved"]), code or str(instance))
+    check("b2: and no folder listing is read to settle it",
+          r is not None and not any(s["url"].endswith("index.json") for s in r["sources"]), str(r and r["sources"]))
+    _, code = xbrl_call(folder, part="instance")
+    check("b2: the instance part of such a filing is refused, not guessed", code == "UNSUPPORTED_DOCUMENT", code)
+    r, code = xbrl_call(folder, part="instance", instance_file="t-20251231_htm.xml", concepts=["us-gaap:Cash"])
+    check("b2: the caller can name the instance file", code is None and r["file"]["name"] == "t-20251231_htm.xml"
+          and r["file"]["found_by"].startswith("named by the caller"), code or str(r and r["file"]))
+    _, code = xbrl_call(folder, part="instance", instance_file="../x.xml")
+    check("b2: a named file must be a plain file name of the folder", code == "INVALID_INPUT", code)
+
+    folder = filed(inline=False)
+    folder["0000000001-26-000001-index.htm"] = index_page([("1", "10-K", "t-20251231.htm", "10-K")])
+    r, code = xbrl_call(folder)
+    check("b2: a file named like an instance is not picked by its name when the index lists none",
+          code is None and r["files"]["instance"]["resolved"] is False
+          and r["files"]["instance"].get("candidates") == [], code or str(r and r["files"]["instance"]))
+    check("b2: nor is the one .xsd in InputFiles picked by its suffix when nothing names it",
+          r is not None and r["files"]["schema"]["resolved"] is False, str(r and r["files"]["schema"]))
+
+    ref = b'<link:schemaRef xlink:type="simple" xlink:href="t-20251231.xsd"/>'
+    folder = filed()
+    folder["t-20251231_htm.xml"] = folder["t-20251231_htm.xml"].replace(
+        ref, ref + b'<link:schemaRef xlink:type="simple" xlink:href="t-other.xsd"/>')
+    r, code = xbrl_call(folder)
+    check("b2: two schemaRefs in the instance leave the schema unresolved, both named",
+          code is None and r["files"]["schema"]["resolved"] is False and len(r["files"]["schema"]["candidates"]) == 2
+          and any(u.get("file") == "schema" for u in r["unresolved"]), code or str(r and r["files"]["schema"]))
+    r, code = xbrl_call(folder, part="schema", schema_file="t-20251231.xsd")
+    check("b2: the caller can name the schema file", code is None and r["file"]["name"] == "t-20251231.xsd"
+          and r["file"]["found_by"] == "named by the caller (schema_file)", code or str(r and r["file"]))
+    _, code = xbrl_call(folder, part="schema", schema_file="t-missing.xsd")
+    check("b2: a named file the folder does not have is NOT_FOUND", code == "NOT_FOUND", code)
+
+    folder = filed()
+    folder["t-20251231_htm.xml"] = folder["t-20251231_htm.xml"].replace(
+        b"<xbrli:xbrl ", b'<xbrli:xbrl xml:base="https://example.com/taxonomy/" ', 1)
+    r, code = xbrl_call(folder)
+    check("b2: the schemaRef is resolved against the inherited xml:base, so here it is outside the filing",
+          code is None and r["files"]["schema"]["resolved"] is False
+          and r["files"]["schema"]["candidates"] == ["https://example.com/taxonomy/t-20251231.xsd"],
+          code or str(r and r["files"]["schema"]))
+
+    folder = filed()
+    del folder["FilingSummary.xml"]
+    r, code = xbrl_call(folder)
+    check("b2: a filing without FilingSummary.xml still answers, and says exactly that file is missing",
+          code is None and r["filing_summary"] is None
+          and any(u.get("file") == "FilingSummary.xml" and "no XBRL" not in u["reason"] for u in r["unresolved"]),
+          code or str(r and r["unresolved"]))
+    r, code = xbrl_call(folder, part="instance", concepts=["us-gaap:Cash"])
+    check("b2: and its instance is still found from the index", code is None
+          and r["file"]["name"] == "t-20251231_htm.xml", code)
+
+
 if __name__ == "__main__":
     no_implicit_filter_cases()
+    discovery_cases()
     search_cases()
     client_cases()
     lookup_cases()

@@ -248,7 +248,7 @@ SEC's order. A concept the company never reported is `NOT_FOUND`.
 The frames document unchanged. `period` is `CY2023`, `CY2023Q4` or
 `CY2023Q4I`. A frame the SEC does not publish is `NOT_FOUND`.
 
-### `get_filing_xbrl(cik_or_ticker, accession_number=None, form=None, as_of=None, part="summary", concepts=None, offset=0, limit=500)`
+### `get_filing_xbrl(cik_or_ticker, accession_number=None, form=None, as_of=None, part="summary", concepts=None, offset=0, limit=500, instance_file=None, schema_file=None)`
 
 One filing's XBRL files as the filer wrote them, one `part` at a time. The
 filing is `accession_number`, else the first submissions row whose `form`
@@ -262,6 +262,14 @@ locator, arc and resource with every attribute, in document order; nothing
 combined, overridden or dropped) and `instance` (contexts, units and every fact
 as written, duplicates included). `concepts` selects facts of the instance by
 QName or local name. Items are paged by `offset` and `limit`.
+
+The instance is the one file the filing index page lists as type `EX-101.INS`
+or as the `EXTRACTED XBRL INSTANCE DOCUMENT`; the schema is the one the
+instance's `link:schemaRef` names. No file name is guessed: zero or several
+candidates leave the file unresolved with the candidates listed, and
+`instance_file` or `schema_file` names it. A filing without `FilingSummary.xml`
+still answers, with `filing_summary` null and the missing file named in
+`unresolved`.
 
 ## Errors
 

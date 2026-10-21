@@ -296,7 +296,7 @@ choice below is now the consumer's.
 | `filing.accession_number`, `form`, `filing_date`, `reporting_date` | `part="summary"`: `filing.record` (the submissions row: `accessionNumber`, `form`, `filingDate`, `reportDate`) |
 | `filing.document` | `filing.record["primaryDocument"]` within `filing.folder` |
 | `filing.acceptance` (`.utc`) | `acceptance.header_utc`, the header time read as US Eastern and converted, with `header_utc_derivation`. `acceptance.header_acceptance_datetime` is the header text and `acceptance.submissions_acceptanceDateTime` is the submissions value. They can disagree, and both are returned without a choice |
-| `filing.inline_xbrl` | `files.instance.found_by` and `files.input_files` (FilingSummary's InputFiles) |
+| `filing.inline_xbrl` | `files.instance.index_row` (the filing index row: description `EXTRACTED XBRL INSTANCE DOCUMENT` for an instance the SEC extracted from inline XBRL, type `EX-101.INS` for one filed as such) and `files.input_files` (FilingSummary's InputFiles, with each `doctype` attribute as written; null when the filing has no FilingSummary.xml) |
 | `statements[].kind`, `title`, `parenthetical` | the consumer classifies. Published inputs: each role's `definition` in `part="schema"` (e.g. "995200100 - Statement - CONSOLIDATED CONDENSED BALANCE SHEETS") and the extended link's `xlink:title`; the SEC's `FilingSummary.xml` reports (`MenuCategory`, `ShortName`, `LongName`, `Role`) in `part="summary"` `filing_summary` |
 | `statements[].lines[]` (`element`, `depth`, `structure`) | `part="presentation"`: locators and arcs per extended link, with `order`, `preferredLabel`, `use`, `priority` as written. The consumer builds the tree and resolves prohibited or overriding arcs |
 | `lines[].label` | `part="label"`: every label resource with its `xlink:role` and `xml:lang`. The consumer picks one, using the presentation arc's `preferredLabel` if it follows 0.8 |
@@ -316,9 +316,15 @@ What 1.0 leaves unresolved, and says so:
   name is the fragment as written (e.g. `us-gaap_Assets`), which by the EDGAR
   Filer Manual convention is `<prefix>_<local name>`. Relying on that
   convention is the consumer's choice.
-- The instance file is found from FilingSummary's InputFiles. `found_by` says
-  how. If more than one file fits, the instance is unresolved and the
-  candidates are listed.
+- The instance file is the one the filing index page lists as type
+  `EX-101.INS` or as the `EXTRACTED XBRL INSTANCE DOCUMENT`, and the schema is
+  the one the instance's `link:schemaRef` names. `found_by` says how. 0.8 (and
+  rc1) derived `<document>_htm.xml`, matched `<name>-<YYYYMMDD>.xml` and took
+  the one `.xsd`; 1.0 does none of that. If no file or several fit, the entry
+  is unresolved with the candidates listed; pass `instance_file` or
+  `schema_file` to name it. A filing without FilingSummary.xml is no longer
+  refused as "no XBRL financial data": `filing_summary` is null and
+  `unresolved` names the missing file.
 - A fact with `xsi:nil` keeps `nil` and its text as written. No value is
   invented for it.
 - A part's `roleRef` and `arcroleRef` items come only from linkbases that

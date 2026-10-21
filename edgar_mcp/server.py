@@ -326,26 +326,14 @@ def _filing_file(url: str) -> tuple[str, int, str]:
     return f"https://www.sec.gov{parts.path}", int(found["cik"]), found["folder"]
 
 
-@_tool
-def list_filing_documents(url: str) -> dict:
-    """The rows of one filing's index page: the main document, its exhibits and its data files.
-
-    `url` is any file URL of the filing, as returned by `list_filings` or
-    `search_filings`. Each row has `sequence`, `description`, `type` and
-    `size` as the index page shows them, the file name (`document`) and its
-    `url`. This is a view read from the page's HTML table by the rules named
-    in `transformation`; the page itself is `original.url`, which
-    `get_filing_document` returns byte for byte. The type is the SEC's label
-    for a document ("8-K", "EX-99.1", "GRAPHIC", ...); it does not say whether
-    a document was filed or furnished.
-    """
-    _, cik, folder = _filing_file(url)
+def _index_documents(cik: int, folder: str, sources: list) -> tuple[str, list, list]:
+    """(index page URL, its document rows, links left out) for one filing
+    folder, read from the SEC's filing index page by the rules of
+    `_INDEX_RULES`. SecNotFound when the folder has no index page."""
     accession = f"{folder[:10]}-{folder[10:12]}-{folder[12:]}"
     base = f"/Archives/edgar/data/{cik}/{folder}/"
     index_url = f"https://www.sec.gov{base}{accession}-index.htm"
-    sources = []
-    raw = _archive(index_url, sources)
-    page = raw.decode("utf-8", errors="replace")
+    page = _archive(index_url, sources).decode("utf-8", errors="replace")
 
     def cell(text):
         return html.unescape(text).strip() or None
@@ -366,6 +354,26 @@ def list_filing_documents(url: str) -> dict:
             "document": path[len(base):],
             "url": f"https://www.sec.gov{path}",
         })
+    return index_url, documents, skipped
+
+
+@_tool
+def list_filing_documents(url: str) -> dict:
+    """The rows of one filing's index page: the main document, its exhibits and its data files.
+
+    `url` is any file URL of the filing, as returned by `list_filings` or
+    `search_filings`. Each row has `sequence`, `description`, `type` and
+    `size` as the index page shows them, the file name (`document`) and its
+    `url`. This is a view read from the page's HTML table by the rules named
+    in `transformation`; the page itself is `original.url`, which
+    `get_filing_document` returns byte for byte. The type is the SEC's label
+    for a document ("8-K", "EX-99.1", "GRAPHIC", ...); it does not say whether
+    a document was filed or furnished.
+    """
+    _, cik, folder = _filing_file(url)
+    accession = f"{folder[:10]}-{folder[10:12]}-{folder[12:]}"
+    sources = []
+    index_url, documents, skipped = _index_documents(cik, folder, sources)
     if not documents:
         raise SecUnsupported(f"the filing index {index_url} has no rows in the expected table layout")
     return envelope("transformed", sources, cik=format_cik(cik), accession_number=accession,
@@ -432,9 +440,13 @@ def _eastern_to_utc(stamp: str) -> str:
 # ── get_filing_xbrl ─────────────────────────────────────────────────────────
 
 _XBRL_PARTS = ("summary", "schema", "presentation", "calculation", "definition", "label", "reference", "instance")
-# An instance as the EDGAR Filer Manual names it before inline XBRL: "ko-20181231.xml".
-_INSTANCE_NAME = re.compile(r"[A-Za-z0-9]+-\d{8}\.xml")
-_HTML_NAME = re.compile(r"(?i)(?P<stem>.+)\.html?")
+# The syntax of a file name inside one filing folder (no path), nothing more.
+_FOLDER_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,200}")
+# The filing index page's labels for the instance, as the SEC writes them: the type of an instance filed as
+# such, and the description of the instance the SEC extracted from an inline XBRL document.
+_INSTANCE_TYPE = "EX-101.INS"
+_EXTRACTED_INSTANCE = "EXTRACTED XBRL INSTANCE DOCUMENT"
+_SCHEMA_TYPE = "EX-101.SCH"
 _MAX_CONCEPTS = 50
 # The syntax of a name, nothing more: prefix:local, {namespace}local or a bare local name (XML NCNames).
 _CONCEPT_NAME = re.compile(r"(?:[A-Za-z_][\w.-]*:|\{[^{}\s]{1,500}\})?[A-Za-z_][\w.-]*")
@@ -539,65 +551,112 @@ def _header_acceptance(folder: str, accession: str, record: dict, sources: list)
             "submissions_acceptanceDateTime": record.get("acceptanceDateTime")}
 
 
-def _xbrl_files(folder: str, accession: str, sources: list, unresolved: list) -> dict:
-    """The filing's FilingSummary.xml as parsed, and the instance and the
-    company schema with how each was found."""
+def _xbrl_files(folder: str, cik: int, accession: str, sources: list, unresolved: list,
+                instance_file: str | None, schema_file: str | None) -> dict:
+    """The filing's FilingSummary.xml as parsed (None when the folder has
+    none), and the instance and the company schema with how each was found.
+
+    Only what the filing publishes names a file: the instance is the caller's
+    `instance_file`, else the one row of the filing index page typed
+    EX-101.INS or described as the extracted XBRL instance; the schema is the
+    caller's `schema_file`, else the instance's own link:schemaRef, else
+    (instance unresolved) the one index row typed EX-101.SCH. Zero or several
+    candidates leave the file unresolved, with the candidates named."""
+    summary_url = folder + "FilingSummary.xml"
+    summary = input_files = None
     try:
-        summary_raw = _archive(folder + "FilingSummary.xml", sources)
+        summary_raw = _archive(summary_url, sources)
     except SecNotFound:
-        raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession} has no XBRL financial data "
-                        "(no FilingSummary.xml in its folder)") from None
-    try:
-        summary = xs.XmlDoc(summary_raw, "FilingSummary.xml")
-    except xs.FilingDataError as e:
-        raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {e}") from e
-    inputs = summary.root.find("InputFiles")
-    input_files = [] if inputs is None else [
-        {"seq": summary.seq(f), "name": (f.text or "").strip(), "attributes": dict(f.attrib)} for f in inputs.iter("File")]
-    names = [f["name"] for f in input_files]
-    listing = None
-
-    def folder_names():
-        nonlocal listing
-        if listing is None:
-            data, meta = get_json(folder + "index.json")
-            sources.append(source(meta))
-            listing = [str(i.get("name", "")) for i in data.get("directory", {}).get("item", []) if isinstance(i, dict)]
-        return listing
-
-    def one(found, name, url_name, found_by, candidates):
-        return ({"resolved": True, "name": url_name, "url": folder + url_name, "found_by": found_by}
-                if found else {"resolved": False, "reason": name, "candidates": candidates})
-
-    marked = [f for f in input_files if "doctype" in f["attributes"]]
-    if len(marked) == 1:
-        document = marked[0]["name"]
-        html = _HTML_NAME.fullmatch(document)
-        instance = one(True, None, f"{html.group('stem')}_htm.xml" if html else document,
-                       ("InputFiles names one file with a doctype attribute, an inline XBRL document; the SEC "
-                        "publishes the instance it extracted from it as <document name>_htm.xml") if html
-                       else "InputFiles names one file with a doctype attribute", [])
-    elif len(marked) > 1:
-        instance = one(False, "InputFiles names several files with a doctype attribute", None, None,
-                       [f["name"] for f in marked])
+        unresolved.append({"file": "FilingSummary.xml", "url": summary_url,
+                           "reason": "the filing folder has no FilingSummary.xml (the SEC's rendering summary); its "
+                                     "report list and InputFiles are not available. The instance and schema are "
+                                     "found from the filing index page and the instance, or named by the caller"})
     else:
-        plain = [n for n in names if _INSTANCE_NAME.fullmatch(n)] or [n for n in folder_names()
-                                                                     if _INSTANCE_NAME.fullmatch(n)]
-        instance = one(len(plain) == 1, "no InputFiles entry has a doctype attribute, and the files named "
-                       "<name>-<YYYYMMDD>.xml are not exactly one", plain[0] if len(plain) == 1 else None,
-                       "the only file named <name>-<YYYYMMDD>.xml (the EDGAR Filer Manual's instance name) "
-                       + ("in InputFiles" if any(_INSTANCE_NAME.fullmatch(n) for n in names) else "in the folder"),
-                       plain)
-    schemas = [n for n in names if n.lower().endswith(".xsd")]
-    where = "InputFiles"
-    if len(schemas) != 1:
-        schemas, where = [n for n in folder_names() if n.lower().endswith(".xsd")], "the folder"
-    schema = one(len(schemas) == 1, "the .xsd files of the filing are not exactly one",
-                 schemas[0] if len(schemas) == 1 else None, f"the only .xsd file in {where}", schemas)
+        try:
+            summary = xs.XmlDoc(summary_raw, "FilingSummary.xml")
+        except xs.FilingDataError as e:
+            raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {e}") from e
+        inputs = summary.root.find("InputFiles")
+        input_files = [] if inputs is None else [
+            {"seq": summary.seq(f), "name": (f.text or "").strip(), "attributes": dict(f.attrib)}
+            for f in inputs.iter("File")]
+
+    folder_digits = accession.replace("-", "")
+    index = {"url": f"{folder}{accession}-index.htm"}
+    try:
+        index["url"], documents, _ = _index_documents(cik, folder_digits, sources)
+        index.update(read=True, rows=len(documents))
+        if not documents:
+            index["reason"] = "the page has no rows in the expected table layout"
+    except SecNotFound:
+        documents = []
+        index.update(read=False, reason="the filing folder has no index page")
+        unresolved.append({"file": "index", "url": index["url"], "reason": index["reason"]})
+
+    def row_of(d):
+        return {k: d[k] for k in ("sequence", "description", "type", "document")}
+
+    def named(name, parameter):
+        return {"resolved": True, "name": name, "url": folder + name, "found_by": f"named by the caller ({parameter})"}
+
+    def index_choice(rows, what, label, parameter):
+        if len(rows) == 1:
+            return {"resolved": True, "name": rows[0]["document"], "url": rows[0]["url"],
+                    "found_by": f"the filing index page lists it {label(rows[0])}", "index_row": row_of(rows[0])}
+        where = "the filing index page could not be read" if not index.get("read") else (
+            f"the filing index page lists {'no' if not rows else len(rows)} document"
+            f"{'s' if len(rows) != 1 else ''} {what}")
+        return {"resolved": False, "reason": f"{where}; name the file with {parameter}",
+                "candidates": [r["document"] for r in rows]}
+
+    if instance_file is not None:
+        instance = named(instance_file, "instance_file")
+    else:
+        rows = [d for d in documents if d["type"] == _INSTANCE_TYPE or d["description"] == _EXTRACTED_INSTANCE]
+        instance = index_choice(
+            rows, f"typed {_INSTANCE_TYPE} or described as {_EXTRACTED_INSTANCE!r}",
+            lambda r: (f"with type {_INSTANCE_TYPE}" if r["type"] == _INSTANCE_TYPE else
+                       f"with description {_EXTRACTED_INSTANCE!r}, the instance the SEC extracted from the "
+                       "inline XBRL document"), "instance_file")
+
+    instance_doc = None
+    if schema_file is not None:
+        schema = named(schema_file, "schema_file")
+    elif instance["resolved"]:
+        try:
+            instance_doc = xs.XmlDoc(_archive(instance["url"], sources), instance["name"])
+        except SecNotFound:
+            if instance_file is not None:
+                raise ToolError(f"NOT_FOUND: {accession} has no file {instance_file!r}") from None
+            schema = {"resolved": False, "reason": f"the instance {instance['name']} is not in the filing folder, "
+                      "so its schemaRef cannot be read; name the schema with schema_file", "candidates": []}
+        except xs.FilingDataError as e:
+            schema = {"resolved": False, "reason": f"the instance cannot be read, so its schemaRef is not known "
+                      f"({e}); name the schema with schema_file", "candidates": []}
+        if instance_doc is not None:
+            refs = [e for e in instance_doc.root if e.tag == f"{{{xs.LINK}}}schemaRef"]
+            hrefs = [(e.get(f"{{{xs.XLINK}}}href"), e) for e in refs]
+            urls = [instance_doc.resolve_href(h, e, instance["url"]) if h else None for h, e in hrefs]
+            if len(refs) == 1 and urls[0] and urls[0].startswith(folder) and "/" not in urls[0][len(folder):] \
+                    and "#" not in urls[0]:
+                schema = {"resolved": True, "name": urls[0][len(folder):], "url": urls[0],
+                          "found_by": f"the instance's link:schemaRef (xlink:href {hrefs[0][0]!r})"}
+            else:
+                schema = {"resolved": False, "candidates": [u for u in urls],
+                          "reason": ("the instance has no link:schemaRef" if not refs else
+                                     f"the instance has {len(refs)} link:schemaRef elements" if len(refs) > 1 else
+                                     "the instance's link:schemaRef has no xlink:href" if not urls[0] else
+                                     f"the instance's link:schemaRef points outside the filing folder ({urls[0]})")
+                          + "; name the schema with schema_file"}
+    else:
+        schema = index_choice([d for d in documents if d["type"] == _SCHEMA_TYPE], f"typed {_SCHEMA_TYPE} (the "
+                              "instance, whose schemaRef names the schema, is unresolved)",
+                              lambda r: f"with type {_SCHEMA_TYPE} (the instance is unresolved)", "schema_file")
     for key, entry in (("instance", instance), ("schema", schema)):
         if not entry["resolved"]:
             unresolved.append({"file": key, "reason": entry["reason"], "candidates": entry["candidates"]})
-    return {"summary": summary, "input_files": input_files, "instance": instance, "schema": schema}
+    return {"summary": summary, "summary_url": summary_url, "input_files": input_files, "index": index,
+            "instance": instance, "schema": schema, "instance_doc": instance_doc}
 
 
 @_tool
@@ -611,6 +670,8 @@ def get_filing_xbrl(
     concepts: list[str] | None = None,
     offset: int = 0,
     limit: int = 500,
+    instance_file: str | None = None,
+    schema_file: str | None = None,
 ) -> dict:
     """The XBRL files of one filing as the filer wrote them, one `part` at a time.
 
@@ -622,7 +683,8 @@ def get_filing_xbrl(
 
     - "summary": the submissions row, the acceptance time as the filing header
       states it, the instance and schema files and how each was found, and the
-      SEC's FilingSummary.xml as an element tree.
+      SEC's FilingSummary.xml as an element tree (null, and named in
+      `unresolved`, when the folder has none).
     - "schema": the company schema's declarations in document order: imports,
       linkbase references, role and arcrole types (definition and usedOn as
       written) and elements with every attribute. Imported schemas outside
@@ -648,6 +710,13 @@ def get_filing_xbrl(
     every namespace; `concept_matches` says what each name matched.
     Items are paged by `offset` and `limit`; `page.next_offset` is null on the
     last page. Attribute names in a namespace are given as "{namespace}local".
+
+    Files are found only from what the filing publishes: the instance is the
+    one row of the filing index page typed EX-101.INS or described as the
+    extracted XBRL instance; the schema is the one the instance's
+    link:schemaRef names. Zero or several candidates leave a file unresolved
+    with the candidates listed; `instance_file` and `schema_file` (a file name
+    in the filing folder) then name it.
     """
     if accession_number is not None and not _ACCESSION.fullmatch(accession_number):
         raise ValueError(f"accession_number must look like 0000320193-24-000123, got {accession_number!r}")
@@ -659,6 +728,9 @@ def get_filing_xbrl(
         raise ValueError(f"not an SEC form type: {form!r}")
     if part not in _XBRL_PARTS:
         raise ValueError(f"part must be one of {', '.join(_XBRL_PARTS)}, got {part!r}")
+    for parameter, value in (("instance_file", instance_file), ("schema_file", schema_file)):
+        if value is not None and not (isinstance(value, str) and _FOLDER_FILE.fullmatch(value)):
+            raise ValueError(f"{parameter} must be the name of one file in the filing folder (no path), got {value!r}")
     if concepts is not None:
         if part != "instance":
             raise ValueError("`concepts` selects facts of the instance: use it with part=\"instance\"")
@@ -677,15 +749,17 @@ def get_filing_xbrl(
         raise ToolError(f"UNSUPPORTED_DOCUMENT: the submissions row has no usable accessionNumber: {accession!r}")
     folder = f"https://www.sec.gov/Archives/edgar/data/{int(company['cik'])}/{accession.replace('-', '')}/"
     filing = {"accessionNumber": accession, "record": record, "source": row["source"], "folder": folder}
-    files = _xbrl_files(folder, accession, sources, unresolved)
+    files = _xbrl_files(folder, int(company["cik"]), accession, sources, unresolved, instance_file, schema_file)
     common = {"cik": company["cik"], "filing": filing, "part": part, "warnings": warnings}
 
     if part == "summary":
         acceptance = _header_acceptance(folder, accession, record, sources)
         return envelope("parsed_source", sources, **common, acceptance=acceptance,
-                        files={"input_files": files["input_files"], "instance": files["instance"],
-                               "schema": files["schema"]},
-                        filing_summary=xs.tree(files["summary"]), unresolved=unresolved)
+                        files={"filing_summary": {"url": files["summary_url"], "read": files["summary"] is not None},
+                               "index": files["index"], "input_files": files["input_files"],
+                               "instance": files["instance"], "schema": files["schema"]},
+                        filing_summary=xs.tree(files["summary"]) if files["summary"] is not None else None,
+                        unresolved=unresolved)
 
     if part == "instance":
         entry = files["instance"]
@@ -693,7 +767,12 @@ def get_filing_xbrl(
             raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: the instance is unresolved: {entry['reason']} "
                             f"(candidates: {entry['candidates']})")
         try:
-            instance = xs.read_instance(_archive(entry["url"], sources), entry["name"])
+            if files["instance_doc"] is not None:
+                instance = xs.read_instance(None, entry["name"], doc=files["instance_doc"])
+            else:
+                instance = xs.read_instance(_archive(entry["url"], sources), entry["name"])
+        except SecNotFound:
+            raise ToolError(f"NOT_FOUND: {accession} has no file {entry['name']!r}") from None
         except xs.FilingDataError as e:
             raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {e}") from e
         unresolved += instance["unresolved"]
@@ -713,6 +792,8 @@ def get_filing_xbrl(
                         f"{schema_entry['reason']} (candidates: {schema_entry['candidates']})")
     try:
         schema = xs.read_schema(_archive(schema_entry["url"], sources), schema_entry["name"])
+    except SecNotFound:
+        raise ToolError(f"NOT_FOUND: {accession} has no file {schema_entry['name']!r}") from None
     except xs.FilingDataError as e:
         raise ToolError(f"UNSUPPORTED_DOCUMENT: {accession}: {e}") from e
     unresolved += schema["unresolved"]

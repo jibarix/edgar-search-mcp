@@ -18,6 +18,7 @@ import json
 import os
 import sys
 import tempfile
+import re
 import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -239,10 +240,19 @@ def xbrl_sources_checks(result, kwargs):
 def xbrl_summary_checks(result, kwargs):
     xbrl_sources_checks(result, kwargs)
     files = result["files"]
-    check("get_filing_xbrl summary: the instance is the SEC extraction of the one doctype file",
-          files["instance"]["resolved"] and files["instance"]["url"] == INSTANCE_URL, str(files["instance"]))
-    check("get_filing_xbrl summary: the schema is the one .xsd in InputFiles",
-          files["schema"]["resolved"] and files["schema"]["name"].endswith(".xsd"), str(files["schema"]))
+    index = frozen_bytes(FOLDER + f"{ACCESSION}-index.htm").decode("utf-8")
+    extracted = re.findall(r"(?is)<td[^>]*>\s*<b>EXTRACTED</b>\s*XBRL INSTANCE DOCUMENT\s*</td>\s*<td[^>]*>"
+                           r"\s*<a href=\"[^\"]*/([^\"/]+)\"", index)
+    check("get_filing_xbrl summary: the instance is the one file the index page lists as the extracted instance",
+          extracted == ["wina-20251227x10k_htm.xml"] and files["instance"]["resolved"]
+          and files["instance"]["url"] == INSTANCE_URL
+          and files["instance"].get("index_row", {}).get("document") == extracted[0],
+          str(files["instance"]))
+    check("get_filing_xbrl summary: the schema is the file the instance's schemaRef names",
+          files["schema"]["resolved"] and files["schema"]["name"] == frozen_schema()[0]
+          and "schemaRef" in files["schema"]["found_by"], str(files["schema"]))
+    check("get_filing_xbrl summary: FilingSummary.xml and the index page are reported as read",
+          files.get("filing_summary", {}).get("read") is True and files.get("index", {}).get("read") is True)
     header = frozen_bytes(FOLDER + f"{ACCESSION}-index-headers.html").decode("latin-1")
     raw = result["acceptance"]["header_acceptance_datetime"]
     check("get_filing_xbrl summary: the header acceptance time is returned as written",
@@ -333,13 +343,11 @@ LINK_PARTS = {"presentation": "presentationLink", "calculation": "calculationLin
 
 
 def frozen_schema():
-    name = next(n for n in input_files() if n.endswith(".xsd"))
+    """The schema the frozen instance's one link:schemaRef names, read with the standard library."""
+    refs = ET.fromstring(frozen_bytes(INSTANCE_URL)).findall("{%s}schemaRef" % LINK_NS)
+    assert len(refs) == 1
+    name = refs[0].get("{http://www.w3.org/1999/xlink}href")
     return name, ET.fromstring(frozen_bytes(FOLDER + name))
-
-
-def input_files():
-    summary = ET.fromstring(frozen_bytes(FOLDER + "FilingSummary.xml"))
-    return [f.text for f in summary.find("InputFiles")]
 
 
 def xbrl_schema_checks(result, kwargs):

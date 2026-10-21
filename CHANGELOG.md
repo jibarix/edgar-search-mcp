@@ -13,6 +13,17 @@ A review of 1.0.0rc1 found places where the server still chose or guessed.
   every CIK, and the hit is in `unresolved`. In `get_filing_xbrl`, a row with no
   `filingDate` never counts as on or before `as_of`: it is skipped and named in
   `warnings`, and an accession number naming one is refused.
+- **Document discovery from published references only**: `get_filing_xbrl`
+  finds the instance from the filing index page (the one row typed
+  `EX-101.INS` or described `EXTRACTED XBRL INSTANCE DOCUMENT`) and the schema
+  from the instance's `link:schemaRef`. It no longer derives
+  `<document>_htm.xml`, matches `<name>-<YYYYMMDD>.xml`, takes the one `.xsd`
+  or reads the folder's `index.json` listing. Zero or several candidates are
+  unresolved with the candidates named; new parameters `instance_file` and
+  `schema_file` name the file. A filing without `FilingSummary.xml` answers
+  with `filing_summary` null and the missing file in `unresolved`, instead of
+  `UNSUPPORTED_DOCUMENT` "no XBRL financial data". The summary's `files` adds
+  `filing_summary` and `index` with their read status.
 
 ## 1.0.0rc1
 

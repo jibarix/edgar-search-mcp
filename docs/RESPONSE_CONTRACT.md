@@ -190,7 +190,7 @@ The companyconcept document unchanged: every unit and every observation.
 The frames document unchanged. `period` is `CY2023`, `CY2023Q4` or
 `CY2023Q4I`.
 
-### `get_filing_xbrl(cik_or_ticker, accession_number=None, form=None, as_of=None, part="summary", concepts=None, offset=0, limit=500)` — `parsed_source`
+### `get_filing_xbrl(cik_or_ticker, accession_number=None, form=None, as_of=None, part="summary", concepts=None, offset=0, limit=500, instance_file=None, schema_file=None)` — `parsed_source`
 
 The filing is `accession_number`, else the first row of the company's
 submissions, in the SEC's order (the recent table, then each older file in
@@ -214,19 +214,39 @@ their plain name. A QName in an attribute or in text is returned as written,
 with the namespace and local name it resolves to through the declarations in
 scope at that element, or `resolved: false` and a reason.
 
-The instance and the company schema are found from `FilingSummary.xml`: the
-one `InputFiles` entry with a `doctype` attribute is the instance (for an
-inline XBRL document, the instance the SEC extracted from it,
-`<document stem>_htm.xml`), and the one `.xsd` entry is the schema. Each
-`files` entry says how it was found (`found_by`); when that is not exactly
-one file, the entry is `resolved: false` with its candidates.
+The instance and the company schema are found only from what the filing
+publishes; no file name is derived, matched against a pattern or picked by
+its suffix, and the folder's directory listing is never read:
+
+- the instance is `instance_file` when the caller names it, else the one row
+  of the filing index page (`<accession>-index.htm`) whose type is
+  `EX-101.INS` or whose description is `EXTRACTED XBRL INSTANCE DOCUMENT` (the
+  instance the SEC extracted from an inline XBRL document); `index_row` is
+  that row as the page shows it;
+- the schema is `schema_file` when the caller names it, else the file the
+  instance's one `link:schemaRef` names (its `xlink:href` resolved against
+  the instance's URL and any inherited `xml:base`), else, when the instance is
+  unresolved, the one index row typed `EX-101.SCH`.
+
+Each `files` entry says how it was found (`found_by`). Zero or several
+candidates (two rows listed as the instance, two `schemaRef`s, one pointing
+outside the filing) leave the entry `resolved: false` with the reason and
+its `candidates`, and the same in `unresolved`; the caller then names the
+file. `instance_file` and `schema_file` are plain file names of the filing
+folder (no path); one that is not there is `NOT_FOUND`. A filing without
+`FilingSummary.xml` is not an error: `filing_summary` is null,
+`files.input_files` is null, and `unresolved` names `FilingSummary.xml` and
+what is missing with it (its report list and `InputFiles`). An index page
+that is missing is named in `unresolved` the same way.
 
 The XBRL files of one filing, one `part` at a time:
 
 - `summary`: the filing's submissions record, its acceptance time as the
-  filing header states it, the files read and how each was found, and the
-  SEC's `FilingSummary.xml` as an element tree (every report with its `Role`,
-  `LongName`, `MenuCategory`, `HtmlFileName` and `Position` as written).
+  filing header states it, the files read and how each was found
+  (`files.filing_summary` and `files.index` with `read`, `files.input_files`,
+  `files.instance`, `files.schema`), and the SEC's `FilingSummary.xml` as an
+  element tree (every report with its `Role`, `LongName`, `MenuCategory`,
+  `HtmlFileName` and `Position` as written), or null when there is none.
 - `schema`: the company schema's declarations in document order, each by its
   XML construct (`import`, `include`, `linkbaseRef`, `roleType`,
   `arcroleType`, `element`, `linkbase` for one written inside the schema,

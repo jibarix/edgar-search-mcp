@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import io
 import xml.etree.ElementTree as ET
+from urllib.parse import urljoin
 from xml.sax.saxutils import escape, quoteattr
 
 XBRLI = "http://www.xbrl.org/2003/instance"
@@ -54,7 +55,8 @@ class XmlDoc:
         self.declarations = []      # every xmlns declaration, in document order
         self._scope = {}            # element -> {prefix: namespace} in scope there
         self._seq = {}              # element -> position in document order
-        pending, stack, seq = [], [{"xml": XML_NS}], 0
+        self._parent = {}           # element -> its parent element (None for the document element)
+        pending, stack, seq, open_elements = [], [{"xml": XML_NS}], 0, []
         try:
             events = ET.iterparse(io.BytesIO(raw), events=("start-ns", "start", "end"))
             for event, obj in events:
@@ -71,9 +73,12 @@ class XmlDoc:
                     stack.append(scope)
                     self._scope[obj] = scope
                     self._seq[obj] = seq
+                    self._parent[obj] = open_elements[-1] if open_elements else None
+                    open_elements.append(obj)
                     seq += 1
                 else:
                     stack.pop()
+                    open_elements.pop()
             self.root = events.root
         except ET.ParseError as e:
             raise FilingDataError(f"{name} is not readable XML ({e})") from e
@@ -83,6 +88,32 @@ class XmlDoc:
 
     def seq(self, element) -> int:
         return self._seq[element]
+
+    def parent(self, element):
+        return self._parent[element]
+
+    def ancestry(self, element) -> list:
+        """`element` and its ancestors, the document element first."""
+        chain = []
+        while element is not None:
+            chain.append(element)
+            element = self._parent[element]
+        return chain[::-1]
+
+    def base_uri(self, element, document_url: str) -> str:
+        """The base URI in effect at `element` (XML Base): the document's URL,
+        changed by every xml:base written on the element or its ancestors, the
+        outermost first. An href written on `element` is resolved against it."""
+        base = document_url
+        for e in self.ancestry(element):
+            written = e.get(f"{{{XML_NS}}}base")
+            if written is not None:
+                base = urljoin(base, written)
+        return base
+
+    def resolve_href(self, href: str, element, document_url: str) -> str:
+        """`href`, written on `element`, as an absolute URL (RFC 3986 against the effective base URI)."""
+        return urljoin(self.base_uri(element, document_url), href)
 
     def namespaces(self) -> dict:
         """The bindings declared on the document element, as written."""
@@ -231,16 +262,17 @@ def _fact(doc: XmlDoc, element) -> dict:
     return out
 
 
-def read_instance(raw: bytes, name: str = "instance") -> dict:
+def read_instance(raw: bytes | None, name: str = "instance", doc: XmlDoc | None = None) -> dict:
     """Every top-level element of an instance, in document order.
 
     `node` says which XBRL element it is, by its element name only:
     "context" (xbrli:context), "unit" (xbrli:unit), "fact" (an element
     outside the xbrli and link namespaces that carries contextRef), "link"
     (an element in the link namespace: schemaRef, footnoteLink, ...), or
-    "other" (anything else, a tuple say), returned as XML.
+    "other" (anything else, a tuple say), returned as XML. `doc` is the file
+    already parsed, if it was.
     """
-    doc = XmlDoc(raw, name)
+    doc = doc if doc is not None else XmlDoc(raw, name)
     root_ns, root_local = split(doc.root.tag)
     unresolved = list(doc.conflicts())
     if (root_ns, root_local) != (XBRLI, "xbrl"):
