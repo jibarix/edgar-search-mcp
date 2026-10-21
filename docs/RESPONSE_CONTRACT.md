@@ -270,7 +270,11 @@ to (its discoverable taxonomy set, as far as it lies inside the filing): from
 each schema read, the schemas its `xs:import` and `xs:include` name
 (`schemaLocation`), the linkbases its `link:linkbaseRef` names and those
 written inside it; the linkbases the instance names with `link:linkbaseRef`;
-and a schema of the filing that a locator points to. Every href and
+and a schema of the filing that a locator, `roleRef` or `arcroleRef` of a
+linkbase or the instance points to. These files are found before the part is
+chosen, following the locators of every extended link whatever its element,
+so every schema and linkbase part reads the same files and lists the same
+`schemas`. Every href and
 `schemaLocation` is resolved against the base URI in effect where it is
 written (the file's URL, changed by any inherited `xml:base`). Each file is
 read once; a reference back to a file already read stops there. `schemas`
@@ -305,7 +309,7 @@ The XBRL files of one filing, one `part` at a time:
   element tree (every report with its `Role`, `LongName`, `MenuCategory`,
   `HtmlFileName` and `Position` as written), or null when there is none.
 - `schema`: the declarations of the company schema and of every schema of the
-  filing it imports or includes, file by file in discovery order and in
+  filing reached as described above, file by file in discovery order and in
   document order within a file (each item has `file`), each by its XML
   construct (`import`, `include`, `linkbaseRef`, `roleType`,
   `arcroleType`, `element`, `linkbase` for one written inside the schema,
@@ -322,7 +326,10 @@ The XBRL files of one filing, one `part` at a time:
   `schemaLocation` or `href` resolved. `target_namespace` and `namespaces` are
   the company schema's; each schema's own `target_namespace` is in `schemas`.
   Imported schemas outside the filing, a QName that does not resolve and an
-  id two elements share are listed in `unresolved`.
+  id two elements share are listed in `unresolved`, and so is each schema
+  outside the filing that a linkbase or the instance points to (`schema`, and
+  `references`, how many references by element: `loc`, `roleRef`,
+  `arcroleRef`).
 - `presentation`, `calculation`, `definition`, `label`, `reference`: every
   extended link of that element (`extended_link_element`, for instance
   `{http://www.xbrl.org/2003/linkbase}calculationLink`) in every linkbase

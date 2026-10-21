@@ -687,6 +687,29 @@ def read_linkbase(doc: XmlDoc, linkbase, file: str, part: str, target_of,
     return items, unresolved
 
 
+def linkbase_references(doc: XmlDoc, linkbase, url: str | None = None) -> list:
+    """Every reference one linkbase element makes to another file, whatever
+    part returns it: each roleRef and arcroleRef, and each locator of every
+    extended link of any element, in document order, as {"seq", "node",
+    "href", "url"}. With `url` (the file's URL) each href is resolved against
+    the base URI in effect where it is written; without it `url` is the href
+    as written."""
+    found = []
+    for element in linkbase:
+        ns, local = split(element.tag)
+        if ns == LINK and local in ("roleRef", "arcroleRef"):
+            candidates = [(local, element)]
+        elif element.get(_XLINK_TYPE) == "extended":
+            candidates = [("loc", c) for c in element if c.get(_XLINK_TYPE) == "locator"]
+        else:
+            continue
+        for node, e in candidates:
+            href = e.get(_XLINK_HREF)
+            found.append({"seq": doc.seq(e), "node": node, "href": href,
+                          "url": doc.resolve_href(href, e, url) if url is not None and href else href})
+    return found
+
+
 def extended_link_counts(doc: XmlDoc, linkbase) -> dict:
     """How many extended links of each element ("{namespace}local") the linkbase holds, whichever part returns them."""
     counts = {}

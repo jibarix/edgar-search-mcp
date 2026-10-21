@@ -11,6 +11,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 import types
@@ -1441,6 +1442,81 @@ def exact_number_cases():
             filing_retrieval.filing_cache.delete(key)
 
 
+# ── Round 3, blocker 1: the files read do not depend on the part asked for ──
+
+def b_schema(name, element, linkbase):
+    """A filing schema declaring `element` whose only linkbase is `linkbase` (link:linkbaseRef)."""
+    return (f'<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" {LB_NS} '
+            'xmlns:xbrli="http://www.xbrl.org/2003/instance" targetNamespace="http://t.example/b">'
+            '<xs:annotation><xs:appinfo><link:linkbaseRef xlink:type="simple" '
+            f'xlink:href="{linkbase}" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>'
+            f'</xs:appinfo></xs:annotation><xs:element id="{element}" name="{element[2:]}" '
+            'type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" xbrli:periodType="instant"/>'
+            '</xs:schema>').encode()
+
+
+def dts_closure_cases():
+    # The reviewer's probe: a presentation locator points to b.xsd, and b.xsd references the only label
+    # linkbase. The filing's own label linkbase is not referenced.
+    folder = filed()
+    folder["t-20251231.xsd"] = re.sub(rb'<link:linkbaseRef [^>]*t-20251231_lab\.xml"/>', b"",
+                                      folder["t-20251231.xsd"])
+    del folder["t-20251231_lab.xml"]
+    opening = b'<link:presentationLink xlink:type="extended" xlink:role="http://t.example/role/Income">'
+    assert opening in folder["t-20251231_pre.xml"]
+    folder["t-20251231_pre.xml"] = folder["t-20251231_pre.xml"].replace(
+        opening, opening + b'<link:loc xlink:type="locator" xlink:href="b.xsd#b_Thing" xlink:label="b_Thing"/>', 1)
+    folder["b.xsd"] = b_schema("b.xsd", "b_Thing", "b_lab.xml")
+    folder["b_lab.xml"] = label_linkbase("b.xsd#b_Thing", "Thing from b")
+    r, code = xbrl_call(folder, part="label")
+    mine = [i for i in (r["items"] if r else []) if i.get("file") == "b_lab.xml"]
+    loc = [i for i in mine if i["node"] == "loc"]
+    check("r3 b1: part=label reads the label linkbase of a schema found only through a presentation locator",
+          code is None and any(i["node"] == "resource" and i["text"] == "Thing from b" for i in mine)
+          and loc and loc[0]["target"].get("resolved") is True and loc[0]["target"].get("file") == "b.xsd",
+          code or str(r and (r["items"][:3], r["unresolved"])))
+    lists = {}
+    for part in ("schema", "presentation", "calculation", "definition", "label", "reference"):
+        r, code = xbrl_call(folder, part=part)
+        lists[part] = (code, r and [x["name"] for x in r["schemas"]],
+                       r and [(f.get("name") or f.get("embedded_in")) for f in r.get("linkbases", [])])
+    check("r3 b1: every part reads the same schemas, b.xsd among them",
+          all(c is None and names == ["t-20251231.xsd", "b.xsd"] for c, names, _ in lists.values()), str(lists))
+    check("r3 b1: every linkbase part reads the same linkbases, b_lab.xml among them",
+          len({tuple(l) for p, (_, _, l) in lists.items() if p != "schema"}) == 1
+          and "b_lab.xml" in lists["label"][2], str(lists))
+    r, code = xbrl_call(folder, part="schema")
+    check("r3 b1: part=schema returns the declarations of b.xsd, found through the presentation locator",
+          code is None and any(i.get("file") == "b.xsd" and i["node"] == "element" and i.get("name") == "Thing"
+                               for i in r["items"])
+          and any(x["name"] == "b.xsd" and x["discovered_by"].get("node") == "loc"
+                  and x["discovered_by"].get("file") == "t-20251231_pre.xml" for x in r["schemas"]),
+          code or str(r and r["schemas"]))
+
+    # A roleRef is a reference too: a linkbase's roleRef to a filing schema discovers it, and its linkbases.
+    folder = filed()
+    folder["t-20251231_cal.xml"] = folder["t-20251231_cal.xml"].replace(
+        b"<link:calculationLink ", b'<link:roleRef roleURI="http://t.example/role/C" '
+                                   b'xlink:type="simple" xlink:href="c.xsd#C"/><link:calculationLink ', 1)
+    folder["c.xsd"] = b_schema("c.xsd", "c_Other", "c_lab.xml").replace(
+        b"</xs:appinfo>", b'<link:roleType roleURI="http://t.example/role/C" id="C">'
+                          b'<link:usedOn>link:calculationLink</link:usedOn></link:roleType></xs:appinfo>', 1)
+    folder["c_lab.xml"] = label_linkbase("c.xsd#c_Other", "Other from c")
+    r, code = xbrl_call(folder, part="label")
+    check("r3 b1: a roleRef in a calculation linkbase discovers c.xsd, whose label linkbase part=label reads",
+          code is None and any(i.get("file") == "c_lab.xml" and i.get("text") == "Other from c" for i in r["items"])
+          and any(x["name"] == "c.xsd" and x["discovered_by"].get("node") == "roleRef" for x in r["schemas"]),
+          code or str(r and r["schemas"]))
+
+    # A schema outside the filing that only a locator names is named, whatever the part.
+    folder = filed()
+    r, code = xbrl_call(folder, part="schema")
+    gaap = "https://xbrl.fasb.org/us-gaap/2024/elts/us-gaap-2024.xsd"
+    check("r3 b1: part=schema names the outside schema the linkbases' locators point to",
+          code is None and any(u.get("schema") == gaap and u.get("references", {}).get("loc") for u in r["unresolved"]),
+          code or str(r and r["unresolved"]))
+
+
 if __name__ == "__main__":
     no_implicit_filter_cases()
     discovery_cases()
@@ -1449,6 +1525,7 @@ if __name__ == "__main__":
     lossless_cases()
     tuple_cases()
     exact_number_cases()
+    dts_closure_cases()
     search_cases()
     client_cases()
     lookup_cases()
