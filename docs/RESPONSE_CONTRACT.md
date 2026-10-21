@@ -102,7 +102,8 @@ drops an item.
 ### Errors
 
 A tool that cannot do its work raises an error whose message starts with a
-code: `INVALID_INPUT`, `AMBIGUOUS_COMPANY`, `NOT_FOUND`, `RATE_LIMITED`,
+code (over MCP the SDK puts `Error executing tool <name>: ` before it, so
+the code follows that prefix in the result's text): `INVALID_INPUT`, `AMBIGUOUS_COMPANY`, `NOT_FOUND`, `RATE_LIMITED`,
 `UPSTREAM_UNAVAILABLE`, `UNSUPPORTED_DOCUMENT`, `NO_USER_AGENT`,
 `NO_FROZEN_COPY`. A normal answer with nothing in it always means the SEC had
 nothing, never that a request failed.

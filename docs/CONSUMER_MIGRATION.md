@@ -23,12 +23,49 @@ The answer shapes are defined in [RESPONSE_CONTRACT.md](RESPONSE_CONTRACT.md).
 | error codes | unchanged, except `INDEX_UNAVAILABLE` (removed) and `NO_FROZEN_COPY` (new) |
 
 How results reach the caller did not change: over MCP the answer is the tool's
-dict (`structured_content`, or the JSON text), and an error is an MCP error
-whose text starts with the code (`valuation/tools.py:73-80`,
-`valuation/statements.py:983-994`; `peer_count.py:120` still finds
-`RATE_LIMITED` in it). Called in-process, each tool still has `__wrapped__`
-(`functools.wraps`), takes the same first positional argument, and raises
-instead of returning an error.
+dict (`structured_content` when the client gets one, otherwise the JSON text in
+`content[0].text`), and an error is an MCP result with `is_error` set. Its
+text is the SDK's prefix `Error executing tool <name>: ` followed by the code
+and the message (for example `Error executing tool get_companyfacts:
+INVALID_INPUT: ...`), so look for the code after the prefix, not at the start
+(`valuation/tools.py:73-80`, `valuation/statements.py:983-994`;
+`peer_count.py:120` finds `RATE_LIMITED` anywhere in it, which still works).
+
+### Calling the tools: use MCP, not `__wrapped__`
+
+`valuation/filed_facts.py:59-69` (`tools()`) imports `edgar_mcp.server` and
+calls `getattr(server.<tool>, "__wrapped__", ...)`. That reaches past the MCP
+layer into an implementation detail: `__wrapped__` is what
+`functools.wraps` leaves on the async wrapper, it is not part of the 1.0
+contract, it skips argument validation, and it raises Python exceptions
+instead of returning coded errors. The tool it looks up,
+`get_filed_statements`, is also gone, so the `facts` parameter check there
+fails with a RuntimeError. Replace it with an MCP call, as the rest of the
+app already does:
+
+- Out of process, the app's own session in `valuation/tools.py:60-80`
+  (`stdio_client` on `python -m edgar_mcp`, `ClientSession.call_tool`) is
+  the supported route: call `get_filing_xbrl` and `list_filings` through it
+  and read the dict it returns.
+- In process (tests, or one-off scripts), connect the MCP client to the
+  server object, which runs every tool through the same validation and
+  error path as stdio:
+
+  ```python
+  import json
+  from mcp import Client
+  from edgar_mcp import server
+
+  async with Client(server.mcp) as client:
+      result = await client.call_tool("get_filing_xbrl", {"cik_or_ticker": "320193", "form": "10-K",
+                                                           "part": "instance", "concepts": ["us-gaap:Revenues"]})
+      if result.is_error:
+          ...  # result.content[0].text holds the code after the SDK prefix
+      answer = result.structured_content or json.loads(result.content[0].text)
+  ```
+
+The identification `tools()` records (`edgar_mcp.__version__` and the
+module path) can stay; it is read from the package, not from a tool.
 
 `statements._Session.call` logs `data.get("source_url") or data.get("url")`
 (`valuation/statements.py:983-994`). In 1.0 use `data["sources"][0]["url"]`;
@@ -124,7 +161,10 @@ those keys of the chosen row.
 
 `fetch(url, max_bytes=)` still returns `(body, content_type)`, `get_json(url)`
 still returns `(data, meta)` with `meta["source_url"]` and
-`meta["retrieved_at"]`, and `SecNotFound` and `SecError` are unchanged. New:
+`meta["retrieved_at"]`, and `SecNotFound` and `SecError` are unchanged.
+`get_json` no longer rounds numbers: one a double cannot carry exactly is a
+string holding the SEC's text, and `meta["numbers_as_text"]` lists its path
+(see the response contract, "Numbers"). New:
 `fetch_response(url, max_bytes=)` returns the response with its retrieval time.
 Callers: `valuation/facts.py:18`, `valuation/companies.py:34`,
 `valuation/peer_universe.py:487-495`, `sp_aggregates/identity.py:24,146-166`,
@@ -135,11 +175,45 @@ Callers: `valuation/facts.py:18`, `valuation/companies.py:34`,
 
 ### Version and build checks
 
-`edgar_mcp.__version__` is `1.0.0rc1`. `valuation/build.py:84-107` (version,
-path, wheel and the `requirements.lock` pin) and
-`valuation/filed_facts.py:59-69` (which requires a `facts` parameter on
-`get_filed_statements`) need the new version and, for the second, the
-rebuild below.
+`edgar_mcp.__version__` is `1.0.0rc2`. Three checks in the app have to
+change before it can run on 1.0; updating the version number in
+`requirements.lock` is not enough.
+
+1. **The lock-file pattern rejects a pre-release.** `valuation/build.py:95`
+   reads the pin with
+   `edgar_search_mcp-([\d.]+)-py3-none-any\.whl`. `[\d.]+` stops at the
+   `r` of `1.0.0rc2` (and of `1.0.0rc1`), so the pattern does not match,
+   `locked` is None, and the assertion at `valuation/build.py:189-190`
+   fails even when the right wheel is installed and pinned. A wheel file
+   name puts no `-` inside the version, so `edgar_search_mcp-([^-]+)-py3-none-any\.whl`
+   reads every PEP 440 version (`1.0.0rc2`, `1.0.0`, `1.0.1.post1`).
+2. **The installed files are not compared with the wheel.** `build.py`
+   checks that `edgar_mcp` is imported from `site-packages`, that its
+   `__version__` equals the pinned version, and it hashes the installed
+   files into its own `code_sha256`. Nothing checks that those files are
+   the files of the pinned wheel: an edited or partly upgraded install with
+   the right version string passes. pip checks the wheel's hash at install
+   (`--require-hashes` with the lock's `--hash=sha256:`); after that, check
+   the installed content against the wheel's `RECORD`, which pip installs
+   beside the package:
+
+   ```python
+   import base64, hashlib, importlib.metadata
+   dist = importlib.metadata.distribution("edgar-search-mcp")
+   for f in dist.files:
+       if f.hash is None:  # RECORD itself and compiled .pyc files carry no hash
+           continue
+       digest = base64.urlsafe_b64encode(hashlib.sha256(f.locate().read_bytes()).digest()).rstrip(b"=").decode()
+       assert f.hash.mode == "sha256" and f.hash.value == digest, f"installed {f} differs from the wheel"
+   ```
+
+   The release's `edgar_search_mcp-<version>.manifest.json` lists every
+   file of the wheel with its sha256 and the wheel's own sha256, so the
+   `RECORD` can also be compared with the release, and the lock's hash with
+   `wheel_sha256`.
+3. **The tool the app unwraps is gone.** `valuation/filed_facts.py:59-69`
+   requires a `facts` parameter on `get_filed_statements`; see "Calling the
+   tools" above for what replaces both the tool and the unwrapping.
 
 ## Tools
 
@@ -304,6 +378,7 @@ choice below is now the consumer's.
 | `lines[].values[]`, `by_member[]`, `columns` | `part="instance"`: facts (`concept`, `contextRef`, `unitRef`, `decimals`, `precision`, `nil`, `text`), contexts (entity, period as written, `segment.explicit_members`, typed members) and units. Every duplicate is returned. 0.8's `conflict` (two values for one cell) is for the consumer to detect |
 | `calculation_checks[]`, `roll_forward_checks[]` | the consumer computes them from the calculation arcs and the instance facts |
 | `requested_facts` (`facts=`) | `part="instance"` with `concepts=["prefix:Local", "{namespace}Local" or "Local"]` (up to 50); `concept_matches` says what each name matched. `tagged_by_member` and `by_member` come from the contexts' `explicit_members` |
+| `lines[].values_from_member` (`values` taken from one member, with `member`) | nothing: 1.0 never moves a dimensioned value onto an undimensioned line. 0.8 did it when a face line had no fact without dimensions, exactly one single-dimension member fact per column, and the line's calculation parent had no fact under that member (Tesla's "Operating lease vehicles, net"); a JPM-style total under the member left the line alone. In 1.0 those facts are in `part="instance"` with their context's `segment.explicit_members`, and the presentation and calculation arcs are in their parts, so a consumer that wants the rule applies it itself and records that it did. The valuation app does not read `values_from_member` (no match in `valuation/`); it reads `by_member` (`valuation/filed_facts.py:173-188,454,623,672`), which maps to the contexts' members as in the `requested_facts` row |
 | `cover_shares[]`, `document_facts`, `registered_securities[]` | the cover's dei facts in `part="instance"` (for example `dei:EntityCommonStockSharesOutstanding`, `dei:EntityRegistrantName`, `dei:EntityCentralIndexKey`, `dei:Security12bTitle`, `dei:TradingSymbol`) with their contexts. The share class is the context's member, as tagged |
 | `conflicts[]` | the consumer: facts with one concept, context and unit and different text |
 | `sources[]` (`file`, `sha256`) | `sources[]` (`url`, `sha256`, ...) and `file` on every part |
@@ -366,9 +441,24 @@ services), and kept one currency and one period. It reported `total_revenue`,
 
 1. `get_filing_xbrl(cik, form="10-K", part="instance", concepts=[...])`, where
    the consumer names the revenue concepts it accepts.
-2. Each fact's context gives the period and `segment.explicit_members`
-   (dimension and member as namespace and local name). A fact whose context
-   has no members is the undimensioned total.
+2. Each fact's context gives the period and its dimensional qualifiers.
+   Read all of them: `segment.explicit_members` (dimension and member as
+   namespace and local name), `segment.typed_members` (the dimension and its
+   value as XML), the same two lists under `scenario` (XBRL allows
+   dimensions there too), and the `other` lists of `segment` and `scenario`,
+   which hold any other qualifier as XML. `segment` or `scenario` is null
+   when the context has none.
+   A context with none of these written is not thereby the company's total.
+   It means only that the filer wrote no qualifier. Whether that fact is
+   the consolidated total depends on the concept, on the default member
+   of each axis (dimension-default arcs in `part="definition"`), and on
+   what the filer presents. A filer can report a figure with no dimensions
+   that is not the total of the members, and members that do not add up
+   to it. Equally, a total can be tagged under an axis's default member
+   written explicitly. Deciding which fact is the total, and whether
+   members should sum to it, is the consumer's call (compare the face
+   statement's presentation and calculation arcs, for example). Record that
+   decision rather than infer it from an empty context.
 3. Member labels come from `part="label"` for the company's own members, or
    from the taxonomy for standard ones.
 4. Shares, sums and the choice of axis, unit and period are the consumer's.

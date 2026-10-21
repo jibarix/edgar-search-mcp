@@ -275,8 +275,8 @@ still answers, with `filing_summary` null and the missing file named in
 
 ## Errors
 
-A tool that cannot do its work returns an MCP error whose message starts with a
-code:
+A tool that cannot do its work returns an MCP error whose message, after the
+MCP SDK's prefix `Error executing tool <name>: `, starts with a code:
 
 | Code | Meaning |
 |------|---------|
