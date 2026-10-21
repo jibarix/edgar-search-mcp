@@ -1700,6 +1700,97 @@ def record_number_cases():
         filing_retrieval.filing_cache.delete("submissions_0000000099")
 
 
+# ── Round 3, doc gap 4: the installed-content check of CONSUMER_MIGRATION.md catches stale files ──
+
+def install_check_cases():
+    import re as _re
+    import shutil
+    import zipfile
+    doc = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs",
+                            "CONSUMER_MIGRATION.md"), encoding="utf-8").read()
+    blocks = [b for b in _re.findall(r"```python\n(.*?)```", doc, flags=_re.S) if "def check_install" in b]
+    check("r3 doc: CONSUMER_MIGRATION.md has one installed-content check (check_install)", len(blocks) == 1,
+          str(len(blocks)))
+    if len(blocks) != 1:
+        return
+    lines = blocks[0].splitlines()
+    indent = min(len(l) - len(l.lstrip()) for l in lines if l.strip())
+    code = "\n".join(l[indent:] for l in lines)
+    code = code[:code.index("# locked_sha256:")]  # the last lines run it on the real install
+    ns = {}
+    exec(compile(code, "CONSUMER_MIGRATION.md", "exec"), ns)
+
+    dist_info = "edgar_search_mcp-1.0.0rc3.dist-info"
+    contents = {"edgar_mcp/__init__.py": b'__version__ = "1.0.0rc3"\n', "edgar_mcp/server.py": b"x = 1\n",
+                "edgar_mcp/edgar/xbrl_source.py": b"y = 2\n", f"{dist_info}/METADATA": b"Name: edgar-search-mcp\n",
+                f"{dist_info}/WHEEL": b"Wheel-Version: 1.0\n", f"{dist_info}/RECORD": b"(as built)\n"}
+    tmp = tempfile.mkdtemp(prefix="r3_install_")
+    try:
+        wheel = os.path.join(tmp, "edgar_search_mcp-1.0.0rc3-py3-none-any.whl")
+        with zipfile.ZipFile(wheel, "w") as z:
+            for name, data in contents.items():
+                z.writestr(name, data)
+        locked = hashlib.sha256(open(wheel, "rb").read()).hexdigest()
+        manifest = os.path.join(tmp, "manifest.json")
+        with open(manifest, "w", encoding="utf-8") as f:
+            json.dump({"wheel_sha256": locked, "files": [{"path": n, "sha256": hashlib.sha256(d).hexdigest()}
+                                                         for n, d in contents.items()]}, f)
+
+        def install():
+            site = os.path.join(tmp, "site")
+            shutil.rmtree(site, ignore_errors=True)
+            with zipfile.ZipFile(wheel) as z:
+                z.extractall(site)
+            # What pip does beside the files: rewrite RECORD, add INSTALLER, compile bytecode.
+            open(os.path.join(site, dist_info, "RECORD"), "w").write("rewritten by pip\n")
+            open(os.path.join(site, dist_info, "INSTALLER"), "w").write("pip\n")
+            os.makedirs(os.path.join(site, "edgar_mcp", "__pycache__"))
+            open(os.path.join(site, "edgar_mcp", "__pycache__", "server.cpython-313.pyc"), "wb").write(b"\0")
+            return site
+
+        def outcome(expected, site):
+            try:
+                ns["check_install"](expected, site)
+                return "pass"
+            except AssertionError as e:
+                return f"fail: {e}"
+        expected = ns["expected_from_wheel"](wheel, locked)
+        site = install()
+        check("r3 doc: a clean install passes (bytecode and pip's RECORD and INSTALLER aside)",
+              outcome(expected, site) == "pass", outcome(expected, site))
+        check("r3 doc: the manifest gives the same list as the wheel",
+              ns["expected_from_manifest"](manifest, locked) == expected)
+        open(os.path.join(site, "edgar_mcp", "edgar", "tag_classifier.py"), "w").write("stale = True\n")
+        got = outcome(expected, site)
+        check("r3 doc: a stale module the release does not have fails (unexpected)",
+              got.startswith("fail") and "tag_classifier.py" in got, got)
+        site = install()
+        open(os.path.join(site, "edgar_mcp", "server.py"), "w").write("x = 2\n")
+        got = outcome(expected, site)
+        check("r3 doc: a modified file fails", got.startswith("fail") and "modified ['edgar_mcp/server.py']" in got,
+              got)
+        site = install()
+        os.remove(os.path.join(site, "edgar_mcp", "edgar", "xbrl_source.py"))
+        got = outcome(expected, site)
+        check("r3 doc: a missing file fails",
+              got.startswith("fail") and "missing ['edgar_mcp/edgar/xbrl_source.py']" in got, got)
+        site = install()
+        os.makedirs(os.path.join(site, "edgar_search_mcp-0.8.0.dist-info"))
+        got = outcome(expected, site)
+        check("r3 doc: a leftover dist-info of another version fails",
+              got.startswith("fail") and "edgar_search_mcp-0.8.0.dist-info/" in got, got)
+        for label, fn, path in (("wheel", "expected_from_wheel", wheel), ("manifest", "expected_from_manifest",
+                                                                           manifest)):
+            try:
+                ns[fn](path, "0" * 64)
+                got = "pass"
+            except AssertionError:
+                got = "fail"
+            check(f"r3 doc: a {label} that is not the one the lock pins fails", got == "fail", got)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     no_implicit_filter_cases()
     discovery_cases()
@@ -1711,6 +1802,7 @@ if __name__ == "__main__":
     dts_closure_cases()
     index_cases()
     record_number_cases()
+    install_check_cases()
     search_cases()
     client_cases()
     lookup_cases()

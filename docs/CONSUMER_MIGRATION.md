@@ -194,24 +194,70 @@ change before it can run on 1.0; updating the version number in
    files into its own `code_sha256`. Nothing checks that those files are
    the files of the pinned wheel: an edited or partly upgraded install with
    the right version string passes. pip checks the wheel's hash at install
-   (`--require-hashes` with the lock's `--hash=sha256:`); after that, check
-   the installed content against the wheel's `RECORD`, which pip installs
-   beside the package:
+   (`--require-hashes` with the lock's `--hash=sha256:`). After that, compare
+   the installed files with a list you trust, never with the installed
+   `RECORD` (pip writes it, and it lists only the files it installed, so an
+   edited `RECORD` or a stale module left by an older version goes unseen).
+   The trusted list comes from the pinned wheel itself (its sha256 checked
+   against the lock) or from the release's
+   `edgar_search_mcp-<version>.manifest.json` (its `wheel_sha256` checked
+   against the lock). Then walk every file actually installed under
+   `edgar_mcp/` and the distribution's `.dist-info/`, leaving aside only
+   bytecode (`__pycache__`, `.pyc`) and the dist-info files pip writes
+   itself, so that a missing, modified or unexpected file fails, and so does
+   a second `edgar_search_mcp-*.dist-info` left by another version:
 
    ```python
-   import base64, hashlib, importlib.metadata
-   dist = importlib.metadata.distribution("edgar-search-mcp")
-   for f in dist.files:
-       if f.hash is None:  # RECORD itself and compiled .pyc files carry no hash
-           continue
-       digest = base64.urlsafe_b64encode(hashlib.sha256(f.locate().read_bytes()).digest()).rstrip(b"=").decode()
-       assert f.hash.mode == "sha256" and f.hash.value == digest, f"installed {f} differs from the wheel"
+   import hashlib, importlib.metadata, io, json, pathlib, zipfile
+
+   def expected_from_wheel(wheel, locked_sha256):
+       """Every file of the pinned wheel with its sha256, read from the wheel."""
+       body = pathlib.Path(wheel).read_bytes()
+       assert hashlib.sha256(body).hexdigest() == locked_sha256, "the wheel is not the one the lock pins"
+       with zipfile.ZipFile(io.BytesIO(body)) as z:
+           return {n: hashlib.sha256(z.read(n)).hexdigest() for n in z.namelist() if not n.endswith("/")}
+
+   def expected_from_manifest(manifest, locked_sha256):
+       """The same list from the release manifest, when the wheel is not kept."""
+       m = json.loads(pathlib.Path(manifest).read_text(encoding="utf-8"))
+       assert m["wheel_sha256"] == locked_sha256, "the manifest is not the pinned wheel's"
+       return {f["path"]: f["sha256"] for f in m["files"]}
+
+   PIP_WRITES = {"RECORD", "INSTALLER", "REQUESTED", "direct_url.json"}  # dist-info files pip writes
+
+   def check_install(expected, site=None):
+       """The installed package and dist-info against `expected`: missing, modified and unexpected files fail."""
+       if site is None:
+           site = importlib.metadata.distribution("edgar-search-mcp").locate_file("")
+       site = pathlib.Path(site)
+
+       def kept(path):
+           top, name = path.split("/")[0], path.rsplit("/", 1)[-1]
+           return not (top.endswith(".dist-info") and name in PIP_WRITES)
+       wanted = {p: h for p, h in expected.items() if kept(p)}
+       tops = {p.split("/")[0] for p in expected}  # edgar_mcp and edgar_search_mcp-<version>.dist-info
+       actual = {}
+       for top in tops:
+           for f in (site / top).rglob("*"):
+               path = f.relative_to(site).as_posix()
+               if f.is_file() and "__pycache__" not in f.parts and f.suffix != ".pyc" and kept(path):
+                   actual[path] = hashlib.sha256(f.read_bytes()).hexdigest()
+       missing = sorted(wanted.keys() - actual.keys())
+       unexpected = sorted(actual.keys() - wanted.keys())
+       unexpected += sorted(d.name + "/" for d in site.glob("edgar_search_mcp-*.dist-info") if d.name not in tops)
+       modified = sorted(p for p in wanted.keys() & actual.keys() if wanted[p] != actual[p])
+       assert not (missing or unexpected or modified), \
+           f"installed edgar_mcp differs from the release: missing {missing}, unexpected {unexpected}, " \
+           f"modified {modified}"
+
+   # locked_sha256: the --hash=sha256: of the wheel in requirements.lock
+   check_install(expected_from_wheel("edgar_search_mcp-1.0.0rc3-py3-none-any.whl", locked_sha256))
    ```
 
-   The release's `edgar_search_mcp-<version>.manifest.json` lists every
-   file of the wheel with its sha256 and the wheel's own sha256, so the
-   `RECORD` can also be compared with the release, and the lock's hash with
-   `wheel_sha256`.
+   `tests/test_tools_offline.py` (`install_check_cases`) runs this block
+   against a made-up install: a clean one passes, and a stale extra module,
+   a modified file, a missing file, a leftover dist-info folder and a wheel
+   or manifest that is not the pinned one each fail.
 3. **The tool the app unwraps is gone.** `valuation/filed_facts.py:59-69`
    requires a `facts` parameter on `get_filed_statements`; see "Calling the
    tools" above for what replaces both the tool and the unwrapping.
