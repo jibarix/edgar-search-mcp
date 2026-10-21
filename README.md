@@ -23,7 +23,7 @@ SEC had nothing. A failed request is a coded error, never an empty answer. The
 full contract is in [docs/RESPONSE_CONTRACT.md](docs/RESPONSE_CONTRACT.md), with
 a JSON Schema beside it.
 
-This is a release candidate, `1.0.0rc3`. The tools of 0.8 that classified,
+This is a release candidate, `1.0.0rc4`. The tools of 0.8 that classified,
 mapped or chose figures are gone. [docs/CONSUMER_MIGRATION.md](docs/CONSUMER_MIGRATION.md)
 lists every removed or changed tool and field and how to rebuild each from the
 raw data. [CHANGELOG.md](CHANGELOG.md) has the history.

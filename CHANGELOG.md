@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.0rc4
+
+A review of 1.0.0rc3 found unread references missing from linkbase answers.
+**Breaking** against rc3:
+
+- **Every unread reference in every part**: each address that a locator,
+  `roleRef` or `arcroleRef` anywhere in the filing (any linkbase, or the
+  instance) names and that is not read (outside the filing, not one file of
+  the folder, no href) is listed once in `unresolved` by every schema and
+  linkbase part, with `schema`, `references` (counts by element),
+  `referenced_from` and `reason`. Linkbase parts add `locators`, the count of
+  their own locators into it, possibly 0. rc3 listed them only for
+  `part="schema"`; a linkbase part named only outside schemas its own
+  locators pointed to (so `part="label"` could return empty `items` and empty
+  `unresolved` while a presentation locator named an unread schema), and
+  references into the folder that name no single file, or with no href, were
+  dropped in every part.
+
 ## 1.0.0rc3
 
 A review of 1.0.0rc2 found three places where an answer depended on the

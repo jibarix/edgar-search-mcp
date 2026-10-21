@@ -176,18 +176,18 @@ Callers: `valuation/facts.py:18`, `valuation/companies.py:34`,
 
 ### Version and build checks
 
-`edgar_mcp.__version__` is `1.0.0rc3`. Three checks in the app have to
+`edgar_mcp.__version__` is `1.0.0rc4`. Three checks in the app have to
 change before it can run on 1.0; updating the version number in
 `requirements.lock` is not enough.
 
 1. **The lock-file pattern rejects a pre-release.** `valuation/build.py:95`
    reads the pin with
    `edgar_search_mcp-([\d.]+)-py3-none-any\.whl`. `[\d.]+` stops at the
-   `r` of `1.0.0rc3` (and of the earlier release candidates), so the pattern does not match,
+   `r` of `1.0.0rc4` (and of the earlier release candidates), so the pattern does not match,
    `locked` is None, and the assertion at `valuation/build.py:189-190`
    fails even when the right wheel is installed and pinned. A wheel file
    name puts no `-` inside the version, so `edgar_search_mcp-([^-]+)-py3-none-any\.whl`
-   reads every PEP 440 version (`1.0.0rc3`, `1.0.0`, `1.0.1.post1`).
+   reads every PEP 440 version (`1.0.0rc4`, `1.0.0`, `1.0.1.post1`).
 2. **The installed files are not compared with the wheel.** `build.py`
    checks that `edgar_mcp` is imported from `site-packages`, that its
    `__version__` equals the pinned version, and it hashes the installed
@@ -251,7 +251,7 @@ change before it can run on 1.0; updating the version number in
            f"modified {modified}"
 
    # locked_sha256: the --hash=sha256: of the wheel in requirements.lock
-   check_install(expected_from_wheel("edgar_search_mcp-1.0.0rc3-py3-none-any.whl", locked_sha256))
+   check_install(expected_from_wheel("edgar_search_mcp-1.0.0rc4-py3-none-any.whl", locked_sha256))
    ```
 
    `tests/test_tools_offline.py` (`install_check_cases`) runs this block
