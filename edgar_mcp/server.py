@@ -2,8 +2,9 @@
 
 Tools:
     lookup_company       - resolve a name or ticker to SEC CIK
-    get_financial_statement - normalized BS / IS / CF / EQ / CI facts by period
-    get_concept          - filed values of a single XBRL concept
+    get_companyfacts     - the SEC companyfacts document, unchanged (literal key filters)
+    get_companyconcept   - the SEC companyconcept document, unchanged
+    get_frames           - the SEC frames document, unchanged
     list_filings         - filings with accession number, dates and document URL
     list_filing_documents - every document of one filing: main document, exhibits, data files
     get_filing_text      - plain text of a filing document (main document or exhibit), in pages
@@ -36,17 +37,16 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import ToolAnnotations
 
 from edgar_mcp import __version__
+from edgar_mcp.contract import envelope, source
 from edgar_mcp.edgar import filed_statements as fs
 from edgar_mcp.edgar.company_lookup import find_company, format_cik, get_company_tickers
 from edgar_mcp.edgar.filing_retrieval import FilingRetrieval
-from edgar_mcp.edgar.xbrl_parser import XBRLParser
 from edgar_mcp.utils.helpers import iso_date
 from edgar_mcp.utils.sec_client import SecError, SecNotFound, SecUnsupported, fetch_response, get_json
 
 mcp = MCPServer("edgar-search", version=__version__)
 
 _filings = FilingRetrieval()
-_parser = XBRLParser()
 
 _classifier_index: dict | None = None
 
@@ -61,14 +61,6 @@ _MAX_MATCHES = 40
 # Changes whenever the HTML-to-text rules below change, since offsets depend on them.
 _EXTRACTION = "tags-stripped-v2"  # v2: invisible characters removed
 _MAX_FIND_CHARS = 200
-_EMPTY_REASONS = {
-    "NO_FACTS": "the SEC returned no XBRL facts for this company",
-    "NO_SUPPORTED_TAXONOMY": "the company reports in neither us-gaap nor ifrs-full",
-    "NO_FACTS_FOR_STATEMENT": "none of its reported concepts belong to this statement",
-    "UNSUPPORTED_UNITS": "its figures for this statement are in units this tool does not read",
-    "NOTHING_ON_FILE_AT_CUTOFF": "nothing for this statement had been filed by the cutoff date",
-    "INSUFFICIENT_PERIOD_EVIDENCE": "facts exist, but none could be placed in a fiscal period of this type",
-}
 _SEARCH_URL = "https://efts.sec.gov/LATEST/search-index"
 _SEARCH_PAGE = 100
 _DISPLAY_NAME = re.compile(r"^(?P<name>.*?)\s*(?:\((?P<tickers>[^()]*)\)\s*)?\(CIK (?P<cik>\d{10})\)$")
@@ -164,141 +156,63 @@ def lookup_company(query: str) -> dict:
 
 
 @_tool
-def get_financial_statement(
-    cik_or_ticker: str,
-    statement_type: Literal["BS", "IS", "CF", "EQ", "CI", "ALL"],
-    period_type: Literal["annual", "quarterly", "ytd"] = "annual",
-    num_periods: int = 4,
-    as_of: str | None = None,
-) -> dict:
-    """Retrieve the reported facts of one financial statement, by period.
+def get_companyfacts(cik_or_ticker: str, taxonomy: str | None = None, concept: str | None = None) -> dict:
+    """The SEC companyfacts document of one company, unchanged.
 
     `cik_or_ticker` accepts a CIK, an exact ticker or an exact company name.
-
-    These are the whole-company facts the SEC publishes from XBRL filings,
-    grouped by statement. They are not the full statement as filed: facts
-    split by share class, segment or geography, and company-specific line
-    items, are not included (read those with `get_filing_text`). Only
-    amounts in USD are returned; anything left out is named in
-    `metadata.skipped_units`.
-
-    `period_type`: "annual" returns fiscal years; "quarterly" returns single
-    fiscal quarters (a quarter the company did not report on its own is
-    derived as year-to-date minus the prior year-to-date; its entry in
-    `sources` is marked `derived` and gives both figures and their filings);
-    "ytd" returns the fiscal year to date at each quarter end. To build a
-    trailing twelve months, take the last fiscal year, add the current "ytd"
-    and subtract the "ytd" one year earlier.
-
-    `as_of` (YYYY-MM-DD) ignores anything filed after that date. Each value
-    carries the accession number, form and filing date it came from in
-    `sources`; when a period was reported more than once, the latest
-    periodic report wins. Read `metadata.warnings` before using the figures.
+    Without filters `payload` is the document as the SEC published it
+    (`representation` "source"). With `taxonomy` (and optionally `concept`)
+    `payload.facts` keeps only those keys, compared literally (case
+    included); every unit and every observation under them is unchanged and
+    every other key of the document is kept (`representation`
+    "source_records"). A key the document does not have gives an empty
+    `facts`, which means the SEC published nothing under it.
     """
-    _bounded("num_periods", num_periods, 1, 40)
-    if as_of is not None:
-        iso_date(as_of)
+    if concept is not None and taxonomy is None:
+        raise ValueError("`concept` needs `taxonomy`: the companyfacts document keys concepts by taxonomy")
     company = _resolve(cik_or_ticker)
-
-    facts, meta = _filings.get_company_facts(company["cik"])
-    normalized = _parser.parse_company_facts(
-        facts,
-        statement_type=statement_type,
-        period_type=period_type,
-        num_periods=num_periods,
-        as_of=as_of,
-    )
-    if not normalized["periods"]:
-        # The reason is part of the error: "nothing filed", "filed in another
-        # currency" and "fiscal calendar unclear" call for different next steps.
-        details = normalized["metadata"]
-        reason = _EMPTY_REASONS.get(details["empty_reason"], details["empty_reason"])
-        skipped = details.get("skipped_units")
-        raise SecNotFound(
-            f"{details['empty_reason']}: no {statement_type} {period_type} figures for CIK {company['cik']}"
-            + (f" as of {as_of}" if as_of else "") + f"; {reason}"
-            + (f"; units left out: {skipped}" if skipped else "")
-            + "".join(f"; {w}" for w in details["warnings"] if "skipped_units" not in w))
-
-    return {
-        "cik": company["cik"],
-        "entity_name": facts.get("entityName", ""),
-        "matched_on": company["matched_on"],
-        "statement_type": statement_type,
-        "period_type": period_type,
-        **meta,
-        **normalized,
-    }
+    data, meta = _filings.get_company_facts(company["cik"])
+    filters = {"taxonomy": taxonomy, "concept": concept}
+    if taxonomy is None:
+        return envelope("source", [source(meta)], cik=company["cik"], filters=filters, payload=data)
+    facts = data.get("facts") if isinstance(data.get("facts"), dict) else {}
+    kept = {}
+    if taxonomy in facts:
+        concepts = facts[taxonomy]
+        kept[taxonomy] = (concepts if concept is None
+                          else {concept: concepts[concept]} if isinstance(concepts, dict) and concept in concepts
+                          else {})
+    payload = {k: (kept if k == "facts" else v) for k, v in data.items()}
+    return envelope("source_records", [source(meta)], cik=company["cik"], filters=filters, payload=payload)
 
 
 @_tool
-def get_concept(
-    cik_or_ticker: str,
-    concept: str,
-    taxonomy: Literal["us-gaap", "ifrs-full", "dei"] = "us-gaap",
-    unit: str | None = None,
-    as_of: str | None = None,
-    limit: int = 100,
-    period_end_from: str | None = None,
-    period_end_to: str | None = None,
-    offset: int = 0,
-) -> dict:
-    """Retrieve the filed values of a single XBRL concept, newest period first.
+def get_companyconcept(cik_or_ticker: str, taxonomy: str, concept: str) -> dict:
+    """The SEC companyconcept document of one company and concept, unchanged:
+    every unit and every observation, in the SEC's order.
 
-    Use this for anything `get_financial_statement` does not group, for
-    example the cover-page share count (`taxonomy="dei"`,
-    `concept="EntityCommonStockSharesOutstanding"`).
-
-    Every filing that reported a period contributes a row, so the same
-    period appears more than once; each row has its accession number, form
-    and filing date. `as_of` (YYYY-MM-DD) leaves out rows filed after that
-    date. `unit` (for example "USD" or "shares") is needed only when the
-    concept was reported in more than one unit. Rows are whole-company
-    values: a figure reported separately for each share class is not here.
-
-    `period_end_from` and `period_end_to` (YYYY-MM-DD, inclusive) keep only
-    rows whose period ends in that range. When `next_offset` is not null
-    there are more rows: call again with it as `offset`.
+    `taxonomy` and `concept` are put into the SEC address as given (checked
+    for syntax only), so "Revenues" and "revenues" are different requests.
+    A concept the company never reported is NOT_FOUND, as the SEC answers.
     """
-    _bounded("limit", limit, 1, 500)
-    _bounded("offset", offset, 0, 10**6)
-    for bound in (as_of, period_end_from, period_end_to):
-        if bound is not None:
-            iso_date(bound)
     company = _resolve(cik_or_ticker)
-
     data, meta = _filings.get_company_concept(company["cik"], taxonomy, concept)
-    units = data.get("units", {})
-    if unit is None and len(units) == 1:
-        unit = next(iter(units))
-    if unit not in units:
-        raise ValueError(f"{taxonomy}:{concept} is reported in {sorted(units)}; pass one as `unit`")
+    return envelope("source", [source(meta)], cik=company["cik"], payload=data)
 
-    rows = [r for r in units[unit]
-            if r.get("filed") and (as_of is None or r["filed"] <= as_of)
-            and (period_end_from is None or (r.get("end") or "") >= period_end_from)
-            and (period_end_to is None or (r.get("end") or "9999") <= period_end_to)]
-    rows.sort(key=lambda r: (r.get("end") or "", r["filed"], r.get("accn") or ""), reverse=True)
-    return {
-        "cik": company["cik"],
-        "entity_name": data.get("entityName", ""),
-        "matched_on": company["matched_on"],
-        "taxonomy": taxonomy,
-        "concept": concept,
-        "label": data.get("label"),
-        "unit": unit,
-        "units_available": sorted(units),
-        "as_of": as_of,
-        "period_end_from": period_end_from,
-        "period_end_to": period_end_to,
-        "scope": "whole-entity values only",
-        **meta,
-        "total_rows": len(rows),
-        "offset": offset,
-        "truncated": len(rows) > offset + limit,
-        "next_offset": offset + limit if len(rows) > offset + limit else None,
-        "facts": rows[offset:offset + limit],
-    }
+
+@_tool
+def get_frames(taxonomy: str, concept: str, unit: str, period: str) -> dict:
+    """The SEC frames document, unchanged: one fact per company for one
+    concept, unit and calendar period, as the SEC aggregates them.
+
+    `unit` as the frames API spells it ("USD", "shares", "USD-per-shares",
+    "pure"). `period` is "CY2023" (annual), "CY2023Q4" (quarterly duration)
+    or "CY2023Q4I" (instant). Each argument is checked for syntax only and
+    put into the address as given. A frame the SEC does not publish is
+    NOT_FOUND.
+    """
+    data, meta = _filings.get_frame(taxonomy, concept, unit, period)
+    return envelope("source", [source(meta)], payload=data)
 
 
 @_tool

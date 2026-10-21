@@ -9,6 +9,10 @@ Every response is saved as a frozen copy under tests/fixtures/sec (the
 EDGAR_RECORD_DIR machinery of sec_client). Each tool output is saved as
 JSON under tests/fixtures/outputs_0.8.0, so the behaviour before the 1.0
 contract stays on record. tests/test_frozen.py replays both offline.
+
+The tool calls are those of 0.8.0 (commit ee208d0 of this repository), several
+of which 1.0 removed: run it with 0.8.0 checked out. The fixtures it wrote
+are kept as they were and are never re-recorded by 1.0.
 """
 from __future__ import annotations
 

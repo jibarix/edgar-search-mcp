@@ -27,7 +27,6 @@ import httpx  # noqa: E402
 from edgar_mcp import server  # noqa: E402
 from edgar_mcp.config import settings  # noqa: E402
 from edgar_mcp.edgar import company_classifier, company_lookup, filed_statements, filing_retrieval  # noqa: E402
-from edgar_mcp.edgar.tag_classifier import TagClassifier  # noqa: E402
 from edgar_mcp.utils import sec_client  # noqa: E402
 
 problems = []
@@ -886,35 +885,6 @@ def text_cases():
         server.fetch_response = real
 
 
-# ── statement classification ───────────────────────────────────────────────
-
-def classifier_cases():
-    tags = ["InterestExpense", "InterestIncome", "DividendsCommonStockCash",
-            "StockIssuedDuringPeriodValueRestrictedStockAwardGross", "DebtSecuritiesUnrealizedGainLoss",
-            "LeaseCost", "IncomeLossAttributableToParent", "MadeUpDurationThing", "Revenues"]
-    c = TagClassifier()
-    is_, report = c.classify_with_report(tags, "IS")
-    check("classifier: interest expense is not revenue", is_["InterestExpense"]["category"] != "Revenue")
-    check("classifier: interest income keeps its place", is_["InterestIncome"]["category"] == "Revenue")
-    check("classifier: dividends and restricted stock are not income statement lines",
-          "DividendsCommonStockCash" not in is_ and "StockIssuedDuringPeriodValueRestrictedStockAwardGross" not in is_)
-    eq, _ = c.classify_with_report(tags, "EQ")
-    bs, _ = c.classify_with_report(tags, "BS")
-    check("classifier: they are movements in equity, not balances",
-          "DividendsCommonStockCash" in eq and "DividendsCommonStockCash" not in bs)
-    check("classifier: the unrealized debt gain is excluded with a reason",
-          "comprehensive" in report["excluded"].get("DebtSecuritiesUnrealizedGainLoss", ""))
-    check("classifier: an unknown tag stays unmapped, not guessed", "MadeUpDurationThing" in report["unmapped"])
-    check("classifier: lease cost stays available", "LeaseCost" in is_)
-    label = is_["IncomeLossAttributableToParent"]["display_name"].lower()
-    check("classifier: the parent, before-tax label keeps both meanings", "parent" in label and "before tax" in label)
-    other, _ = c.classify_with_report(["InterestAndOtherIncome"], "IS")
-    check("classifier: interest and other income is not called interest income",
-          other["InterestAndOtherIncome"]["display_name"] == "Interest and other income")
-    check("classifier: dividends are reported as on another statement",
-          "DividendsCommonStockCash" in report["other_statements"])
-
-
 # ── company index: files, precedence, builder ──────────────────────────────
 
 def index_cases():
@@ -1035,7 +1005,6 @@ if __name__ == "__main__":
     segment_cases()
     filed_cases()
     text_cases()
-    classifier_cases()
     index_cases()
     path_cases()
     print(f"problems: {len(problems)}")

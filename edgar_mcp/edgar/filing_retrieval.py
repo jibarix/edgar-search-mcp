@@ -229,3 +229,19 @@ class FilingRetrieval:
             raise ValueError(f"not a taxonomy and concept name: {taxonomy!r}, {concept!r}")
         url = f"https://data.sec.gov/api/xbrl/companyconcept/CIK{formatted_cik}/{taxonomy}/{concept}.json"
         return get_json(url, filing_cache, f"company_concept_{formatted_cik}_{taxonomy}_{concept}")
+
+    def get_frame(self, taxonomy, concept, unit, period):
+        """The SEC frames document: one fact per company for one concept, unit
+        and calendar period. The arguments are checked for syntax only and
+        put into the address as given.
+
+        Returns:
+            (dict, dict): the frames document and its retrieval record
+        """
+        if (not re.fullmatch(r"[a-z][a-z0-9-]*", taxonomy) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", concept)
+                or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}", unit)
+                or not re.fullmatch(r"CY\d{4}(Q[1-4]I?)?", period)):
+            raise ValueError(f"not a taxonomy, concept, unit and CY period: "
+                             f"{taxonomy!r}, {concept!r}, {unit!r}, {period!r}")
+        url = f"https://data.sec.gov/api/xbrl/frames/{taxonomy}/{concept}/{unit}/{period}.json"
+        return get_json(url, filing_cache, f"frame_{taxonomy}_{concept}_{unit}_{period}")

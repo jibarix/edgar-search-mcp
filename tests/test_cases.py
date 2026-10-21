@@ -1,4 +1,4 @@
-"""Fixed cases for the parser, filing list, document address check and cache.
+"""Fixed cases for company lookup, the SEC client, filing list, document address check and cache.
 
 No network. Run from the repository root:
     python -X utf8 tests/test_cases.py
@@ -18,7 +18,6 @@ os.environ["EDGAR_CACHE_DIR"] = tempfile.mkdtemp(prefix="edgar_cache_test_")
 
 from edgar_mcp.edgar import company_lookup  # noqa: E402
 from edgar_mcp.edgar.filing_retrieval import FilingRetrieval  # noqa: E402
-from edgar_mcp.edgar.xbrl_parser import XBRLParser  # noqa: E402
 from edgar_mcp.server import _document_url, _resolve  # noqa: E402
 from edgar_mcp.utils import sec_client  # noqa: E402
 from edgar_mcp.utils.cache import Cache  # noqa: E402
@@ -30,171 +29,6 @@ def check(label, ok, detail=""):
     print(f"{'OK  ' if ok else 'FAIL'} {label} {detail}")
     if not ok:
         problems.append(label)
-
-
-def fact(start, end, val, form, filed, accn=None):
-    row = {"end": end, "val": val, "form": form, "accn": accn or f"{form}-{filed}"}
-    if start:
-        row["start"] = start
-    if filed:
-        row["filed"] = filed
-    return row
-
-
-# A calendar-year company. Revenue: 2022 = 100; 2023 quarters 25, 35, 30, 30.
-REVENUE = [
-    fact("2022-01-01", "2022-12-31", 100, "10-K", "2023-02-15"),
-    fact("2023-01-01", "2023-03-31", 25, "10-Q", "2023-05-01"),
-    fact("2023-04-01", "2023-06-30", 35, "10-Q", "2023-08-01"),
-    fact("2023-01-01", "2023-06-30", 60, "10-Q", "2023-08-01"),
-    fact("2022-07-01", "2023-06-30", 110, "10-Q", "2023-08-01"),  # trailing twelve months
-    fact("2023-07-01", "2023-09-30", 30, "10-Q", "2023-11-01"),
-    fact("2023-01-01", "2023-09-30", 90, "10-Q", "2023-11-01"),
-    fact("2023-01-01", "2023-12-31", 120, "10-K", "2024-02-15"),
-    fact("2023-01-01", "2023-09-30", 95, "10-Q", "2024-11-01"),  # restated a year later
-]
-
-
-def company(revenue):
-    return {"entityName": "Test Co", "facts": {"us-gaap": {"Revenues": {"units": {"USD": revenue}}}}}
-
-
-def revenue_of(parsed):
-    metric = next(m for m in parsed["metrics"].values() if m["tag"] == "us-gaap:Revenues")
-    return metric["values"], metric["sources"]
-
-
-def parser_cases():
-    parser = XBRLParser()
-
-    values, _ = revenue_of(parser.parse_company_facts(company(REVENUE), "IS", "ytd", 8))
-    check("year to date is not the trailing twelve months", values.get("2023-06-30") == 60,
-          str(values.get("2023-06-30")))
-
-    # Nothing restated: quarters and year agree, and nothing is flagged.
-    first_filed = [f for f in REVENUE if f["val"] != 95]
-    parsed = parser.parse_company_facts(company(first_filed), "IS", "quarterly", 8)
-    values, sources = revenue_of(parsed)
-    q4 = sources["2023-12-31"]
-    quarters = [values[p] for p in ("2023-03-31", "2023-06-30", "2023-09-30", "2023-12-31")]
-    check("quarters add up to the year when nothing was restated",
-          quarters == [25, 35, 30, 30] and sum(quarters) == 120, str(quarters))
-    check("derived quarter has its own interval", (q4["start"], q4["end"]) == ("2023-10-01", "2023-12-31"),
-          f"{q4['start']} to {q4['end']}")
-    check("derived quarter gives both figures",
-          q4["derived"] and q4["cumulative"]["val"] == 120 and q4["minus"]["val"] == 90
-          and q4["minus"]["filed"] == "2023-11-01" and "warnings" not in q4)
-    metric = next(m for m in parsed["metrics"].values() if m["tag"] == "us-gaap:Revenues")
-    check("no difference is reported when quarters and year agree",
-          "reconciliation" not in metric
-          and not any("INCONSISTENT_REPORTING_BASIS" in w for w in parsed["metadata"]["warnings"]))
-
-    # The nine months were restated to 95 after the annual report. One vintage
-    # is used throughout, and every place the figures stop agreeing is flagged.
-    ytd_values, _ = revenue_of(parser.parse_company_facts(company(REVENUE), "IS", "ytd", 8))
-    parsed = parser.parse_company_facts(company(REVENUE), "IS", "quarterly", 8)
-    values, sources = revenue_of(parsed)
-    q4 = sources["2023-12-31"]
-    check("a derived quarter is the difference of the year-to-date figures returned",
-          values["2023-12-31"] == ytd_values["2023-12-31"] - ytd_values["2023-09-30"] == 25
-          and q4["minus"]["val"] == 95, f"{values['2023-12-31']} from {q4['minus']['val']}")
-    check("a restated earlier figure is flagged on the derived quarter",
-          any("INCONSISTENT_REPORTING_BASIS" in w for w in q4.get("warnings", [])))
-    metric = next(m for m in parsed["metrics"].values() if m["tag"] == "us-gaap:Revenues")
-    found = metric.get("reconciliation", {})
-    check("quarters that miss the nine months are reported",
-          found.get("2023-09-30") == {"year_to_date": 95, "sum_of_quarters": 90, "difference": -5},
-          str(found.get("2023-09-30")))
-    check("quarters that miss the year are reported",
-          found.get("2023-12-31") == {"year_to_date": 120, "sum_of_quarters": 115, "difference": -5},
-          str(found.get("2023-12-31")))
-    check("the result as a whole carries the warning and its vintage",
-          any("INCONSISTENT_REPORTING_BASIS" in w for w in parsed["metadata"]["warnings"])
-          and parsed["metadata"]["vintage"].startswith("latest filed"))
-
-    # A first fiscal year on file is anchored by its own annual figures.
-    no_prior_year = [f for f in first_filed if f["end"] != "2022-12-31"]
-    values, _ = revenue_of(parser.parse_company_facts(company(no_prior_year), "IS", "ytd", 8))
-    check("year to date in the first year on file starts where that year's annual figures start",
-          values.get("2023-06-30") == 60 and values.get("2023-09-30") == 90, str(values))
-
-    # With no fiscal year on file at all, a lone quarter is not called a year to date.
-    lone = [fact("2023-07-01", "2023-09-30", 30, "10-Q", "2023-11-01")]
-    parsed = parser.parse_company_facts(company(lone), "IS", "ytd", 8)
-    check("a figure is not taken for the year to date without a fiscal year to anchor it",
-          parsed["periods"] == [] and parsed["metadata"]["empty_reason"] == "INSUFFICIENT_PERIOD_EVIDENCE"
-          and any("2023-09-30" in w for w in parsed["metadata"]["warnings"]),
-          str(parsed["metadata"]))
-    parsed = parser.parse_company_facts(company(lone), "IS", "quarterly", 8)
-    check("thin evidence of the quarter ends is said so",
-          parsed["periods"] == ["2023-09-30"]
-          and any("INSUFFICIENT_PERIOD_EVIDENCE" in w for w in parsed["metadata"]["warnings"]),
-          str(parsed["metadata"]["warnings"]))
-
-    # Five concepts report real quarters; one reports a stub period ending
-    # mid-quarter, repeated in six filings. Rows are not evidence: concepts are.
-    names = ["Revenues", "NetIncomeLoss", "OperatingIncomeLoss", "GrossProfit", "CostOfRevenue"]
-    many = {name: {"units": {"USD": list(REVENUE)}} for name in names}
-    many["IncomeTaxExpenseBenefit"] = {"units": {"USD": [
-        fact("2023-05-17", "2023-08-15", 7, "10-Q", f"2023-{month:02d}-01", accn=f"stub-{month}")
-        for month in range(7, 13)]}}
-    parsed = parser.parse_company_facts({"entityName": "Test Co", "facts": {"us-gaap": many}}, "IS", "quarterly", 12)
-    check("one concept repeated in many filings does not make a quarter end",
-          "2023-08-15" not in parsed["periods"] and "2023-09-30" in parsed["periods"]
-          and not any("INSUFFICIENT_PERIOD_EVIDENCE" in w for w in parsed["metadata"]["warnings"]),
-          str(parsed["periods"]))
-
-    shifted = [dict(f, start="2023-01-04") if (f["end"], f["val"]) == ("2023-09-30", 90) else f
-               for f in REVENUE if f["val"] != 95]
-    values, _ = revenue_of(parser.parse_company_facts(company(shifted), "IS", "quarterly", 8))
-    check("no quarter is derived from figures with different start dates", values.get("2023-12-31") is None,
-          str(values.get("2023-12-31")))
-
-    try:
-        parser.parse_company_facts(company(REVENUE), "IS", "annual", 4, as_of="2023-6-30")
-        check("a malformed cutoff date is refused", False)
-    except ValueError:
-        check("a malformed cutoff date is refused", True)
-
-    parsed = parser.parse_company_facts(company(REVENUE), "IS", "annual", 4, as_of="2023-06-30")
-    check("cutoff hides the later annual report", parsed["periods"] == ["2022-12-31"], str(parsed["periods"]))
-
-    undated = REVENUE + [fact("2024-01-01", "2024-12-31", 140, "10-K", None, accn="no-date")]
-    free = parser.parse_company_facts(company(undated), "IS", "annual", 4)
-    cut = parser.parse_company_facts(company(undated), "IS", "annual", 4, as_of="2030-01-01")
-    check("a fact with no filing date is left out under a cutoff",
-          free["periods"][0] == "2024-12-31" and cut["periods"][0] == "2023-12-31",
-          f"{free['periods'][0]} / {cut['periods'][0]}")
-
-    transition = REVENUE + [fact("2024-01-01", "2024-06-30", 50, "10-KT", "2024-08-15")]
-    parsed = parser.parse_company_facts(company(transition), "IS", "annual", 4)
-    check("a transition period is not a fiscal year and is reported",
-          "2024-06-30" not in parsed["periods"] and any("2024-06-30" in w for w in parsed["metadata"]["warnings"]),
-          str(parsed["metadata"]["warnings"]))
-
-    euros = {"entityName": "Test Co", "facts": {"us-gaap": {
-        "Revenues": {"units": {"USD": REVENUE}},
-        "NetIncomeLoss": {"units": {"EUR": [fact("2023-01-01", "2023-12-31", 9, "10-K", "2024-02-15")]}},
-    }}}
-    parsed = parser.parse_company_facts(euros, "IS", "annual", 4)
-    check("amounts in another currency are named as skipped",
-          parsed["metadata"].get("skipped_units") == {"us-gaap:NetIncomeLoss": ["EUR"]},
-          str(parsed["metadata"].get("skipped_units")))
-
-    only_euros = {"entityName": "Test Co", "facts": {"us-gaap": {
-        "Revenues": {"units": {"EUR": REVENUE}}}}}
-    parsed = parser.parse_company_facts(only_euros, "IS", "annual", 4)
-    check("a statement wholly in another currency says so instead of looking empty",
-          parsed["periods"] == [] and parsed["metadata"]["empty_reason"] == "UNSUPPORTED_UNITS"
-          and parsed["metadata"]["skipped_units"] == {"us-gaap:Revenues": ["EUR"]}, str(parsed["metadata"]))
-    parsed = parser.parse_company_facts(company(REVENUE), "IS", "annual", 4, as_of="2020-01-01")
-    check("a cutoff before the first filing says so",
-          parsed["periods"] == [] and parsed["metadata"]["empty_reason"] == "NOTHING_ON_FILE_AT_CUTOFF",
-          str(parsed["metadata"]))
-    parsed = parser.parse_company_facts(company(REVENUE), "BS", "annual", 4)
-    check("a statement with no reported concepts says so",
-          parsed["periods"] == [] and parsed["metadata"]["empty_reason"] == "NO_FACTS_FOR_STATEMENT",
-          str(parsed["metadata"]))
 
 
 def lookup_cases():
@@ -414,7 +248,6 @@ def cache_race_cases():
 
 
 if __name__ == "__main__":
-    parser_cases()
     lookup_cases()
     client_cases()
     filing_cases()

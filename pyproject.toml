@@ -29,8 +29,6 @@ version = { attr = "edgar_mcp.__version__" }
 [tool.setuptools.packages.find]
 include = ["edgar_mcp*"]
 
-# The tag-to-statement mapping the classifier cannot work without, and the
-# company index snapshot that search_companies reads unless another is built.
+# The company index snapshot that search_companies reads unless another is built.
 [tool.setuptools.package-data]
-"edgar_mcp.edgar" = ["data/*.json"]
 edgar_mcp = ["data/*.json"]

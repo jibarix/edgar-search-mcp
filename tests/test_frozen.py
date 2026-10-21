@@ -33,11 +33,20 @@ URLS = {
 }
 # Tool outputs of 0.8.0 that 1.0 no longer reproduces, and why. Each is
 # covered by docs/CONSUMER_MIGRATION.md and by tests/test_contract.py.
-REPLACED = {}
+REPLACED = {
+    "get_financial_statement_is": "removed in 1.0 (step 3): it grouped concepts into statements with a tag "
+                                  "classifier; get_companyfacts returns the SEC document unchanged",
+    "get_concept": "removed in 1.0 (step 3): it chose a unit, filtered and re-sorted rows; "
+                   "get_companyconcept returns the SEC document unchanged",
+}
 # Fields that differ between a live answer and its replay by design. The
 # capture read some addresses more than once, and a frozen copy keeps the
 # time of the last reading, so retrieved_at can differ too.
 VOLATILE = {"returned_at", "frozen", "retrieved_at"}
+# Keys 1.0 adds to an answer that otherwise kept its 0.8.0 shape. They are
+# ignored only where the saved answer does not have them, so every saved key,
+# a saved sha256 included, must still match.
+ADDED = {"sha256": "step 3: the hash of the SEC bytes, kept with every retrieval record"}
 
 
 def body_of(url):
@@ -84,6 +93,16 @@ def strip(value):
     return value
 
 
+def same(new, saved):
+    """Equal, except that keys in ADDED may appear in `new` where `saved` lacks them."""
+    if isinstance(new, dict) and isinstance(saved, dict):
+        extra = set(new) - set(saved)
+        return extra <= set(ADDED) and set(saved) <= set(new) and all(same(new[k], saved[k]) for k in saved)
+    if isinstance(new, list) and isinstance(saved, list):
+        return len(new) == len(saved) and all(same(a, b) for a, b in zip(new, saved))
+    return new == saved
+
+
 def replay():
     """Call every saved tool output again, in the order it was captured."""
     from edgar_mcp import server
@@ -102,7 +121,7 @@ def replay():
             result = asyncio.run(tool(**saved["arguments"]))
         except Exception as e:
             result = {"error": str(e)}
-        results[name] = {"same": strip(json.loads(json.dumps(result))) == strip(saved["result"])}
+        results[name] = {"same": same(strip(json.loads(json.dumps(result))), strip(saved["result"]))}
     return results
 
 

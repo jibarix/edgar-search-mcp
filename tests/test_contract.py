@@ -42,10 +42,12 @@ with open(os.path.join(ROOT, "tests", "fixtures", "outputs_0.8.0", "_about.json"
 # their 0.8 shape), and 0.8 tools not yet removed. Both shrink step by step;
 # in the release both are empty.
 PENDING = {"lookup_company", "get_submissions", "list_filings", "list_filing_documents", "get_filing_document",
-           "get_filing_text", "search_filings", "get_companyfacts", "get_companyconcept", "get_frames",
-           "get_filing_xbrl"}
-NOT_YET_REMOVED = {"get_financial_statement", "get_concept", "get_filed_statements", "get_segment_revenue",
-                   "search_companies"}
+           "get_filing_text", "search_filings", "get_filing_xbrl"}
+NOT_YET_REMOVED = {"get_filed_statements", "get_segment_revenue", "search_companies"}
+# Files removed from the package, and the import names that must not come back.
+REMOVED_FILES = ["edgar_mcp/edgar/tag_classifier.py", "edgar_mcp/edgar/xbrl_parser.py",
+                 "edgar_mcp/edgar/data/sec_tag_mapping.json"]
+REMOVED_NAMES = ["tag_classifier", "xbrl_parser", "TagClassifier", "XBRLParser", "sec_tag_mapping"]
 
 problems = []
 
@@ -139,14 +141,130 @@ def tool_cases():
                 extra(result, kwargs)
 
 
-TOOL_CALLS = []
-EXTRA_CHECKS = {}
+CIK = "0000908315"
+FACTS_URL = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{CIK}.json"
+CONCEPT_URL = f"https://data.sec.gov/api/xbrl/companyconcept/CIK{CIK}/us-gaap/Revenues.json"
+
+
+def sha_of(url):
+    return hashlib.sha256(frozen_bytes(url)).hexdigest()
+
+
+def source_is(url, label):
+    def extra(result, kwargs):
+        s = result["sources"]
+        check(f"{label}: names its one source with the hash of the frozen bytes",
+              len(s) == 1 and s[0]["url"] == url and s[0]["sha256"] == sha_of(url) and s[0]["frozen"] is True,
+              str(s)[:200])
+    return extra
+
+
+def companyfacts_checks(result, kwargs):
+    raw = frozen_json(FACTS_URL)
+    taxonomy, concept = kwargs.get("taxonomy"), kwargs.get("concept")
+    label = f"get_companyfacts taxonomy={taxonomy!r} concept={concept!r}"
+    source_is(FACTS_URL, label)(result, kwargs)
+    check(f"{label}: filters echoed as given", result["filters"] == {"taxonomy": taxonomy, "concept": concept})
+    if taxonomy is None:
+        check(f"{label}: the payload is the SEC document unchanged",
+              result["payload"] == raw and result["representation"] == "source")
+        check(f"{label}: the key order of the document is kept",
+              list(result["payload"]) == list(raw)
+              and list(result["payload"]["facts"]["us-gaap"]) == list(raw["facts"]["us-gaap"]))
+        return
+    if taxonomy not in raw["facts"]:
+        expected = {}
+    elif concept is None:
+        expected = {taxonomy: raw["facts"][taxonomy]}
+    else:
+        expected = {taxonomy: {concept: raw["facts"][taxonomy][concept]} if concept in raw["facts"][taxonomy] else {}}
+    check(f"{label}: facts keeps only the literal keys, every unit and observation unchanged",
+          result["payload"]["facts"] == expected and result["representation"] == "source_records",
+          str(result["payload"]["facts"])[:160])
+    check(f"{label}: every other key of the document is unchanged",
+          {k: v for k, v in result["payload"].items() if k != "facts"}
+          == {k: v for k, v in raw.items() if k != "facts"})
+
+
+def companyconcept_checks(result, kwargs):
+    source_is(CONCEPT_URL, "get_companyconcept")(result, kwargs)
+    raw = frozen_json(CONCEPT_URL)
+    check("get_companyconcept: the payload is the SEC document unchanged, every unit kept",
+          result["payload"] == raw and list(result["payload"]["units"]) == list(raw["units"])
+          and all(result["payload"]["units"][u] == raw["units"][u] for u in raw["units"]))
+
+
+def frames_checks(result, kwargs):
+    source_is(ABOUT["frame"], "get_frames")(result, kwargs)
+    check("get_frames: the payload is the SEC document unchanged", result["payload"] == frozen_json(ABOUT["frame"]))
+
+
+TOOL_CALLS = [
+    ("get_companyfacts", {"cik_or_ticker": "908315"}),
+    ("get_companyfacts", {"cik_or_ticker": "908315", "taxonomy": "us-gaap", "concept": "Revenues"}),
+    ("get_companyfacts", {"cik_or_ticker": "908315", "taxonomy": "dei"}),
+    ("get_companyfacts", {"cik_or_ticker": "908315", "taxonomy": "us-gaap", "concept": "revenues"}),
+    ("get_companyfacts", {"cik_or_ticker": "908315", "taxonomy": "US-GAAP"}),
+    ("get_companyconcept", {"cik_or_ticker": "908315", "taxonomy": "us-gaap", "concept": "Revenues"}),
+    ("get_frames", {"taxonomy": "us-gaap", "concept": "SalesTypeLeaseSellingProfitLoss", "unit": "USD",
+                    "period": "CY2023"}),
+]
+EXTRA_CHECKS = {"get_companyfacts": [companyfacts_checks], "get_companyconcept": [companyconcept_checks],
+                "get_frames": [frames_checks]}
+# Calls that must fail, with the code the message starts with.
+ERROR_CALLS = [
+    ("get_companyfacts", {"cik_or_ticker": "908315", "concept": "Revenues"}, "INVALID_INPUT"),
+    ("get_frames", {"taxonomy": "us-gaap", "concept": "FranchiseRevenue", "unit": "USD", "period": "CY2023"},
+     "NOT_FOUND"),
+    ("get_frames", {"taxonomy": "us-gaap", "concept": "Revenues", "unit": "USD", "period": "FY2023"},
+     "INVALID_INPUT"),
+    ("get_frames", {"taxonomy": "us-gaap", "concept": "Revenues", "unit": "../x", "period": "CY2023"},
+     "INVALID_INPUT"),
+    ("get_companyconcept", {"cik_or_ticker": "908315", "taxonomy": "us-gaap", "concept": "Rev/../x"},
+     "INVALID_INPUT"),
+]
+
+
+def error_cases():
+    for tool, kwargs, code in ERROR_CALLS:
+        if tool in PENDING:
+            continue
+        result, error = call(tool, **kwargs)
+        check(f"{tool}({kwargs}) fails with {code}", result is None and str(error).startswith(code + ":"),
+              str(error)[:160])
+
+
+def removal_cases():
+    import subprocess
+    for path in REMOVED_FILES:
+        check(f"removed from the package: {path}", not os.path.exists(os.path.join(ROOT, path)))
+    with open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8") as f:
+        pyproject = f.read()
+    check("pyproject ships no data files for the removed classifier", '"edgar_mcp.edgar"' not in pyproject)
+    left = []
+    for folder, _, files in os.walk(os.path.join(ROOT, "edgar_mcp")):
+        for name in files:
+            if name.endswith(".py"):
+                with open(os.path.join(folder, name), encoding="utf-8") as f:
+                    text = f.read()
+                left += [f"{name}: {n}" for n in REMOVED_NAMES if n in text]
+    check("no module refers to the removed classifier or parser", not left, str(left))
+    env = {k: v for k, v in os.environ.items() if not k.startswith("EDGAR_")}
+    env["EDGAR_FROZEN_DIR"] = SEC
+    started = subprocess.run(
+        [sys.executable, "-X", "utf8", "-c",
+         "import asyncio, edgar_mcp.server as s; print(len(asyncio.run(s.mcp.list_tools())))"],
+        cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
+    check("the server starts without the removed files", started.returncode == 0 and started.stdout.strip().isdigit(),
+          started.stderr[-300:])
 
 
 def main():
     schema_cases()
     inventory_cases()
     tool_cases()
+    error_cases()
+    removal_cases()
     print(f"problems: {len(problems)}")
     return 1 if problems else 0
 

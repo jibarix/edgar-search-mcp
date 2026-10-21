@@ -248,13 +248,14 @@ def get_json(url, cache=None, key=None, ttl=None):
     """Fetch and parse JSON. Returns (data, meta).
 
     `meta` records where the data came from and when it left the SEC:
-    {'source_url', 'retrieved_at', 'cache_hit', 'frozen'}; a cache hit keeps
-    the retrieval time of the answer it holds.
+    {'source_url', 'retrieved_at', 'cache_hit', 'frozen', 'sha256'}; a cache
+    hit keeps the retrieval time and the hash of the bytes of the answer it
+    holds (sha256 is None for an entry stored before hashes were kept).
     """
     if cache is not None:
         entry = cache.get_entry(key or url)
         if entry:
-            return entry['data'], {**entry.get('meta', {}), 'source_url': url, 'cache_hit': True}
+            return entry['data'], {'sha256': None, **entry.get('meta', {}), 'source_url': url, 'cache_hit': True}
     response = fetch_response(url)
     try:
         data = json.loads(response.body)
@@ -264,6 +265,7 @@ def get_json(url, cache=None, key=None, ttl=None):
         'source_url': url,
         'retrieved_at': response.retrieved_at,
         'frozen': response.frozen,
+        'sha256': hashlib.sha256(response.body).hexdigest(),
     }
     if cache is not None:
         cache.set(key or url, data, ttl=ttl, meta=meta)
