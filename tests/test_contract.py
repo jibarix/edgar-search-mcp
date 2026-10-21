@@ -42,14 +42,16 @@ with open(os.path.join(ROOT, "tests", "fixtures", "outputs_0.8.0", "_about.json"
 # 1.0 tools whose 1.0 answer is not implemented yet (absent, or still in
 # their 0.8 shape), and 0.8 tools not yet removed. Both shrink step by step;
 # in the release both are empty.
-PENDING = {"lookup_company", "get_submissions", "list_filings", "list_filing_documents", "get_filing_document",
-           "get_filing_text", "search_filings"}
-NOT_YET_REMOVED = {"get_segment_revenue", "search_companies"}
+PENDING: set = set()
+NOT_YET_REMOVED: set = set()
 # Files removed from the package, and the import names that must not come back.
 REMOVED_FILES = ["edgar_mcp/edgar/tag_classifier.py", "edgar_mcp/edgar/xbrl_parser.py",
-                 "edgar_mcp/edgar/data/sec_tag_mapping.json", "edgar_mcp/edgar/filed_statements.py"]
+                 "edgar_mcp/edgar/data/sec_tag_mapping.json", "edgar_mcp/edgar/filed_statements.py",
+                 "edgar_mcp/edgar/company_classifier.py", "edgar_mcp/config/sic_codes.py",
+                 "edgar_mcp/data/company_index.json"]
 REMOVED_NAMES = ["tag_classifier", "xbrl_parser", "TagClassifier", "XBRLParser", "sec_tag_mapping",
-                 "filed_statements", "get_filed_statements"]
+                 "filed_statements", "get_filed_statements", "company_classifier", "sic_codes", "company_index",
+                 "COMPANY_INDEX", "get_segment_revenue", "search_companies", "get_close_matches", "name_suffix"]
 
 problems = []
 
@@ -407,6 +409,136 @@ def xbrl_linkbase_checks(result, kwargs):
         check(f"{label}: arcroles as written", bool(arcroles), str(arcroles))
 
 
+TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+OLDER_URL = f"https://data.sec.gov/submissions/CIK{CIK}-submissions-001.json"
+SEARCH_URL = ("https://efts.sec.gov/LATEST/search-index?q=%22Winmark%22&forms=10-K&dateRange=custom"
+              "&startdt=2024-01-01&enddt=2024-12-31")
+
+
+def lookup_checks(result, kwargs):
+    q = kwargs["query"]
+    label = f"lookup_company {q!r}"
+    source_is(TICKERS_URL, label)(result, kwargs)
+    feed = list(frozen_json(TICKERS_URL).values())
+    key = " ".join(q.split()).casefold()
+    want = [r for r in feed if (q.isdigit() and r["cik_str"] == int(q))
+            or (not q.isdigit() and (r["ticker"].upper() == q.upper() or " ".join(r["title"].split()).casefold() == key))]
+    check(f"{label}: every row equal to the query, in the feed's order, each as published",
+          [m["record"] for m in result["matches"]] == want, str(result["matches"])[:160])
+    ciks = {str(r["cik_str"]).zfill(10) for r in want}
+    status = "not_found" if not ciks else "resolved" if len(ciks) == 1 else "ambiguous"
+    check(f"{label}: status {status}", result["status"] == status, result["status"])
+    check(f"{label}: an ambiguous query is listed unresolved with its CIKs",
+          (status == "ambiguous") == bool(result["unresolved"])
+          and all(u["ciks"] == sorted(ciks) for u in result["unresolved"]))
+
+
+def submissions_checks(result, kwargs):
+    raw = frozen_json(SUBMISSIONS_URL)
+    check("get_submissions: the payload is the SEC document unchanged, sic and sicDescription as published",
+          result["payload"] == raw and list(result["payload"]) == list(raw)
+          and result["payload"]["sicDescription"] == raw["sicDescription"])
+    urls = [s["url"] for s in result["sources"]]
+    if kwargs.get("include_older_files"):
+        check("get_submissions: each older file is returned unchanged, in the order listed",
+              [o["name"] for o in result["older_files"]] == [f["name"] for f in raw["filings"]["files"]]
+              and result["older_files"][0]["payload"] == frozen_json(OLDER_URL) and urls == [SUBMISSIONS_URL, OLDER_URL],
+              str(urls))
+    else:
+        check("get_submissions: no older file is read unless asked", "older_files" not in result
+              and urls == [SUBMISSIONS_URL])
+
+
+def filings_checks(result, kwargs):
+    label = f"list_filings {kwargs}"[:90]
+    tables = {f"CIK{CIK}.json#filings.recent": frozen_json(SUBMISSIONS_URL)["filings"]["recent"],
+              f"CIK{CIK}-submissions-001.json": frozen_json(OLDER_URL)}
+    rows = [(name, i, {k: v[i] for k, v in t.items()}) for name, t in tables.items()
+            for i in range(len(t["accessionNumber"]))]
+    form, as_of = kwargs.get("form", "10-K"), kwargs.get("as_of")
+    wanted = None if form is None else {form, form + "/A"} if kwargs.get("include_amendments") else {form}
+    expected = [(n, i, r) for n, i, r in rows
+                if (wanted is None or r["form"] in wanted) and (as_of is None or r["filingDate"] <= as_of)]
+    expected = expected[:kwargs.get("limit", 10)]
+    got = [(f["source"]["file"], f["source"]["index"], f["record"]) for f in result["filings"]]
+    check(f"{label}: the matching rows in the SEC's order, every column as published", got == expected,
+          f"{len(got)} vs {len(expected)}")
+    def built(record):
+        doc = record["primaryDocument"]
+        if not doc or "/" in doc:
+            return None
+        return f"https://www.sec.gov/Archives/edgar/data/908315/{record['accessionNumber'].replace('-', '')}/{doc}"
+    check(f"{label}: each url is built from the CIK, accession number and primaryDocument; null for a rendering path",
+          all(f["url"] == built(f["record"]) for f in result["filings"]))
+    read_older = any(n.endswith("-001.json") for n, _, _ in got) or len(got) < kwargs.get("limit", 10)
+    check(f"{label}: the older file is read only when the list goes past the recent table",
+          [s["url"] for s in result["sources"]] == [SUBMISSIONS_URL] + ([OLDER_URL] if read_older else []))
+
+
+def documents_checks(result, kwargs):
+    index_url = FOLDER + f"{ACCESSION}-index.htm"
+    source_is(index_url, "list_filing_documents")(result, kwargs)
+    check("list_filing_documents: original names the index page and its hash",
+          result["original"] == {"url": index_url, "sha256": sha_of(index_url), "tool": "get_filing_document"})
+    page = frozen_bytes(index_url).decode("utf-8")
+    docs = result["documents"]
+    check("list_filing_documents: every row's file is linked from the page and inside the filing folder",
+          docs and all(d["url"] == FOLDER + d["document"] and d["document"] in page for d in docs))
+    check("list_filing_documents: the main document and the exhibit are rows",
+          {ABOUT["main_document"], ABOUT["exhibit"]} <= {d["url"] for d in docs})
+    check("list_filing_documents: the transformation names its rules", result["transformation"]["rules"])
+
+
+def document_checks(result, kwargs):
+    url = kwargs["url"]
+    raw = frozen_bytes(url)
+    source_is(url, "get_filing_document")(result, kwargs)
+    offset, size = kwargs.get("offset", 0), kwargs.get("max_bytes", 1_000_000)
+    chunk = base64.b64decode(result["data_base64"])
+    check(f"get_filing_document {url.rsplit('/', 1)[1]} {offset}: the bytes as published, hash of the whole file",
+          chunk == raw[offset:offset + size] and result["sha256"] == sha_of(url) and result["total_bytes"] == len(raw)
+          and result["length"] == len(chunk))
+    check(f"get_filing_document {offset}: next_offset continues or ends",
+          result["next_offset"] == (offset + len(chunk) if offset + len(chunk) < len(raw) else None))
+    try:
+        text = chunk.decode("utf-8")
+    except UnicodeDecodeError:
+        text = None
+    check(f"get_filing_document {offset}: text is the strict UTF-8 reading of those bytes, or null",
+          result["text"] == text)
+
+
+def text_checks(result, kwargs):
+    url = kwargs["url"]
+    source_is(url, "get_filing_text")(result, kwargs)
+    check("get_filing_text: original names the file, its hash and get_filing_document",
+          result["original"] == {"url": url, "sha256": sha_of(url), "tool": "get_filing_document"})
+    check("get_filing_text: the transformation is named, with its rules",
+          result["transformation"]["name"] == server._EXTRACTION and result["transformation"]["rules"])
+    full = server.document_text(url, frozen_bytes(url), "text/html")
+    if kwargs.get("find"):
+        check("get_filing_text find: every match is the phrase in the extracted text",
+              result["matches"] and all(full[m["start"]:m["start"] + len(kwargs["find"])].lower()
+                                        == kwargs["find"].lower() for m in result["matches"]))
+    else:
+        check("get_filing_text: the page is the extracted text at the offset",
+              result["text"] == full[kwargs.get("start", 0):kwargs.get("start", 0) + kwargs["max_chars"]])
+
+
+def search_checks(result, kwargs):
+    source_is(SEARCH_URL, "search_filings")(result, kwargs)
+    raw = frozen_json(SEARCH_URL)["hits"]
+    check("search_filings: every hit's record is the index's hit verbatim, in its order",
+          [h["record"] for h in result["hits"]] == raw["hits"][:kwargs.get("limit", 25)])
+    check("search_filings: the total is the index's", result["total_hits"] == raw["total"]["value"]
+          and result["total_relation"] == raw["total"]["relation"])
+    ok = all(h["url"] == "https://www.sec.gov/Archives/edgar/data/{}/{}/{}".format(
+        int(h["record"]["_source"]["ciks"][0]), *[p.replace("-", "") if i == 0 else p
+                                                   for i, p in enumerate(h["record"]["_id"].split(":", 1))])
+             for h in result["hits"])
+    check("search_filings: each url is built from the first CIK and the _id", ok)
+
+
 def xbrl_checks(result, kwargs):
     """One dispatcher for the get_filing_xbrl calls in TOOL_CALLS."""
     if kwargs.get("part", "summary") == "summary":
@@ -424,6 +556,25 @@ def xbrl_checks(result, kwargs):
 
 
 TOOL_CALLS = [
+    ("lookup_company", {"query": "WINA"}),
+    ("lookup_company", {"query": "wina"}),
+    ("lookup_company", {"query": "winmark   corp"}),
+    ("lookup_company", {"query": "908315"}),
+    ("lookup_company", {"query": "Winmark"}),
+    ("lookup_company", {"query": "SUN"}),
+    ("lookup_company", {"query": "Wiseqey Corp."}),
+    ("get_submissions", {"cik_or_ticker": "908315"}),
+    ("get_submissions", {"cik_or_ticker": "WINA", "include_older_files": True}),
+    ("list_filings", {"cik_or_ticker": "908315", "limit": 3}),
+    ("list_filings", {"cik_or_ticker": "908315", "form": None, "limit": 7}),
+    ("list_filings", {"cik_or_ticker": "908315", "form": "10-K", "as_of": "2009-12-31", "limit": 2}),
+    ("list_filings", {"cik_or_ticker": "908315", "form": "10-Q", "include_amendments": True, "limit": 50}),
+    ("list_filing_documents", {"url": ABOUT["main_document"]}),
+    ("get_filing_document", {"url": FOLDER + "FilingSummary.xml"}),
+    ("get_filing_document", {"url": ABOUT["exhibit"], "offset": 100, "max_bytes": 1000}),
+    ("get_filing_text", {"url": ABOUT["exhibit"], "max_chars": 500}),
+    ("get_filing_text", {"url": ABOUT["exhibit"], "find": "consent"}),
+    ("search_filings", {"query": '"Winmark"', "forms": "10-K", "filed_from": "2024-01-01", "filed_to": "2024-12-31"}),
     ("get_companyfacts", {"cik_or_ticker": "908315"}),
     ("get_companyfacts", {"cik_or_ticker": "908315", "taxonomy": "us-gaap", "concept": "Revenues"}),
     ("get_companyfacts", {"cik_or_ticker": "908315", "taxonomy": "dei"}),
@@ -448,9 +599,23 @@ TOOL_CALLS = [
     ("get_filing_xbrl", {"cik_or_ticker": "908315", "accession_number": ABOUT["accession_number"], "part": "reference"}),
 ]
 EXTRA_CHECKS = {"get_companyfacts": [companyfacts_checks], "get_companyconcept": [companyconcept_checks],
-                "get_frames": [frames_checks], "get_filing_xbrl": [xbrl_checks]}
+                "get_frames": [frames_checks], "get_filing_xbrl": [xbrl_checks], "lookup_company": [lookup_checks],
+                "get_submissions": [submissions_checks], "list_filings": [filings_checks],
+                "list_filing_documents": [documents_checks], "get_filing_document": [document_checks],
+                "get_filing_text": [text_checks], "search_filings": [search_checks]}
 # Calls that must fail, with the code the message starts with.
 ERROR_CALLS = [
+    ("get_submissions", {"cik_or_ticker": "Winmark"}, "NOT_FOUND"),
+    ("get_submissions", {"cik_or_ticker": "SUN"}, "AMBIGUOUS_COMPANY"),
+    ("get_companyfacts", {"cik_or_ticker": "wiseqey corp."}, "AMBIGUOUS_COMPANY"),
+    ("lookup_company", {"query": "  "}, "INVALID_INPUT"),
+    ("list_filings", {"cik_or_ticker": "908315", "limit": 0}, "INVALID_INPUT"),
+    ("list_filings", {"cik_or_ticker": "908315", "as_of": "2024-1-1"}, "INVALID_INPUT"),
+    ("get_filing_document", {"url": "https://example.com/Archives/edgar/data/1/000000000000000000/x.htm"},
+     "INVALID_INPUT"),
+    ("get_filing_document", {"url": FOLDER + "FilingSummary.xml?x=1"}, "INVALID_INPUT"),
+    ("get_filing_document", {"url": FOLDER + "FilingSummary.xml", "offset": 10**8}, "INVALID_INPUT"),
+    ("get_filing_document", {"url": FOLDER + "nosuchfile.htm"}, "NO_FROZEN_COPY"),
     ("get_companyfacts", {"cik_or_ticker": "908315", "concept": "Revenues"}, "INVALID_INPUT"),
     ("get_frames", {"taxonomy": "us-gaap", "concept": "FranchiseRevenue", "unit": "USD", "period": "CY2023"},
      "NOT_FOUND"),
@@ -486,6 +651,7 @@ def removal_cases():
     with open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8") as f:
         pyproject = f.read()
     check("pyproject ships no data files for the removed classifier", '"edgar_mcp.edgar"' not in pyproject)
+    check("pyproject ships no company index", "package-data" not in pyproject and "data/*.json" not in pyproject)
     left = []
     for folder, _, files in os.walk(os.path.join(ROOT, "edgar_mcp")):
         for name in files:

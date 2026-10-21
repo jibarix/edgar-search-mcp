@@ -11,9 +11,8 @@ import re
 
 from jsonschema import validate, ValidationError
 
-from edgar_mcp.config.constants import SUBMISSIONS_URL, XBRL_INSTANCE_URL
+from edgar_mcp.config.constants import SUBMISSIONS_URL
 from edgar_mcp.utils.cache import Cache
-from edgar_mcp.utils.helpers import iso_date
 from edgar_mcp.utils.sec_client import SecError, get_json
 
 # Initialize logger
@@ -87,14 +86,31 @@ class FilingRetrieval:
             raise SecError(f"{url} is not in the expected submissions layout: {e.message}") from e
         return data, meta
 
+    def older_file_names(self, submissions, cik):
+        """The names `filings.files` lists, in its order. A name that is not
+        CIK##########-submissions-NNN.json is refused when it is reached."""
+        for entry in submissions["filings"]["files"]:
+            name = str(entry.get("name", "")) if isinstance(entry, dict) else repr(entry)
+            if not _HISTORY_FILE.fullmatch(name):
+                raise SecError(f"older filings file {name!r} has an unexpected name; "
+                               f"the filings of CIK {_format_cik(cik)} cannot all be read")
+            yield name
+
+    def get_older_submissions(self, name):
+        """(data, meta): one older submissions file, as the SEC publishes it."""
+        if not _HISTORY_FILE.fullmatch(str(name)):
+            raise ValueError(f"not an older submissions file name: {name!r}")
+        return get_json(f"https://data.sec.gov/submissions/{name}", filing_cache, f"historical_{name}")
+
     def iter_filing_records(self, cik, sources, warnings, older=True):
         """Every row of the submissions filing tables, in the SEC's order: the
         recent table, then each file `filings.files` names, in the order it
         names them. Each row is {"record", "source"}: `record` maps every
         column, under the SEC's key, to the row's value; `source` is the file
         and the row's index in it. Older files are read only when the caller
-        goes on past the recent table. The meta of every file read is appended
-        to `sources`; a column shorter than the others is reported in
+        goes on past the recent table, and a file that cannot be read raises:
+        the rows are never silently cut short. The meta of every file read is
+        appended to `sources`; a column shorter than the others is reported in
         `warnings` and left out of the rows it does not reach.
         """
         formatted_cik = _format_cik(cik)
@@ -104,140 +120,10 @@ class FilingRetrieval:
         yield from _rows(submissions["filings"]["recent"], f"{name}#filings.recent", warnings)
         if not older:
             return
-        for entry in submissions["filings"]["files"]:
-            file_name = str(entry.get("name", "")) if isinstance(entry, dict) else repr(entry)
-            if not _HISTORY_FILE.fullmatch(file_name):
-                raise SecError(f"older filings file {file_name!r} has an unexpected name; "
-                               f"the filings of CIK {formatted_cik} cannot all be read")
-            data, older_meta = get_json(f"https://data.sec.gov/submissions/{file_name}", filing_cache,
-                                        f"historical_{file_name}")
+        for file_name in self.older_file_names(submissions, formatted_cik):
+            data, older_meta = self.get_older_submissions(file_name)
             sources.append(older_meta)
             yield from _rows(data, file_name, warnings)
-
-    def get_filing_metadata(self, cik, filing_type="10-K", end_date=None, limit=10,
-                            include_amendments=False, strict=False):
-        """
-        Get metadata for company filings, newest first.
-
-        Args:
-            cik (str): The company CIK
-            filing_type (str): Form type to retrieve, or "ALL"
-            end_date (str): YYYY-MM-DD; filings made after it are left out
-            limit (int): Maximum number of filings to return
-            include_amendments (bool): also return amendments ("10-K/A" with "10-K")
-            strict (bool): raise the SecError of an older filings file that
-                cannot be read, instead of warning and going on without it
-
-        Returns:
-            (list, list, dict): filings, warnings and the retrieval record. A
-            warning means the list may be incomplete and says why. The
-            record's "sources" lists every SEC file read, the older filings
-            files included, each with its address and retrieval time.
-        """
-        formatted_cik = _format_cik(cik)
-        if end_date:
-            iso_date(end_date)
-        submissions, meta = self.get_company_submissions(formatted_cik)
-
-        warnings = []
-        sources = [meta]
-        filings = self._process_filings_data(
-            submissions["filings"]["recent"], filing_type, end_date, formatted_cik, include_amendments, warnings)
-        # Older filings sit in separate files, read only if the recent ones run
-        # out, newest first so the first filings found are the latest ones.
-        files = [f if isinstance(f, dict) else {"name": repr(f)} for f in submissions["filings"]["files"]]
-        files.sort(key=lambda f: str(f.get("filingTo") or ""), reverse=True)
-        for name in (str(f.get("name", "")) for f in files):
-            if len(filings) >= limit:
-                break
-            if not _HISTORY_FILE.fullmatch(name):
-                if strict:
-                    raise SecError(f"older filings file {name!r} has an unexpected name; "
-                                   f"the filings of CIK {formatted_cik} cannot all be read")
-                warnings.append(f"older filings file {name!r} has an unexpected name and was not read")
-                continue
-            try:
-                data, older = get_json(f"https://data.sec.gov/submissions/{name}", filing_cache, f"historical_{name}")
-                sources.append(older)
-            except SecError as e:
-                if strict:
-                    raise
-                warnings.append(f"older filings file {name} could not be read ({e.code}); "
-                                "filings from that period are missing")
-                continue
-            filings.extend(self._process_filings_data(
-                data, filing_type, end_date, formatted_cik, include_amendments, warnings))
-
-        unique = {f["accession_number"]: f for f in filings}
-        ordered = sorted(unique.values(), key=lambda f: (f["filing_date"], f["accession_number"]), reverse=True)
-        # Every file read is named, each with its own retrieval time.
-        return ordered[:limit], warnings, {**meta, "sources": sources}
-
-    def _process_filings_data(self, filings_data, filing_type, end_date, cik, include_amendments, warnings):
-        """
-        Pick the matching filings out of one block of the submissions feed.
-
-        Args:
-            filings_data (dict): Filings data from SEC API (parallel lists)
-            filing_type (str): Form type to keep, or "ALL"
-            end_date (str): YYYY-MM-DD cutoff, or None
-            cik (str): The company CIK, used to build each document URL
-            include_amendments (bool): keep "<form>/A" as well
-            warnings (list): receives a note for every filing left out for want of a date
-
-        Returns:
-            list: List of filing metadata
-        """
-        processed_filings = []
-
-        accession_numbers = filings_data.get("accessionNumber", [])
-        form_types = filings_data.get("form", [])
-        filing_dates = filings_data.get("filingDate", [])
-        documents = filings_data.get("primaryDocument", [])
-        reporting_dates = filings_data.get("reportDate", [])
-        items = filings_data.get("items", [])
-        accepted = filings_data.get("acceptanceDateTime", [])
-
-        wanted = filing_type.upper()
-        for i in range(min(len(accession_numbers), len(form_types))):
-            form = form_types[i] or ""
-            if wanted != "ALL" and form.upper() != wanted and not (
-                    include_amendments and form.upper() == f"{wanted}/A"):
-                continue
-
-            # A filing with no readable date cannot be placed before or after
-            # the cutoff, so it is left out and reported.
-            filing_date = filing_dates[i] if i < len(filing_dates) else ""
-            try:
-                iso_date(filing_date)
-            except ValueError:
-                warnings.append(f"{accession_numbers[i]} ({form}) has no usable filing date and was left out")
-                continue
-            if end_date and filing_date > end_date:
-                continue
-
-            # The submissions feed carries no document URL; it is built from
-            # the CIK, the accession number and the primary document name.
-            document = documents[i] if i < len(documents) else ""
-            url = ""
-            if document:
-                folder = accession_numbers[i].replace("-", "")
-                url = f"{XBRL_INSTANCE_URL}/{int(cik)}/{folder}/{document}"
-
-            processed_filings.append({
-                "accession_number": accession_numbers[i],
-                "form": form,
-                "filing_date": filing_date,
-                "description": document,
-                "url": url,
-                "reporting_date": reporting_dates[i] if i < len(reporting_dates) else "",
-                # When the SEC accepted the filing, in UTC as the feed gives it ("2026-02-20T14:46:32.000Z").
-                "acceptance_datetime": accepted[i] if i < len(accepted) else "",
-                # The numbered items of a current report (8-K), as the SEC lists them: ["2.01", "9.01"].
-                "items": [x for x in str(items[i] if i < len(items) else "").split(",") if x],
-            })
-
-        return processed_filings
 
     def get_company_facts(self, cik):
         """

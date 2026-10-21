@@ -40,6 +40,24 @@ REPLACED = {
                    "get_companyconcept returns the SEC document unchanged",
     "get_filed_statements": "removed in 1.0 (step 5): it chose statements, labels and values and checked "
                             "calculations; get_filing_xbrl returns the instance, schema and linkbases as written",
+    "lookup_company_ticker": "changed in 1.0 (step 6): exact matching only, each feed row returned as published "
+                             "with status resolved, ambiguous or not_found, under the 1.0 envelope",
+    "lookup_company_name": "changed in 1.0 (step 6): the suffix and fuzzy title ranking is removed; a title "
+                           "matches only when equal (case and runs of whitespace aside)",
+    "list_filings_10k": "changed in 1.0 (step 6): each row keeps every submissions column under the SEC's key, "
+                        "in the SEC's order, with the file and row index it came from",
+    "list_filing_documents": "changed in 1.0 (step 6): the index page rows as shown (size as text), marked "
+                             "transformed, with the original page and its hash",
+    "get_segment_revenue": "removed in 1.0 (step 6): it chose revenue concepts and segment axes; "
+                           "get_filing_xbrl returns the facts and their contexts as written",
+    "get_filing_text_page": "changed in 1.0 (step 6): marked transformed, with the extraction rules and the "
+                            "original file's hash",
+    "get_filing_text_find": "changed in 1.0 (step 6): marked transformed, with the extraction rules and the "
+                            "original file's hash",
+    "search_filings": "changed in 1.0 (step 6): each hit is the search index's record verbatim, with the "
+                      "index's total relation",
+    "search_companies_sic": "removed in 1.0 (step 6): it grouped companies by industry from a bundled index; "
+                            "get_submissions returns sic and sicDescription as the SEC publishes them",
 }
 # Fields that differ between a live answer and its replay by design. The
 # capture read some addresses more than once, and a frozen copy keeps the

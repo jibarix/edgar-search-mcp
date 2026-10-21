@@ -12,7 +12,7 @@ APP_NAME = "edgar-search-mcp"
 def _user_dir(kind):
     """The per-user folder for `kind` ("cache" or "data"), outside the
     installed package: an installed copy may not write next to its code, and
-    clearing a cache should not remove an index someone built on purpose."""
+    clearing the cache should not remove files kept on purpose."""
     home = Path.home()
     if sys.platform == "win32":
         base = os.environ.get("LOCALAPPDATA")
@@ -47,10 +47,6 @@ RECORD_DIR = os.environ.get("EDGAR_RECORD_DIR") or None
 # the copies and every response is recorded.
 CACHE_DIR = os.environ.get("EDGAR_CACHE_DIR") or str(_user_dir("cache"))
 
-# The company index: EDGAR_COMPANY_INDEX names a file to use; else one built
-# here with the index builder; else the snapshot shipped in the package.
-COMPANY_INDEX = os.environ.get("EDGAR_COMPANY_INDEX") or None
-USER_DATA_DIR = str(_user_dir("data"))
 CACHE_ENABLED = FROZEN_DIR is None and RECORD_DIR is None
 CACHE_EXPIRY = 24 * 60 * 60  # 24 hours in seconds
 

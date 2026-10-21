@@ -1,135 +1,68 @@
-"""Company lookup functionality for finding SEC CIK numbers."""
-from __future__ import annotations
+"""Company identifiers from the SEC's company_tickers.json, matched exactly.
 
-import re
-from difflib import get_close_matches
+The feed is returned as the SEC publishes it. A query matches a row only by
+equality: a CIK (digits) with the row's `cik_str`, a ticker with its `ticker`
+(case aside), or a title with its `title` (case aside, runs of whitespace read
+as one). There is no suffix, prefix or fuzzy matching, and nothing is ranked.
+"""
+from __future__ import annotations
 
 from edgar_mcp.config.constants import COMPANY_TICKERS_URL
 from edgar_mcp.utils.cache import Cache
-from edgar_mcp.utils.sec_client import get_json
+from edgar_mcp.utils.sec_client import SecError, get_json
 
-# Initialize cache for company lookup
 company_cache = Cache("company_lookup")
 
 
 def format_cik(cik):
-    """
-    Format CIK to 10-digit format with leading zeros.
-    
-    Args:
-        cik (str or int): The CIK number
-        
-    Returns:
-        str: Formatted 10-digit CIK
-    """
+    """A CIK as the 10 digits SEC addresses use."""
     return str(cik).zfill(10)
 
 
-def get_company_tickers():
-    """Retrieve the SEC company tickers feed indexed for lookup.
-
-    Returns a dict with two sub-indexes so callers can rank ticker and
-    name hits independently:
-        {
-            "by_name":   normalized lowercase name -> company entry,
-            "by_ticker": uppercase ticker          -> company entry,
-            "shared":    normalized lowercase name -> entries, for a name
-                         used by more than one CIK,
-        }
-    Each entry has the shape {"cik", "ticker", "name"}. "source" says where
-    the feed came from and when it left the SEC; a cached index keeps the
-    time of the download it was built from.
-    """
-    cached_data = company_cache.get("company_tickers_v5")
-    if cached_data:
-        return cached_data
-
-    # A failed download raises SecError; it is never reported as "no match".
-    data, meta = get_json(COMPANY_TICKERS_URL)
-
-    by_name: dict[str, dict] = {}
-    by_ticker: dict[str, dict] = {}
-    by_cik: dict[str, dict[str, dict]] = {}
-    for _, company_info in data.items():
-        cik = company_info["cik_str"]
-        ticker = company_info["ticker"]
-        title = company_info["title"]
-        normalized_title = re.sub(r'[^\w\s]', '', title.lower()).strip()
-
-        entry = {
-            "cik": format_cik(cik),
-            "ticker": ticker,
-            "name": title,
-        }
-        # One company listed under several tickers keeps its first entry.
-        by_name.setdefault(normalized_title, entry)
-        by_cik.setdefault(normalized_title, {}).setdefault(entry["cik"], entry)
-        by_ticker[ticker.upper()] = entry
-
-    # A name used by more than one CIK identifies none of them.
-    shared = {name: list(entries.values()) for name, entries in by_cik.items() if len(entries) > 1}
-    source = {"source_url": COMPANY_TICKERS_URL, "retrieved_at": meta.get("retrieved_at"),
-              "frozen": meta.get("frozen", False)}
-    result = {"by_name": by_name, "by_ticker": by_ticker, "shared": shared, "source": source}
-    company_cache.set("company_tickers_v5", result)
-    return result
+def company_tickers():
+    """(rows, meta): the rows of company_tickers.json in the feed's order, each
+    exactly as published, and the record of where and when the feed was read."""
+    data, meta = get_json(COMPANY_TICKERS_URL, company_cache, "company_tickers_v6")
+    if not isinstance(data, dict):
+        raise SecError(f"{COMPANY_TICKERS_URL} is not an object of rows")
+    return list(data.values()), meta
 
 
-# Common corporate suffixes we strip / try-appending when resolving names.
-_CORP_SUFFIXES = ("inc", "corp", "corporation", "company", "co", "ltd",
-                  "limited", "lp", "llc", "plc", "holdings", "group")
+def _title_key(text) -> str:
+    return " ".join(str(text).split()).casefold()
 
 
 def find_company(query):
-    """Search for a company by name or ticker. Returns (match_type, matches).
+    """(status, matches, meta) for an exact identifier.
 
-    Ranking order (first non-empty rule wins):
-        "ticker"      exact ticker (case-insensitive)          -> 1 result
-        "name"        exact normalized name                    -> 1 result
-        "shared_name" that name belongs to more than one CIK   -> all of them
-        "name_suffix" name == query + one corporate suffix     -> 1 result
-                      (catches "Apple" -> "Apple Inc"); if several
-                      suffixes match, all are returned as "prefix"
-        "prefix"      names starting with query, shortest first
-        "fuzzy"       close names only — tickers excluded so short
-                      tickers like APLE don't outrank longer names
-        "none"        nothing close
-
-    Only "ticker", "name" and "name_suffix" identify one company. The feed lists current
-    tickers and names, not those in use at an earlier date.
+    `matches` lists every row equal to the query, in the feed's order, each as
+    {"cik", "matched_on", "record"}; a row equal on its ticker is "ticker",
+    else "title". `status` is "resolved" when the matches share one CIK,
+    "ambiguous" when they name several, "not_found" when there are none.
     """
-    q = query.strip()
-    q_norm = re.sub(r'[^\w\s]', '', q.lower()).strip()
-    if not q_norm:
-        return "none", []
-
-    data = get_company_tickers()
-    by_name = data["by_name"]
-    by_ticker = data["by_ticker"]
-
-    if q.upper() in by_ticker:
-        return "ticker", [by_ticker[q.upper()]]
-
-    shared = data.get("shared", {})
-    if q_norm in shared:
-        return "shared_name", shared[q_norm]
-    if q_norm in by_name:
-        return "name", [by_name[q_norm]]
-
-    suffixed = [f"{q_norm} {suffix}" for suffix in _CORP_SUFFIXES if f"{q_norm} {suffix}" in by_name]
-    if len(suffixed) == 1:
-        if suffixed[0] in shared:
-            return "shared_name", shared[suffixed[0]]
-        return "name_suffix", [by_name[suffixed[0]]]
-
-    prefix_token = q_norm + " "
-    prefix_hits = [
-        entry for norm, entry in by_name.items()
-        if norm.startswith(prefix_token)
-    ]
-    if prefix_hits:
-        prefix_hits.sort(key=lambda e: len(e["name"]))
-        return "prefix", prefix_hits[:5]
-
-    fuzzy = get_close_matches(q_norm, list(by_name.keys()), n=5, cutoff=0.6)
-    return ("fuzzy" if fuzzy else "none"), [by_name[m] for m in fuzzy]
+    q = str(query).strip()
+    if not q:
+        raise ValueError("query is empty")
+    digits = q.isascii() and q.isdigit()
+    if digits and len(q) > 10:
+        raise ValueError(f"CIK must be up to 10 digits, got {q!r}")
+    rows, meta = company_tickers()
+    matches = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        cik = format_cik(row.get("cik_str", ""))
+        ticker, title = row.get("ticker"), row.get("title")
+        if digits:
+            on = "cik" if cik == format_cik(q) else None
+        elif isinstance(ticker, str) and ticker.upper() == q.upper():
+            on = "ticker"
+        elif isinstance(title, str) and _title_key(title) == _title_key(q):
+            on = "title"
+        else:
+            on = None
+        if on:
+            matches.append({"cik": cik, "matched_on": on, "record": row})
+    ciks = {m["cik"] for m in matches}
+    status = "not_found" if not ciks else "resolved" if len(ciks) == 1 else "ambiguous"
+    return status, matches, meta

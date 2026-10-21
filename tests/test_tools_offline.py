@@ -1,5 +1,5 @@
-"""The tools against made-up SEC answers: search, segments, filed statements, filing history,
-retries and frozen copies, statement classification and the company index.
+"""The tools against made-up SEC answers: search, company lookup, filing rows, filing XBRL,
+retries and frozen copies, filing text and the user folders.
 
 No network: every request goes to a stand-in transport, and any request a
 case did not expect fails the run. Run from the repository root:
@@ -20,13 +20,12 @@ sys.path.insert(0, ROOT)
 os.environ["EDGAR_CACHE_DIR"] = tempfile.mkdtemp(prefix="edgar_cache_test_")
 os.environ.pop("EDGAR_FROZEN_DIR", None)
 os.environ.pop("EDGAR_RECORD_DIR", None)
-os.environ.pop("EDGAR_COMPANY_INDEX", None)
 
 import httpx  # noqa: E402
 
 from edgar_mcp import server  # noqa: E402
 from edgar_mcp.config import settings  # noqa: E402
-from edgar_mcp.edgar import company_classifier, company_lookup, filing_retrieval  # noqa: E402
+from edgar_mcp.edgar import company_lookup, filing_retrieval  # noqa: E402
 from edgar_mcp.utils import sec_client  # noqa: E402
 
 problems = []
@@ -75,6 +74,11 @@ def page(total, hits, relation="eq"):
     return {"hits": {"total": {"value": total, "relation": relation}, "hits": hits}}
 
 
+def meta(url):
+    return {"source_url": url, "retrieved_at": "2026-01-01T00:00:00Z", "cache_hit": False, "frozen": False,
+            "sha256": "0" * 64}
+
+
 def search_cases():
     real = server.get_json
     try:
@@ -88,18 +92,35 @@ def search_cases():
             "a string answer": "error",
             "a hit with no _source": page(1, [{"_id": "x:y.htm"}]),
             "a hit with an unreadable CIK": page(1, [{"_id": "x:y.htm", "_source": {"ciks": ["12a"]}}]),
-            "a hit with a name that is not text": page(1, [{"_id": "x:y.htm", "_source": {"display_names": [5]}}]),
+            "a hit with ciks that is not a list": page(1, [{"_id": "x:y.htm", "_source": {"ciks": "1"}}]),
         }
         for label, answer in bad.items():
-            server.get_json = lambda url, *a, answer=answer, **k: (answer, {})
+            server.get_json = lambda url, *a, answer=answer, **k: (answer, meta(url))
             _, code = call(server.search_filings, query="x")
             check(f"search: {label} is an upstream failure", code == "UPSTREAM_UNAVAILABLE", code)
 
         for relation in ("eq", "gte"):
-            server.get_json = lambda url, *a, relation=relation, **k: (page(0, [], relation), {})
+            server.get_json = lambda url, *a, relation=relation, **k: (page(0, [], relation), meta(url))
             result, code = call(server.search_filings, query="x")
-            check(f"search: no hits ({relation}) is a valid empty answer",
-                  code is None and result["count"] == 0 and result["total_is_exact"] == (relation == "eq"), code)
+            check(f"search: no hits ({relation}) is a valid empty answer, the relation as the index gives it",
+                  code is None and result["count"] == 0 and result["total_relation"] == relation, code)
+
+        odd = {"_id": "0000000001-24-000001:a.htm", "_score": 3.5, "extra": [1],
+               "_source": {"ciks": ["0000000001", "0000000002"], "display_names": [5], "sics": ["x"]}}
+        server.get_json = lambda url, *a, **k: (page(1, [odd]), meta(url))
+        result, code = call(server.search_filings, query="x")
+        check("search: a hit is returned verbatim, names and codes as given, nothing parsed",
+              code is None and result["hits"][0]["record"] == odd
+              and result["hits"][0]["url"] == "https://www.sec.gov/Archives/edgar/data/1/000000000124000001/a.htm",
+              str(result and result["hits"]))
+        check("search: the answer names the address it read",
+              result["sources"][0]["url"].startswith(server._SEARCH_URL))
+        for label, broken in [("an _id with no file", "0000000001-24-000001"),
+                              ("an _id that is not an accession", "abc:a.htm")]:
+            server.get_json = lambda url, *a, broken=broken, **k: (page(1, [{**odd, "_id": broken}]), meta(url))
+            result, code = call(server.search_filings, query="x")
+            check(f"search: {label} keeps its record and has no url",
+                  code is None and result["hits"][0]["url"] is None and result["hits"][0]["record"]["_id"] == broken)
 
         # 10,000 hits: continuation runs through the last upstream page and stops at the ceiling.
         asked = []
@@ -107,7 +128,7 @@ def search_cases():
         def pages(url, *a, **k):
             start = int(url.split("&from=")[1]) if "&from=" in url else 0
             asked.append(start)
-            return page(10000, [hit(start + i) for i in range(100)], relation="gte"), {}
+            return page(10000, [hit(start + i) for i in range(100)], relation="gte"), meta(url)
         server.get_json = pages
         offsets, offset = [], 9900
         while offset is not None:
@@ -125,7 +146,7 @@ def search_cases():
         check("search: a page boundary gives a short page and the next offset",
               result["count"] == 10 and result["next_offset"] == 100 and asked == [0], f"{result['count']}")
 
-        server.get_json = lambda url, *a, **k: (page(30, [hit(i) for i in range(30)]), {})
+        server.get_json = lambda url, *a, **k: (page(30, [hit(i) for i in range(30)]), meta(url))
         result, _ = call(server.search_filings, query="x", limit=25)
         result2, _ = call(server.search_filings, query="x", offset=25, limit=25)
         check("search: continuation stops at the actual total",
@@ -232,193 +253,117 @@ def client_cases():
 
 
 def lookup_cases():
-    feed = {"0": {"cik_str": 1, "ticker": "AAA", "title": "Alpha Inc"}}
-    real = company_lookup.get_json
-    company_lookup.company_cache.delete("company_tickers_v5")
-    company_lookup.get_json = lambda url, *a, **k: (feed, {"retrieved_at": "2026-01-01T00:00:00Z", "frozen": False})
+    feed = {"0": {"cik_str": 1, "ticker": "AAA", "title": "Alpha Inc"},
+            "1": {"cik_str": 1, "ticker": "AAB", "title": "Alpha Inc"}}
+    body = json.dumps(feed).encode("utf-8")
+    asked = []
+
+    def answer(request):
+        asked.append(str(request.url))
+        if str(request.url) == company_lookup.COMPANY_TICKERS_URL:
+            return httpx.Response(200, content=body, headers={"Content-Type": "application/json"})
+        return unexpected(request)
+    company_lookup.company_cache.delete("company_tickers_v6")
+    transport(answer)
     try:
-        first, _ = call(server.lookup_company, query="AAA")
-        company_lookup.get_json = lambda url, *a, **k: (feed, {"retrieved_at": "2026-02-02T00:00:00Z"})
-        second, _ = call(server.lookup_company, query="Alpha")
-        check("lookup_company names its source and when it left the SEC",
-              first["retrieved_at"] == "2026-01-01T00:00:00Z" and first["source_url"].endswith("company_tickers.json"))
-        check("a cached lookup keeps the download time, not a new one",
-              second["retrieved_at"] == "2026-01-01T00:00:00Z" and second["returned_at"] >= first["returned_at"])
+        first, code = call(server.lookup_company, query="AAA")
+        second, code2 = call(server.lookup_company, query="alpha inc")
+        src1, src2 = first["sources"][0], second["sources"][0]
+        check("lookup_company names the feed, when it was read and the hash of its bytes",
+              code is None and src1["url"] == company_lookup.COMPANY_TICKERS_URL and src1["retrieved_at"]
+              and src1["sha256"] == hashlib.sha256(body).hexdigest() and src1["cache_hit"] is False, str(src1))
+        check("a cached lookup keeps the download time and the hash, and says it was cached",
+              code2 is None and src2["cache_hit"] is True and src2["retrieved_at"] == src1["retrieved_at"]
+              and src2["sha256"] == src1["sha256"] and len(asked) == 1, f"{src2} {len(asked)}")
+        check("a company under two tickers: the ticker matches one row, the title both, one CIK",
+              first["status"] == second["status"] == "resolved" and len(first["matches"]) == 1
+              and [m["record"] for m in second["matches"]] == list(feed.values()))
+        third, _ = call(server.lookup_company, query="Alpha")
+        check("a partial title is not found, and nothing is unresolved", third["status"] == "not_found"
+              and third["matches"] == [] and third["unresolved"] == [])
     finally:
-        company_lookup.get_json = real
-        company_lookup.company_cache.delete("company_tickers_v5")
+        company_lookup.company_cache.delete("company_tickers_v6")
+        sec_client._client = httpx.Client(transport=httpx.MockTransport(unexpected))
 
 
-# ── filing history and get_segment_revenue ─────────────────────────────────
+# ── list_filings over the submissions tables ────────────────────────────────
 
-SUBMISSIONS = {"filings": {"recent": {"accessionNumber": [], "form": [], "filingDate": [], "primaryDocument": [],
-                                      "reportDate": []},
-                           "files": [{"name": "CIK0000000001-submissions-001.json", "filingTo": "2020-12-31"},
-                                     {"name": "CIK0000000001-submissions-002.json", "filingTo": "2015-12-31"}]}}
-
-
-def history(accession, form, date):
-    return {"accessionNumber": [accession], "form": [form], "filingDate": [date], "primaryDocument": ["a.htm"],
-            "reportDate": [date]}
+def table(*rows):
+    """A submissions column table from (accession, form, filingDate) rows."""
+    return {"accessionNumber": [r[0] for r in rows], "form": [r[1] for r in rows],
+            "filingDate": [r[2] for r in rows], "primaryDocument": [f"d{i}.htm" for i in range(len(rows))]}
 
 
 def history_cases():
     real = filing_retrieval.get_json
-    retrieval = filing_retrieval.FilingRetrieval()
+    recent = table(("0000000001-25-000002", "10-K/A", "2025-03-02"), ("0000000001-25-000001", "10-K", "2025-03-01"),
+                   ("0000000001-24-000009", "10-KT", "2024-09-01"), ("0000000001-24-000008", "10-K405", "2024-08-01"),
+                   ("0000000001-24-000007", "10-k", "2024-07-01"))
+    files = [{"name": "CIK0000000001-submissions-001.json"}, {"name": "CIK0000000001-submissions-002.json"}]
+    read = []
 
-    def answers(table):
+    def answers(older):
         def get(url, *a, **k):
             name = url.rsplit("/", 1)[1]
-            got = table.get(name, SUBMISSIONS if name.startswith("CIK0000000001.json") else None)
+            read.append(name)
+            got = ({"filings": {"recent": recent, "files": files}} if name == "CIK0000000001.json"
+                   else older.get(name))
             if isinstance(got, Exception):
                 raise got
-            return got, {"source_url": url}
+            return got, meta(url)
         return get
+
+    def listed(older, **kwargs):
+        read.clear()
+        filing_retrieval.get_json = answers(older)
+        return call(server.list_filings, cik_or_ticker="1", **kwargs)
+    fail = sec_client.SecError("HTTP 503")
     try:
-        newer_fails = {"CIK0000000001-submissions-001.json": sec_client.SecNoFrozenCopy("no copy"),
-                       "CIK0000000001-submissions-002.json": history("0000000001-15-000001", "10-K", "2015-03-01")}
-        filing_retrieval.get_json = answers(newer_fails)
-        rows, warnings, _ = retrieval.get_filing_metadata("1", "10-K", limit=1)
-        check("history: a list goes on past an unreadable file, with a warning",
-              len(rows) == 1 and len(warnings) == 1 and "NO_FROZEN_COPY" in warnings[0], str(warnings))
-        try:
-            retrieval.get_filing_metadata("1", "10-K", limit=1, strict=True)
-            check("history: strict raises when a newer file cannot be read", False)
-        except sec_client.SecNoFrozenCopy:
-            check("history: strict raises when a newer file cannot be read", True)
-
-        filing_retrieval.get_json = answers({
-            "CIK0000000001-submissions-001.json": history("0000000001-20-000001", "10-K", "2020-03-01"),
-            "CIK0000000001-submissions-002.json": sec_client.SecError("HTTP 503")})
-        rows, _, _ = retrieval.get_filing_metadata("1", "10-K", limit=1, strict=True)
-        check("history: files are read newest first and stop once enough is found",
-              rows and rows[0]["filing_date"] == "2020-03-01")
-
-        # Through the tool: the error code survives, and no 20-F is tried in place of a 10-K.
-        real_resolve = server._resolve
-        server._resolve = lambda s: {"cik": "0000000001", "matched_on": "cik"}
-        try:
-            filing_retrieval.get_json = answers(newer_fails)
-            _, code = call(server.get_segment_revenue, cik_or_ticker="1")
-            check("segments: an unreadable history file is NO_FROZEN_COPY, not NOT_FOUND", code == "NO_FROZEN_COPY", code)
-            filing_retrieval.get_json = answers({
-                "CIK0000000001-submissions-001.json": sec_client.SecError("HTTP 503"),
-                "CIK0000000001-submissions-002.json": history("0000000001-15-000002", "20-F", "2015-03-01")})
-            _, code = call(server.get_segment_revenue, cik_or_ticker="1")
-            check("segments: a failed 10-K search does not fall back to a 20-F", code == "UPSTREAM_UNAVAILABLE", code)
-            filing_retrieval.get_json = answers({
-                "CIK0000000001-submissions-001.json": history("0000000001-20-000003", "8-K", "2020-03-01"),
-                "CIK0000000001-submissions-002.json": history("0000000001-15-000003", "10-Q", "2015-03-01")})
-            _, code = call(server.get_segment_revenue, cik_or_ticker="1")
-            check("segments: a complete history with no annual report is NOT_FOUND", code == "NOT_FOUND", code)
-        finally:
-            server._resolve = real_resolve
+        first = table(("0000000001-20-000001", "10-K", "2020-03-01"), ("0000000001-19-000001", "10-K", ""))
+        second = table(("0000000001-15-000001", "10-K", "2015-03-01"))
+        both = {"CIK0000000001-submissions-001.json": first, "CIK0000000001-submissions-002.json": second}
+        result, code = listed({"CIK0000000001-submissions-001.json": first,
+                               "CIK0000000001-submissions-002.json": fail}, limit=1)
+        check("list_filings: the form is compared literally (not 10-K/A, 10-KT, 10-K405 or 10-k)",
+              code is None and [f["record"]["accessionNumber"] for f in result["filings"]] == ["0000000001-25-000001"])
+        check("list_filings: an older file is not read while the recent table fills the limit",
+              read == ["CIK0000000001.json"] and result["limit_reached"] and result["complete"], str(read))
+        result, code = listed({"CIK0000000001-submissions-001.json": first,
+                               "CIK0000000001-submissions-002.json": fail}, limit=2)
+        check("list_filings: older files are read in the order listed, only as far as the limit needs",
+              code is None and read == ["CIK0000000001.json", "CIK0000000001-submissions-001.json"]
+              and [f["source"]["file"] for f in result["filings"]]
+              == ["CIK0000000001.json#filings.recent", "CIK0000000001-submissions-001.json"], str(read))
+        _, code = listed({"CIK0000000001-submissions-001.json": sec_client.SecNoFrozenCopy("no copy"),
+                          "CIK0000000001-submissions-002.json": second}, limit=5)
+        check("list_filings: an unreadable older file is NO_FROZEN_COPY, never a shorter list",
+              code == "NO_FROZEN_COPY", code)
+        _, code = listed({"CIK0000000001-submissions-001.json": fail}, limit=5)
+        check("list_filings: an older file the SEC fails to serve is UPSTREAM_UNAVAILABLE",
+              code == "UPSTREAM_UNAVAILABLE", code)
+        result, code = listed(both, limit=10, include_amendments=True)
+        check("list_filings: amendments come when asked, in the SEC's order, and every file is read",
+              code is None and [f["record"]["form"] for f in result["filings"]]
+              == ["10-K/A", "10-K", "10-K", "10-K", "10-K"] and not result["limit_reached"] and result["complete"])
+        result, code = listed(both, as_of="2024-12-31")
+        check("list_filings: as_of keeps rows filed on or before it; a row without a date is left out and named",
+              code is None and [f["record"]["filingDate"] for f in result["filings"]] == ["2020-03-01", "2015-03-01"]
+              and len(result["warnings"]) == 1 and "0000000001-19-000001" in result["warnings"][0]
+              and result["complete"] is False, str(result and result["warnings"]))
+        result, code = listed(both, form=None, limit=6)
+        check("list_filings: form=None keeps every form, as written",
+              code is None and [f["record"]["form"] for f in result["filings"]]
+              == ["10-K/A", "10-K", "10-KT", "10-K405", "10-k", "10-K"])
+        check("list_filings: each file read is a source", [s["url"].rsplit("/", 1)[1] for s in result["sources"]]
+              == ["CIK0000000001.json", "CIK0000000001-submissions-001.json"])
+        for bad in [{"form": "10-K; drop"}, {"as_of": "2024/12/31"}, {"limit": 1001}]:
+            _, code = listed({}, **bad)
+            check(f"list_filings: refused {bad}", code == "INVALID_INPUT", code)
     finally:
         filing_retrieval.get_json = real
-        filing_retrieval.filing_cache.clear() if hasattr(filing_retrieval.filing_cache, "clear") else None
 
 
 US_GAAP = "http://fasb.org/us-gaap/2024"
-SRT = "http://fasb.org/srt/2024"
-
-
-def instance(facts, units=None, iso_prefix="iso4217", extra_ns=""):
-    """A small XBRL instance. `facts` are (concept, context, unit, value); a
-    concept may be "custom:Revenues". Contexts: FY (2025), FY24S (other
-    start), and FY with members US, CA (geography), P (product)."""
-    units = units if units is not None else {
-        "USD": f"<xbrli:measure>{iso_prefix}:USD</xbrli:measure>",
-        "U_usd": f"<xbrli:measure>{iso_prefix}:USD</xbrli:measure>",
-        "EUR": f"<xbrli:measure>{iso_prefix}:EUR</xbrli:measure>",
-        "USDPerShare": (f"<xbrli:divide><xbrli:unitNumerator><xbrli:measure>{iso_prefix}:USD</xbrli:measure>"
-                        "</xbrli:unitNumerator><xbrli:unitDenominator><xbrli:measure>xbrli:shares</xbrli:measure>"
-                        "</xbrli:unitDenominator></xbrli:divide>")}
-
-    def ctx(cid, start, members=()):
-        seg = "".join(f'<xbrldi:explicitMember dimension="{d}">{m}</xbrldi:explicitMember>' for d, m in members)
-        seg = f"<xbrli:segment>{seg}</xbrli:segment>" if seg else ""
-        return (f'<xbrli:context id="{cid}"><xbrli:entity><xbrli:identifier scheme="x">1</xbrli:identifier>{seg}'
-                f"</xbrli:entity><xbrli:period><xbrli:startDate>{start}</xbrli:startDate>"
-                "<xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period></xbrli:context>")
-    geo = "srt:StatementGeographicalAxis"
-    contexts = [ctx("FY", "2025-01-01"), ctx("FY24S", "2024-12-29"),
-                ctx("US", "2025-01-01", [(geo, "country:US")]), ctx("CA", "2025-01-01", [(geo, "country:CA")]),
-                ctx("MX", "2025-01-01", [(geo, "country:MX")]),
-                ctx("P", "2025-01-01", [("srt:ProductOrServiceAxis", "t:ProductMember")])]
-    body = "".join(f'<{c if ":" in c else "us-gaap:" + c} contextRef="{x}" unitRef="{u}" decimals="-6">{v}'
-                   f'</{c if ":" in c else "us-gaap:" + c}>' for c, x, u, v in facts)
-    unit_xml = "".join(f'<xbrli:unit id="{k}">{v}</xbrli:unit>' for k, v in units.items())
-    return (f'<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xbrldi="http://xbrl.org/2006/xbrldi" '
-            f'xmlns:us-gaap="{US_GAAP}" xmlns:srt="{SRT}" xmlns:{iso_prefix}="http://www.xbrl.org/2003/iso4217" '
-            f'xmlns:country="http://xbrl.sec.gov/country/2024" xmlns:t="http://t.example/2025" '
-            f'xmlns:custom="http://custom.example/2025" {extra_ns}>'
-            f"{''.join(contexts)}{unit_xml}{body}</xbrli:xbrl>").encode("utf-8")
-
-
-def segments(raw):
-    """get_segment_revenue on one made-up instance; returns (result, code)."""
-    real = (server._resolve, server._filings.get_filing_metadata, server.fetch_response)
-    server._resolve = lambda s: {"cik": "0000000001", "matched_on": "cik"}
-    server._filings.get_filing_metadata = lambda *a, **k: ([{
-        "url": "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/t-20251231.htm",
-        "form": "10-K", "accession_number": "0000000001-26-000001", "filing_date": "2026-02-01"}], [], {})
-    server.fetch_response = lambda url, **k: sec_client.Response(raw, "application/xml", "2026-02-02T00:00:00Z")
-    try:
-        return call(server.get_segment_revenue, cik_or_ticker="1")
-    finally:
-        server._resolve, server._filings.get_filing_metadata, server.fetch_response = real
-
-
-def geo(result):
-    return {r["member"].split(":")[-1]: r["value"] for r in result["axes"]["geography"]}
-
-
-def segment_cases():
-    r, _ = segments(instance([("Revenues", "FY", "USD", 100), ("Revenues", "US", "USD", 70),
-                              ("Revenues", "CA", "U_usd", 20)], iso_prefix="iso"))
-    check("segments: two unit ids for USD, under another prefix, are one currency",
-          r["unit"] == "USD" and geo(r) == {"US": 70, "CA": 20} and not r["skipped"], str(r and r["skipped"]))
-    r, _ = segments(instance([("Revenues", "FY", "USD", 100), ("Revenues", "US", "USD", 70),
-                              ("Revenues", "CA", "EUR", 18)]))
-    check("segments: a member in another currency is left out and named",
-          geo(r) == {"US": 70} and [s["reason"] for s in r["skipped"]] == ["in EUR, not USD"], str(r["skipped"]))
-    r, _ = segments(instance([("Revenues", "FY", "USD", 100), ("Revenues", "US", "USD", 70),
-                              ("Revenues", "US", "EUR", 63)]))
-    check("segments: a member given in the right currency is not listed as skipped",
-          geo(r) == {"US": 70} and not r["skipped"], str(r["skipped"]))
-    r, _ = segments(instance([("Revenues", "FY", "EUR", 50), ("Revenues", "US", "EUR", 30)]))
-    check("segments: a report in EUR is read in EUR", r["unit"] == "EUR" and geo(r) == {"US": 30})
-    r, _ = segments(instance([("Revenues", "FY", "USD", 100), ("Revenues", "US", "NOPE", 70)]))
-    check("segments: an undefined unit is named as the reason",
-          not geo(r) and "not defined" in r["skipped"][0]["reason"], str(r["skipped"]))
-    r, _ = segments(instance([("Revenues", "FY", "USD", 100), ("Revenues", "US", "USDPerShare", 1)]))
-    check("segments: a divided unit is not a currency", "not one currency" in r["skipped"][0]["reason"])
-    _, code = segments(instance([("Revenues", "US", "USD", 70), ("Revenues", "CA", "EUR", 20)]))
-    check("segments: two currencies and no total are refused", code == "UNSUPPORTED_DOCUMENT", code)
-    r, _ = segments(instance([("Revenues", "US", "USD", 70), ("Revenues", "CA", "USD", 20)]))
-    check("segments: one currency and no total is read", r["unit"] == "USD" and r["total_revenue"] is None)
-    r, _ = segments(instance([("Revenues", "FY", "USD", 100), ("Revenues", "US", "USD", 70),
-                              ("Revenues", "FY24S", "USD", 101)]))
-    check("segments: a figure for another period is not mixed in",
-          r["total_revenue"]["value"] == 100 and r["fiscal_year"]["start"] == "2025-01-01")
-    r, _ = segments(instance([("Revenues", "FY", "USD", 100), ("Revenues", "US", "USD", 70),
-                              ("RevenueFromContractWithCustomerExcludingAssessedTax", "CA", "USD", 20),
-                              ("RevenueFromContractWithCustomerExcludingAssessedTax", "MX", "USD", 10),
-                              ("Revenues", "MX", "USD", 11)]))
-    check("segments: the concept covering most members is read first, and both are named",
-          geo(r) == {"US": 70, "CA": 20, "MX": 11} or geo(r) == {"US": 70, "CA": 20, "MX": 10},
-          f"{geo(r)} {r['concepts']['geography']}")
-    check("segments: an axis read under two concepts says so", len(r["concepts"]["geography"]) == 2)
-    r, _ = segments(instance([("Revenues", "FY", "USD", 100), ("custom:Revenues", "US", "USD", 70)]))
-    check("segments: a company's own concept named Revenues is not read", not geo(r))
-    r, _ = segments(instance([("Revenues", "FY", "USD", 100), ("Revenues", "US", "USD", 70),
-                              ("Revenues", "CA", "USD", 20), ("Revenues", "MX", "USD", 10)]))
-    check("segments: a dominant member (70/20/10) is kept, not taken for a total",
-          geo(r) == {"US": 70, "CA": 20, "MX": 10})
-    r, _ = segments(instance([("Revenues", "FY", "USD", 100), ("Revenues", "US", "USD", 70),
-                              ("Revenues", "CA", "USD", -5)]))
-    check("segments: a negative member stays", geo(r).get("CA") == -5)
-    check("segments: a live answer says it was not frozen", r["frozen"] is False)
 
 
 # ── get_filing_xbrl on made-up filings ──────────────────────────────────────
@@ -881,92 +826,17 @@ def text_cases():
         first, _ = call(server.get_filing_text, url=url)
         server.fetch_response = lambda u, **k: (_ for _ in ()).throw(AssertionError("read twice"))
         second, _ = call(server.get_filing_text, url=url, find="net sales")
-        check("text: a frozen document says so", first["frozen"] is True and first["text"] == "Net sales rose.")
-        check("text: and still says so when served from memory",
-              second["cache_hit"] and second["frozen"] is True and second["retrieved_at"] == "2026-02-02T00:00:00Z")
+        src1, src2 = first["sources"][0], second["sources"][0]
+        check("text: a frozen document says so", src1["frozen"] is True and first["text"] == "Net sales rose.")
+        check("text: and still says so when served from memory, with the same hash",
+              src2["cache_hit"] and src2["frozen"] is True and src2["retrieved_at"] == "2026-02-02T00:00:00Z"
+              and src2["sha256"] == src1["sha256"] == hashlib.sha256(b"<p>Net sales rose.</p>").hexdigest())
+        check("text: the extraction is marked transformed and points at the original",
+              first["representation"] == "transformed" and first["original"]["sha256"] == src1["sha256"])
         check("text: the answer says the text is the filer's, not instructions",
               "not instructions" in first["content"] and "not instructions" in second["content"])
     finally:
         server.fetch_response = real
-
-
-# ── company index: files, precedence, builder ──────────────────────────────
-
-def index_cases():
-    real = (company_classifier.COMPANY_INDEX, company_classifier.USER_INDEX_FILE)
-    folder = tempfile.mkdtemp(prefix="edgar_index_test_")
-    try:
-        company_classifier.COMPANY_INDEX, company_classifier.USER_INDEX_FILE = None, os.path.join(folder, "none.json")
-        companies, meta = company_classifier.load_index_with_meta()
-        check("index: with nothing built, the packaged snapshot is read",
-              meta["origin"] == "snapshot in the package" and len(companies) > 1000 and "schema_version" not in companies)
-        check("index: the snapshot does not claim a build date it has no record of", meta["built"] is None)
-
-        legacy = os.path.join(folder, "legacy.json")
-        json.dump({"1": {"name": "Old Co", "sic": "1000"}}, open(legacy, "w", encoding="utf-8"))
-        company_classifier.COMPANY_INDEX = legacy
-        companies, meta = company_classifier.load_index_with_meta()
-        check("index: an older index is read, its provenance unknown",
-              list(companies) == ["1"] and meta["built"] is None and meta["origin"] == "EDGAR_COMPANY_INDEX")
-        os.utime(legacy, (0, 0))
-        check("index: a file's modification time does not set the build date",
-              company_classifier.load_index_meta()["built"] is None)
-
-        broken = os.path.join(folder, "broken.json")
-        open(broken, "w").write("{not json")
-        company_classifier.COMPANY_INDEX = broken
-        try:
-            company_classifier.load_index_with_meta()
-            check("index: a named index that cannot be read is an error", False)
-        except company_classifier.IndexUnavailable:
-            check("index: a named index that cannot be read is an error", True)
-        real_index, server._classifier_index = server._classifier_index, None
-        try:
-            _, code = call(server.search_companies, sic="1000")
-            check("index: search_companies reports it as INDEX_UNAVAILABLE", code == "INDEX_UNAVAILABLE", code)
-        finally:
-            server._classifier_index = real_index
-
-        # The builder: two quarters; the newer filing has no geographic split.
-        data = os.path.join(folder, "sets")
-        sub_head = "adsh\tcik\tname\tsic\tcountryinc\tcountryba\tstprinc\tstprba\tform\tperiod\n"
-        num_head = "adsh\ttag\tversion\tddate\tqtrs\tuom\tsegments\tvalue\n"
-        quarters = {
-            "2025q1": (sub_head + "a1\t7\tOLD NAME\t1000\tUS\tUS\tDE\tDE\t10-K\t20231231\n",
-                       num_head + "a1\tRevenues\tus-gaap/2023\t20231231\t4\tUSD\t\t100\n"
-                       "a1\tRevenues\tus-gaap/2023\t20231231\t4\tUSD\tGeographical=US\t80\n"),
-            "2025q2": (sub_head + "a2\t7\tNEW NAME\t2000\tUS\tUS\tNV\tNV\t10-K\t20241231\n",
-                       num_head + "a2\tRevenues\tus-gaap/2024\t20241231\t4\tUSD\t\t120\n"),
-            "2025q3": (sub_head, num_head),
-        }
-        for q, (sub, num) in quarters.items():
-            os.makedirs(os.path.join(data, q))
-            open(os.path.join(data, q, "sub.txt"), "w", encoding="utf-8").write(sub)
-            open(os.path.join(data, q, "num.txt"), "w", encoding="utf-8").write(num)
-        built, used = company_classifier.build_index(max_quarters=2, data_dir=data)
-        check("builder: the quarters actually read are the ones recorded", used == ["2025q3", "2025q2"], str(used))
-        built, used = company_classifier.build_index(max_quarters=3, data_dir=data)
-        entry = built["7"]
-        check("builder: name, SIC and state come from the latest filing",
-              (entry["name"], entry["sic"], entry["state_inc"]) == ("NEW NAME", "2000", "NV"), str(entry))
-        check("builder: the revenue split may come from an older one, and says so",
-              entry["revenue_country"] == "US" and entry["revenue_period"] == "20231231", str(entry))
-
-        snapshot = company_classifier.resources.files("edgar_mcp").joinpath("data", "company_index.json")
-        before = hashlib.sha256(snapshot.read_bytes()).hexdigest()
-        output = os.path.join(folder, "built.json")
-        company_classifier.save_index(built, used, output)
-        company_classifier.COMPANY_INDEX, company_classifier.USER_INDEX_FILE = None, output
-        companies, meta = company_classifier.load_index_with_meta()
-        check("index: a built index is preferred to the snapshot, with its record",
-              meta["origin"] == "built by the user" and meta["quarters"] == used and list(companies) == ["7"])
-        check("index: building leaves the packaged snapshot unchanged",
-              hashlib.sha256(snapshot.read_bytes()).hexdigest() == before)
-        company_classifier.COMPANY_INDEX = legacy
-        check("index: EDGAR_COMPANY_INDEX comes before a built index",
-              company_classifier.load_index_meta()["origin"] == "EDGAR_COMPANY_INDEX")
-    finally:
-        company_classifier.COMPANY_INDEX, company_classifier.USER_INDEX_FILE = real
 
 
 def path_cases():
@@ -1007,11 +877,9 @@ if __name__ == "__main__":
     client_cases()
     lookup_cases()
     history_cases()
-    segment_cases()
     instance_cases()
     xbrl_link_cases()
     text_cases()
-    index_cases()
     path_cases()
     print(f"problems: {len(problems)}")
     sys.exit(1 if problems else 0)

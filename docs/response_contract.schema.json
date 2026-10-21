@@ -80,7 +80,7 @@
   },
   "list_filings": {
    "allOf": [{"$ref": "#/$defs/envelope"}, {
-    "required": ["cik", "filters", "filings", "complete", "warnings"],
+    "required": ["cik", "filters", "count", "limit_reached", "filings", "complete", "warnings"],
     "properties": {
      "representation": {"const": "source_records"},
      "filters": {"type": "object"},
@@ -92,8 +92,11 @@
   },
   "list_filing_documents": {
    "allOf": [{"$ref": "#/$defs/envelope"}, {
-    "required": ["transformation", "documents"],
-    "properties": {"representation": {"const": "transformed"}, "documents": {"type": "array"}}
+    "required": ["cik", "accession_number", "transformation", "original", "documents", "warnings"],
+    "properties": {"representation": {"const": "transformed"},
+                   "transformation": {"type": "object", "required": ["name", "rules"]},
+                   "original": {"type": "object", "required": ["url", "sha256", "tool"]},
+                   "documents": {"type": "array", "items": {"type": "object", "required": ["sequence", "description", "type", "size", "document", "url"]}}}
    }]
   },
   "get_filing_document": {
@@ -113,7 +116,7 @@
   },
   "search_filings": {
    "allOf": [{"$ref": "#/$defs/envelope"}, {
-    "required": ["hits", "total_hits"],
+    "required": ["filters", "hits", "total_hits", "total_relation", "offset", "count", "next_offset"],
     "properties": {"representation": {"const": "source_records"},
                    "hits": {"type": "array", "items": {"type": "object", "required": ["record", "url"],
                             "properties": {"record": {"type": "object", "required": ["_id", "_source"]}}}}}

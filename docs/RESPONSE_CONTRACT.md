@@ -97,53 +97,76 @@ with `AMBIGUOUS_COMPANY` and the candidates.
 
 ### `lookup_company(query)` — `source_records`
 
-Exact identifier lookup in `company_tickers.json`. `status` is `resolved` (one
-CIK), `ambiguous` (several CIKs) or `not_found`. `matches` lists every row that
-matched, each as `{"cik": <10 digits>, "matched_on": "cik" | "ticker" |
-"title", "record": <the row as published>}`. A company with several tickers
-has several rows; they share one CIK.
+Exact identifier lookup in `company_tickers.json`. `status` is `resolved` (the
+matching rows share one CIK), `ambiguous` (they name several CIKs; the answer
+also lists the query and those CIKs in `unresolved`) or `not_found`. `matches`
+lists every row that matched, in the feed's order, each as `{"cik": <10
+digits>, "matched_on": "cik" | "ticker" | "title", "record": <the row as
+published>}`. A company with several tickers has several rows; they share one
+CIK. A CIK missing from the feed can still be given to every other tool.
 
 ### `get_submissions(cik_or_ticker, include_older_files=False)` — `source`
 
 The SEC submissions document unchanged, including `sic` and `sicDescription`
 as the SEC publishes them. With `include_older_files`, `older_files` lists each
-file named in `filings.files`, each as `{"name", "payload"}`.
+file named in `filings.files`, in the order listed, each as `{"name",
+"payload"}` with the file unchanged.
 
 ### `list_filings(cik_or_ticker, form="10-K", as_of=None, limit=10, include_amendments=False)` — `source_records`
 
 Rows of the submissions filing tables, in the SEC's order (the recent table,
-then each older file in the order `filings.files` lists them). `record` holds
-every column under the SEC's own key (`accessionNumber`, `filingDate`,
-`reportDate`, `acceptanceDateTime`, `form`, `primaryDocument`,
-`primaryDocDescription`, `items`, ...). Beside it: `url`, the primary
-document's address built from the CIK, accession number and `primaryDocument`;
-and `source`, the file and row index the record came from. `form` is compared
-literally (`include_amendments` also keeps `<form>/A`); `as_of` keeps rows
-whose `filingDate` is on or before it.
+then each older file in the order `filings.files` lists them); nothing is
+re-sorted, merged or de-duplicated. `record` holds every column under the
+SEC's own key (`accessionNumber`, `filingDate`, `reportDate`,
+`acceptanceDateTime`, `form`, `primaryDocument`, `primaryDocDescription`,
+`items`, ...). Beside it: `url`, the primary document's address built from the
+CIK, accession number and `primaryDocument` (null when either is missing, or
+when `primaryDocument` is a path such as `xslF345X06/form4.xml`: that names an
+SEC rendering, not a file of the filing folder; the record keeps it as
+published); and `source`, the file and row index the record came from.
+
+`form` is compared literally (`include_amendments` also keeps `<form>/A`;
+`form=None` keeps every row). `as_of` keeps rows whose `filingDate` is on or
+before it; a row without a `filingDate` in YYYY-MM-DD form cannot be placed
+against `as_of`, so it is left out and named in `warnings`. Older files are read
+only as far as `limit` needs, and one that cannot be read is an error, never a
+shorter list. `filters` echoes the arguments, `limit_reached` says the list
+stopped at `limit`, and `complete` is false when `warnings` names a row left out
+or a column cut short.
 
 ### `list_filing_documents(url)` — `transformed`
 
-The rows of the filing's index page, parsed from its HTML table (sequence,
-description, type and size as the page shows them). The index page itself is
-available from `get_filing_document`.
+The rows of the filing's index page (`<accession>-index.htm`), read from its
+HTML table by the rules listed in `transformation`: `sequence`, `description`,
+`type` and `size` as the page shows them, the file name (`document`) and its
+`url`. `original` names the index page and its `sha256`; `get_filing_document`
+returns it byte for byte. A link outside the filing folder is left out and
+named in `warnings`.
 
 ### `get_filing_document(url, offset=0, max_bytes=1000000)` — `source`
 
-Any file inside one filing folder, byte for byte, in pages. `data_base64` holds
-the page; `text` holds the same bytes decoded as UTF-8 when they decode
-strictly, else null. `sha256` and `total_bytes` describe the whole file.
+Any file inside one filing folder, byte for byte, in pages of up to 5,000,000
+bytes. `data_base64` holds `length` bytes from `offset`; `text` holds the same
+bytes decoded as UTF-8 when they decode strictly, else null (a page boundary
+can split a character). `sha256` and `total_bytes` describe the whole file and
+`content_type` is the SEC's. `next_offset` is null on the last page.
 
 ### `get_filing_text(url, find=None, start=0, max_chars=12000)` — `transformed`
 
-Plain text extracted from an HTML or text document by the rules named in
-`transformation`, with `original` pointing at the file and its `sha256`.
-Offsets count characters of the extracted text.
+Plain text extracted from an HTML or text document by the rules listed in
+`transformation` (`name` changes whenever a rule changes), with `original`
+pointing at the file, its `sha256` and `get_filing_document`. Offsets count
+characters of the extracted text.
 
 ### `search_filings(query, forms, filed_from, filed_to, offset, limit)` — `source_records`
 
-Hits of the SEC full-text search. Each hit keeps the search index's own record
-(`_id` and `_source`) verbatim in `record`, beside the document `url` built from
-it.
+Hits of the SEC full-text search, in the SEC's order. Each hit keeps the
+search index's own record (`_id`, `_source` and any other key it returns)
+verbatim in `record`, beside the document `url` built from the first CIK of
+`_source.ciks` and the accession number and file name in `_id` (null when those
+are missing). `total_hits` and `total_relation` are the index's `total.value`
+and `total.relation`; `offset`, `count` and `next_offset` page through the
+hits; `filters` echoes the arguments.
 
 ### `get_companyfacts(cik_or_ticker, taxonomy=None, concept=None)` — `source`, or `source_records` when filtered
 

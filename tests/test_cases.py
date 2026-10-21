@@ -1,4 +1,4 @@
-"""Fixed cases for company lookup, the SEC client, filing list, document address check and cache.
+"""Fixed cases for exact company lookup, the SEC client, filing rows, document address check and cache.
 
 No network. Run from the repository root:
     python -X utf8 tests/test_cases.py
@@ -34,31 +34,59 @@ def check(label, ok, detail=""):
 def lookup_cases():
     feed = {
         "0": {"cik_str": 1, "ticker": "AAA", "title": "Twin Holdings Inc"},
-        "1": {"cik_str": 2, "ticker": "BBB", "title": "Twin Holdings Inc."},
+        "1": {"cik_str": 2, "ticker": "BBB", "title": "Twin  Holdings INC"},
         "2": {"cik_str": 3, "ticker": "CCC", "title": "Two Class Corp"},
         "3": {"cik_str": 3, "ticker": "CCD", "title": "Two Class Corp"},
+        "4": {"cik_str": 4, "ticker": "CCC.W", "title": "AAA"},
     }
+    meta = {"source_url": company_lookup.COMPANY_TICKERS_URL, "retrieved_at": "2026-01-01T00:00:00Z",
+            "cache_hit": False, "frozen": False, "sha256": "0" * 64}
     real = company_lookup.get_json
-    company_lookup.get_json = lambda url, *args, **kwargs: (feed, {})
+    company_lookup.get_json = lambda url, *args, **kwargs: (feed, meta)
     try:
-        kind, matches = company_lookup.find_company("Twin Holdings Inc")
-        check("a name shared by two companies identifies neither",
-              kind == "shared_name" and sorted(m["cik"] for m in matches) == ["0000000001", "0000000002"],
-              f"{kind} {[m['cik'] for m in matches]}")
-        kind, matches = company_lookup.find_company("Twin Holdings")
-        check("nor does that name reached by adding a suffix", kind == "shared_name", kind)
-        kind, matches = company_lookup.find_company("Two Class Corp")
-        check("one company under two tickers is still one company",
-              kind == "name" and matches[0]["cik"] == "0000000003", kind)
+        status, matches, _ = company_lookup.find_company("twin holdings inc")
+        check("a title equal (case and runs of spaces aside) to rows of two companies is ambiguous",
+              status == "ambiguous" and [m["cik"] for m in matches] == ["0000000001", "0000000002"]
+              and [m["record"] for m in matches] == [feed["0"], feed["1"]], f"{status} {matches}")
+        status, matches, _ = company_lookup.find_company("Twin Holdings")
+        check("a title missing its suffix is not found: no suffix is added", status == "not_found", status)
+        status, matches, _ = company_lookup.find_company("Twin Holdings Inc.")
+        check("punctuation is compared as written", status == "not_found", status)
+        status, matches, _ = company_lookup.find_company("Twin Holding")
+        check("a near title is not found: nothing is fuzzy-matched", status == "not_found", status)
+        status, matches, _ = company_lookup.find_company("Two Class Corp")
+        check("one company under two tickers is one company, both rows kept",
+              status == "resolved" and len(matches) == 2 and {m["cik"] for m in matches} == {"0000000003"}, status)
+        status, matches, _ = company_lookup.find_company("aaa")
+        check("a query equal to one row's ticker and another row's title is ambiguous, each match labelled",
+              status == "ambiguous" and [(m["cik"], m["matched_on"]) for m in matches]
+              == [("0000000001", "ticker"), ("0000000004", "title")], str(matches))
+        status, matches, _ = company_lookup.find_company("CCC")
+        check("a ticker matches only itself, not a ticker that starts with it",
+              status == "resolved" and [m["record"]["ticker"] for m in matches] == ["CCC"], str(matches))
+        status, matches, _ = company_lookup.find_company("0003")
+        check("digits are a CIK", status == "resolved" and all(m["matched_on"] == "cik" for m in matches), status)
+        for bad in ["", "   ", "12345678901"]:
+            try:
+                company_lookup.find_company(bad)
+                check(f"refused: {bad!r}", False)
+            except ValueError:
+                check(f"refused: {bad!r}", True)
         try:
             _resolve("Twin Holdings Inc")
-            check("a shared name is refused with the candidates", False)
+            check("an ambiguous title is refused with the candidates", False)
         except Exception as e:
-            check("a shared name is refused with the candidates",
+            check("an ambiguous title is refused with the candidates",
                   "AMBIGUOUS_COMPANY" in str(e) and "CIK 0000000002" in str(e), str(e)[:90])
+        try:
+            _resolve("Twin Holding")
+            check("an unknown title is not found", False)
+        except Exception as e:
+            check("an unknown title is not found", "NOT_FOUND" in str(e), str(e)[:90])
+        check("digits resolve to the CIK without reading the feed", _resolve("320193")["cik"] == "0000320193")
     finally:
         company_lookup.get_json = real
-        company_lookup.company_cache.delete("company_tickers_v5")
+        company_lookup.company_cache.delete("company_tickers_v6")
 
 
 def client_cases():
@@ -87,24 +115,53 @@ def client_cases():
 
 
 def filing_cases():
-    feed = {
-        "accessionNumber": ["0000000001-24-000003", "0000000001-24-000002", "0000000001-23-000001",
-                            "0000000001-22-000009"],
-        "form": ["10-K/A", "10-K", "10-K", "10-K"],
-        "filingDate": ["2024-03-01", "2024-02-15", "2023-02-15", ""],
-        "primaryDocument": ["a.htm", "b.htm", "c.htm", "d.htm"],
-        "reportDate": ["2023-12-31", "2023-12-31", "2022-12-31", "2021-12-31"],
+    recent = {
+        "accessionNumber": ["0000000001-24-000003", "0000000001-24-000002", "0000000001-23-000001"],
+        "form": ["10-K/A", "10-K", "10-K"],
+        "filingDate": ["2024-03-01", "2024-02-15", "2023-02-15"],
+        "primaryDocument": ["a.htm", "b.htm", "c.htm"],
     }
+    older = {"accessionNumber": ["0000000001-22-000009", "0000000001-21-000001"],
+             "form": ["10-K", "10-K"], "filingDate": ["", "2021-02-01"], "primaryDocument": ["d.htm"]}
+    submissions = {"filings": {"recent": recent, "files": [{"name": "CIK0000000001-submissions-001.json"}]}}
+    read = []
     retrieval = FilingRetrieval()
-    warnings = []
-    rows = retrieval._process_filings_data(feed, "10-K", "2024-12-31", "0000000001", False, warnings)
-    check("a filing with no date is left out and reported",
-          [r["filing_date"] for r in rows] == ["2024-02-15", "2023-02-15"] and len(warnings) == 1,
-          str(warnings))
-    rows = retrieval._process_filings_data(feed, "10-K", "2024-12-31", "0000000001", True, [])
-    check("amendments are returned when asked for", rows[0]["form"] == "10-K/A", rows[0]["form"])
-    check("document address is built from CIK, accession and document",
-          rows[1]["url"] == "https://www.sec.gov/Archives/edgar/data/1/000000000124000002/b.htm", rows[1]["url"])
+    retrieval.get_company_submissions = lambda cik: (read.append("recent") or submissions, {"source_url": "r"})
+    retrieval.get_older_submissions = lambda name: (read.append(name) or older, {"source_url": name})
+    sources, warnings = [], []
+    rows = retrieval.iter_filing_records("1", sources, warnings)
+    first = [next(rows) for _ in range(3)]
+    check("the recent table's rows come first, in the SEC's order, every column as published",
+          [r["record"] for r in first] == [{k: v[i] for k, v in recent.items()} for i in range(3)]
+          and [r["source"]["index"] for r in first] == [0, 1, 2])
+    check("the older file is not read while the recent table suffices", read == ["recent"], str(read))
+    rest = list(rows)
+    check("then each older file, in the order listed, with its file name and row index",
+          read == ["recent", "CIK0000000001-submissions-001.json"]
+          and [(r["source"]["file"], r["source"]["index"]) for r in rest]
+          == [("CIK0000000001-submissions-001.json", 0), ("CIK0000000001-submissions-001.json", 1)])
+    check("a row with an empty filingDate is kept as published", rest[0]["record"]["filingDate"] == "")
+    check("a column that stops short is reported and absent from the rows it does not reach",
+          len(warnings) == 1 and "primaryDocument" not in rest[1]["record"], str(warnings))
+    check("every file read is recorded", [m["source_url"] for m in sources]
+          == ["r", "CIK0000000001-submissions-001.json"])
+
+    submissions["filings"]["files"] = [{"name": "../../elsewhere.json"}]
+    try:
+        list(FilingRetrieval.older_file_names(retrieval, submissions, "1"))
+        check("an older file with an unexpected name is refused", False)
+    except sec_client.SecError as e:
+        check("an older file with an unexpected name is refused", "unexpected name" in str(e), str(e)[:90])
+
+    def unreadable(name):
+        raise sec_client.SecError("cannot read")
+    submissions["filings"]["files"] = [{"name": "CIK0000000001-submissions-001.json"}]
+    retrieval.get_older_submissions = unreadable
+    try:
+        list(retrieval.iter_filing_records("1", [], []))
+        check("an older file that cannot be read is an error, never a shorter list", False)
+    except sec_client.SecError:
+        check("an older file that cannot be read is an error, never a shorter list", True)
 
 
 def address_cases():
