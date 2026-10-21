@@ -294,8 +294,16 @@ lists every schema reached, with `name`, `url`, `read`, `target_namespace`
 and `discovered_by` (the file, `seq` and element of the reference). A file
 that is not read (outside the filing, missing, unreadable, or referenced by
 an instance that is itself unresolved) is named in `unresolved` with the
-reason, so an empty `items` with an empty `unresolved` means every dependency
-was read and none held anything of that part.
+reason, in the answer of every part, whichever part's file references it.
+Each address that a locator, `roleRef` or `arcroleRef` (of any linkbase or
+of the instance) names and that is not read, because it is outside the
+filing, names no single file of the folder or has no href, is listed once
+as `schema` (null for no href), `references` (how many references by
+element: `loc`, `roleRef`, `arcroleRef`), `referenced_from` (the files, in
+discovery order) and `reason`; a linkbase part adds `locators`, how many of
+its own locators point there (0 when the references are another part's). So
+an empty `items` with an empty `unresolved` means every dependency was read
+and none held anything of that part.
 
 Every part keeps what the files it parses write, and says what it leaves
 out: `not_returned` lists it (comments and processing instructions, the XML
@@ -338,10 +346,8 @@ The XBRL files of one filing, one `part` at a time:
   `schemaLocation` or `href` resolved. `target_namespace` and `namespaces` are
   the company schema's; each schema's own `target_namespace` is in `schemas`.
   Imported schemas outside the filing, a QName that does not resolve and an
-  id two elements share are listed in `unresolved`, and so is each schema
-  outside the filing that a linkbase or the instance points to (`schema`, and
-  `references`, how many references by element: `loc`, `roleRef`,
-  `arcroleRef`).
+  id two elements share are listed in `unresolved`, and so is each address
+  not read that a linkbase or the instance points to, as described above.
 - `presentation`, `calculation`, `definition`, `label`, `reference`: every
   extended link of that element (`extended_link_element`, for instance
   `{http://www.xbrl.org/2003/linkbase}calculationLink`) in every linkbase
@@ -378,7 +384,8 @@ The XBRL files of one filing, one `part` at a time:
   `unresolved`; a
   locator into a schema outside the filing (the US GAAP taxonomy, say) is
   `resolved: false` with `schema` and `fragment`, and each such schema is
-  listed once in `unresolved` with its count of locators. The fragment is
+  listed once in `unresolved` with its count of this part's locators
+  (`locators`), next to every other unread address, as described above. The fragment is
   the schema's own element id, which the filer and the taxonomy write;
   this server does not read external taxonomies, so it does not turn a
   fragment into a concept name. An extended link of an element no part

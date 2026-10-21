@@ -1517,6 +1517,54 @@ def dts_closure_cases():
           code or str(r and r["unresolved"]))
 
 
+# ── Round 4: every reference that is not read is in `unresolved`, whatever the part ──
+
+def unread_reference_cases():
+    ext = "https://ext.example/"
+    folder = filed()
+    after_root = lambda name, xml: re.sub(rb"(<link:linkbase[^>]*>)", lambda m: m.group(1) + xml,
+                                          folder[name], count=1)
+    # The reviewer's probe 1: a presentation locator into an outside schema that nothing else names.
+    opening = b'<link:presentationLink xlink:type="extended" xlink:role="http://t.example/role/Income">'
+    assert opening in folder["t-20251231_pre.xml"]
+    folder["t-20251231_pre.xml"] = folder["t-20251231_pre.xml"].replace(
+        opening, opening + b'<link:loc xlink:type="locator" xlink:href="' + ext.encode()
+        + b'loc-only.xsd#e_A" xlink:label="e_A"/>', 1)
+    # The reviewer's probe 2: a roleRef into an outside schema, in the presentation linkbase itself.
+    folder["t-20251231_pre.xml"] = after_root("t-20251231_pre.xml", b'<link:roleRef roleURI="http://ext.example/R" '
+                                              b'xlink:type="simple" xlink:href="' + ext.encode() + b'roles.xsd#R"/>')
+    # An outside arcroleRef in the definition linkbase, an outside roleRef in the instance, and a locator in the
+    # calculation linkbase whose href names no single file of the folder.
+    folder["t-20251231_def.xml"] = after_root("t-20251231_def.xml", b'<link:arcroleRef arcroleURI="http://ext.example/'
+                                              b'A" xlink:type="simple" xlink:href="' + ext.encode() + b'arcs.xsd#A"/>')
+    schema_ref = b'<link:schemaRef xlink:type="simple" xlink:href="t-20251231.xsd"/>'
+    folder["t-20251231_htm.xml"] = folder["t-20251231_htm.xml"].replace(
+        schema_ref, schema_ref + b'<link:roleRef roleURI="http://ext.example/I" xlink:type="simple" xlink:href="'
+        + ext.encode() + b'instance-roles.xsd#I"/>', 1)
+    cal_open = re.search(rb"<link:calculationLink [^>]*>", folder["t-20251231_cal.xml"]).group(0)
+    folder["t-20251231_cal.xml"] = folder["t-20251231_cal.xml"].replace(
+        cal_open, cal_open + b'<link:loc xlink:type="locator" xlink:href="sub/x.xsd#x_A" xlink:label="x_A"/>', 1)
+
+    wanted = {ext + "loc-only.xsd": {"loc": 1}, ext + "roles.xsd": {"roleRef": 1}, ext + "arcs.xsd": {"arcroleRef": 1},
+              ext + "instance-roles.xsd": {"roleRef": 1}, FOLDER_URL + "sub/x.xsd": {"loc": 1}}
+    for part in ("schema", "presentation", "calculation", "definition", "label", "reference"):
+        r, code = xbrl_call(folder, part=part)
+        got = {u["schema"]: u.get("references") for u in (r or {}).get("unresolved", []) if u.get("schema") in wanted}
+        check(f"r4 {part}: every outside or unreadable schema a locator, roleRef or arcroleRef names is in unresolved,"
+              " counted by element", code is None and got == wanted, code or str(r and r["unresolved"])[:600])
+        named = [u["schema"] for u in (r or {}).get("unresolved", []) if u.get("schema") in wanted]
+        check(f"r4 {part}: each is named once", code is None and len(named) == len(set(named)), str(named))
+        if part != "schema" and code is None:
+            locs = {u["schema"]: u.get("locators") for u in r["unresolved"] if u.get("schema") in wanted}
+            mine = {k: 1 if (part, k) in (("presentation", ext + "loc-only.xsd"),
+                                          ("calculation", FOLDER_URL + "sub/x.xsd")) else 0 for k in wanted}
+            check(f"r4 {part}: `locators` counts this part's locators into each", locs == mine, str(locs))
+    r, code = xbrl_call(folder, part="label")
+    check("r4 label: the reviewer's probe, no longer empty items and empty unresolved",
+          code is None and any(u.get("schema") == ext + "loc-only.xsd" for u in r["unresolved"]),
+          code or str(r and (r["items"][:2], r["unresolved"])))
+
+
 # ── Round 3, blocker 2: the index page is parsed as HTML, and a row it cannot read blocks a unique choice ──
 
 def index_html(rows):
@@ -1800,6 +1848,7 @@ if __name__ == "__main__":
     tuple_cases()
     exact_number_cases()
     dts_closure_cases()
+    unread_reference_cases()
     index_cases()
     record_number_cases()
     install_check_cases()

@@ -964,10 +964,7 @@ def get_filing_xbrl(
         items = [{**item, "file": record["name"]} for record in dts.schemas.values() if record["read"]
                  for item in record["_result"]["items"]]
         main = dts.schemas[schema_entry["url"]]["_result"]
-        for url, counts in dts.referenced_external.items():
-            unresolved.append({"schema": url, "references": counts,
-                               "reason": "the schema is outside the filing: the filing's linkbases or instance "
-                                         "point to it (counted by element), and it is not read"})
+        unresolved += dts.unread_references()
         return envelope("parsed_source", sources, **common, file=schema_entry,
                         target_namespace=main["target_namespace"], namespaces=main["namespaces"],
                         schemas=dts.schema_records(), **_page(items, offset, limit),
@@ -979,10 +976,7 @@ def get_filing_xbrl(
         found, entry_out = dts.read_linkbase(ref, part)
         items += found
         linkbase_files.append(entry_out)
-    for url, count in dts.external.items():
-        unresolved.append({"schema": url, "locators": count,
-                           "reason": "the schema is outside the filing: these locators keep their href and "
-                                     "fragment as written, and their concept is not resolved here"})
+    unresolved += dts.unread_references(part_locators=True)
     return envelope("parsed_source", sources, **common, file=schema_entry, schemas=dts.schema_records(),
                     linkbases=linkbase_files, extended_link_element=f"{{{xs.LINK}}}{xs.EXTENDED_LINKS[part]}",
                     **_page(items, offset, limit), not_returned=[*xs.NOT_RETURNED, _OTHER_LINKS],
@@ -1004,15 +998,17 @@ class _Dts:
     element, whichever part is asked for) into a schema of the filing. Each
     file is read once (a reference back to a file already read ends there).
     A reference to a file outside the filing, or to one that is missing or
-    unreadable, is not read and is named in `unresolved`."""
+    unreadable, is not read and is named in `unresolved`, whatever part is
+    asked for: a filing schema once (`schema`), every other address a
+    locator, roleRef or arcroleRef names once (`unread_references`)."""
 
     def __init__(self, folder: str, accession: str, sources: list, unresolved: list):
         self.folder, self.accession, self.sources, self.unresolved = folder, accession, sources, unresolved
         self.schemas: dict = {}       # url -> record, in discovery order
         self.linkbases: list = []     # linkbase references, in discovery order
         self.read_linkbases: dict = {}
-        self.external: dict = {}      # schema url outside the filing -> locators of the part pointing to it
-        self.referenced_external: dict = {}  # schema url outside the filing -> {element: references}
+        self.part_locators: dict = {}  # unread address -> locators of the part asked for pointing to it
+        self.not_read: dict = {}       # address no filing schema is read at -> its unresolved entry
 
     def local(self, url: str | None) -> str | None:
         """The file name when `url` is one file of the filing folder."""
@@ -1079,15 +1075,32 @@ class _Dts:
         self.linkbases.append({"url": url, "href": href, "attributes": attributes, "discovered_by": discovered_by})
 
     def referenced(self, url: str | None, discovered_by: dict):
-        """A roleRef, arcroleRef or locator pointing to `url` (absolute): a schema of the filing is read."""
-        if not url:
-            return
-        schema_url = url.partition("#")[0]
-        if self.local(schema_url):
+        """A roleRef, arcroleRef or locator pointing to `url` (absolute): a schema of the filing is read;
+        any other address (outside the filing, not one file of the folder, or no href) is counted in
+        `not_read`, by element and by the files that reference it."""
+        schema_url = url.partition("#")[0] if url else None
+        if schema_url and self.local(schema_url):
             self.schema(schema_url, discovered_by)
-        elif not schema_url.startswith(self.folder):
-            counts = self.referenced_external.setdefault(schema_url, {})
-            counts[discovered_by["node"]] = counts.get(discovered_by["node"], 0) + 1
+            return
+        if not schema_url:
+            reason = "the reference has no href, so it names no schema; nothing is read for it"
+        elif schema_url.startswith(self.folder):
+            reason = "the href does not name one file of the filing folder; nothing is read for it"
+        else:
+            reason = ("the schema is outside the filing and is not read: the references to it keep their href "
+                      "as written, and a locator into it is not resolved to a concept")
+        entry = self.not_read.setdefault(schema_url or "", {"schema": schema_url, "references": {},
+                                                            "referenced_from": [], "reason": reason})
+        node = discovered_by["node"]
+        entry["references"][node] = entry["references"].get(node, 0) + 1
+        if discovered_by.get("file") not in entry["referenced_from"]:
+            entry["referenced_from"].append(discovered_by.get("file"))
+
+    def unread_references(self, part_locators: bool = False) -> list:
+        """The `unresolved` entries of every address referenced and not read, in discovery order, for every
+        part; with `part_locators`, each says how many locators of the part asked for point to it."""
+        return [{**e, "locators": self.part_locators.get(e["schema"] or "", 0)} if part_locators else dict(e)
+                for e in self.not_read.values()]
 
     def discover(self, ref: dict):
         """Reads one linkbase reference (once) and follows every reference it makes, whatever part each
@@ -1129,14 +1142,16 @@ class _Dts:
         """Resolves a locator's absolute href (resolved by `read_linkbase` against its effective base URI)."""
         def resolve(href):
             if not href:
+                self.part_locators[""] = self.part_locators.get("", 0) + 1
                 return {"resolved": False, "reason": "the locator has no href"}
             url, _, fragment = href.partition("#")
             if not url.startswith(self.folder):
-                self.external[url] = self.external.get(url, 0) + 1
+                self.part_locators[url] = self.part_locators.get(url, 0) + 1
                 return {"resolved": False, "schema": url, "fragment": fragment,
                         "reason": "the schema is outside the filing"}
             name = self.local(url)
             if name is None:
+                self.part_locators[url] = self.part_locators.get(url, 0) + 1
                 return {"resolved": False, "schema": url, "fragment": fragment,
                         "reason": "the href does not name one file of the filing folder"}
             record = self.schemas.get(url) or self.schema(url, {"node": "loc", "href": href})

@@ -473,6 +473,13 @@ What 1.0 leaves unresolved, and says so:
 - From rc3 `get_filing_xbrl` follows every schema and linkbase the filing
   references before it selects a part, so `part="label"` finds a label
   linkbase that only a presentation locator's schema points to.
+- From rc4 every schema and linkbase part lists in `unresolved` each address
+  that a locator, `roleRef` or `arcroleRef` anywhere in the filing names and
+  that is not read (outside the filing, not one file of the folder, no
+  href), once, with `schema`, `references`, `referenced_from` and `reason`;
+  linkbase parts add `locators` (this part's count, possibly 0). rc3 named
+  them only for `part="schema"`, and the linkbase parts named only outside
+  schemas their own locators point to.
 - A part's `roleRef` and `arcroleRef` items come from linkbases that hold an
   extended link of that part's kind, and from linkbases that hold no
   extended link any part returns (a roleRefs-only linkbase is in every
