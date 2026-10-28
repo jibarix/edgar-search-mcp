@@ -1,5 +1,15 @@
 # Changelog
 
+## Lock update after 1.0.0 (2026-10-28)
+
+- **`requirements.lock`: certifi 2026.7.22 → 2026.10.23.** 2026.7.22 carries
+  [GHSA-6q48-6c7w-9gw2](https://github.com/advisories/GHSA-6q48-6c7w-9gw2)
+  (also PYSEC-2026-4320, rated Critical): it trusts an emSign root linked to
+  compromised intermediate keys. HTTPX checks every SEC connection against
+  certifi's bundle. The package code and the 1.0.0 wheel are unchanged,
+  because the wheel does not pin certifi. Install with the lock from this
+  commit or later, not the one at tag v1.0.0.
+
 ## 1.0.0
 
 The first release whose contract is frozen: "The public API of 1.x" in
