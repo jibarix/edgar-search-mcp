@@ -1,7 +1,8 @@
 """Every request to the SEC goes through this module.
 
-One rate limiter, one retry rule and one set of errors, so a failed request
-is never mistaken for "the SEC has no such data".
+One rate limiter (edgar_mcp.ratelimit, shared by every process on the
+machine), one retry rule and one set of errors, so a failed request is never
+mistaken for "the SEC has no such data".
 """
 from __future__ import annotations
 
@@ -10,8 +11,8 @@ import json
 import logging
 import math
 import os
+import re
 import tempfile
-import threading
 import time
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -20,51 +21,32 @@ from typing import NamedTuple
 
 import httpx
 
+from edgar_mcp import _testhooks, ratelimit
 from edgar_mcp.config.constants import HTTP_HEADERS, USER_AGENT
 from edgar_mcp.config.settings import (
-    API_REQUEST_TIMEOUT, API_RETRY_COUNT, API_RETRY_DELAY, FROZEN_DIR,
-    RATE_LIMIT_REQUESTS_PER_SECOND, RECORD_DIR,
+    API_REQUEST_TIMEOUT, API_RETRY_COUNT, API_RETRY_DELAY, FROZEN_DIR, RECORD_DIR,
+)
+from edgar_mcp.utils.errors import (  # noqa: F401  (re-exported: callers import them from here)
+    SecError, SecLimiterUnavailable, SecNoFrozenCopy, SecNotFound, SecNoUserAgent, SecRateLimited,
+    SecUnsupported,
 )
 
 logger = logging.getLogger(__name__)
 
 MAX_JSON_BYTES = 150 * 1024 * 1024
-MAX_RETRY_WAIT = 60  # seconds
-
-
-class SecError(Exception):
-    """A request to the SEC did not produce usable data."""
-    code = "UPSTREAM_UNAVAILABLE"
-
-
-class SecNotFound(SecError):
-    """The SEC answered: there is nothing at this address."""
-    code = "NOT_FOUND"
-
-
-class SecRateLimited(SecError):
-    code = "RATE_LIMITED"
-
-
-class SecUnsupported(SecError):
-    """The response is too large or not a type this tool reads."""
-    code = "UNSUPPORTED_DOCUMENT"
-
-
-class SecNoFrozenCopy(SecError):
-    """Frozen copies only, and this address has none: the network is never tried."""
-    code = "NO_FROZEN_COPY"
-
-
-class SecNoUserAgent(SecError):
-    """EDGAR_USER_AGENT is not set, so the SEC would not know who is asking."""
-    code = "NO_USER_AGENT"
+MAX_RETRY_WAIT = ratelimit.MAX_RETRY_WAIT  # seconds
+FORBIDDEN_PAUSE = 600  # seconds, after a 403 without Retry-After
 
 
 def _copy_paths(folder, url):
-    """The body file and the description file of one saved response."""
+    """The old-layout body file and the description file of one saved response."""
     name = hashlib.sha256(url.encode("utf-8")).hexdigest()
     return os.path.join(folder, name + ".body"), os.path.join(folder, name + ".json")
+
+
+def _body_name(url, body):
+    """A recorded body's file name: the hashes of its address and of its bytes."""
+    return f"{hashlib.sha256(url.encode('utf-8')).hexdigest()}.{hashlib.sha256(body).hexdigest()}.body"
 
 
 def _now():
@@ -80,11 +62,23 @@ class Response(NamedTuple):
     frozen: bool = False
 
 
-def _read_frozen(url, max_bytes):
-    body_path, about_path = _copy_paths(FROZEN_DIR, url)
+def _read_frozen(url, max_bytes, folder=None):
+    """The saved response in `folder` (FROZEN_DIR by default). Its description
+    names the body by hash; one without a body name is the old layout,
+    <sha256(url)>.body."""
+    folder = folder or FROZEN_DIR
+    body_path, about_path = _copy_paths(folder, url)
     try:
         with open(about_path, encoding="utf-8") as f:
             about = json.load(f)
+        if not isinstance(about, dict):
+            raise ValueError("the description is not a JSON object")
+        if "body" in about:
+            name = about["body"]
+            prefix = os.path.basename(about_path)[:-len(".json")] + "."
+            if not (isinstance(name, str) and _BODY_NAME.fullmatch(name) and name.startswith(prefix)):
+                raise ValueError(f"the body name {name!r} is not valid")
+            body_path = os.path.join(folder, name)
         size = os.path.getsize(body_path)
         with open(body_path, "rb") as f:
             body = f.read(max_bytes + 1)
@@ -108,54 +102,66 @@ def _read_frozen(url, max_bytes):
     return Response(body, about["content_type"], about["retrieved_at"], frozen=True)
 
 
-def _record(url, status, body, content_type, retrieved_at):
-    """Save a live response as a frozen copy; written whole or not at all."""
-    os.makedirs(RECORD_DIR, exist_ok=True)
-    body_path, about_path = _copy_paths(RECORD_DIR, url)
-    about = {"url": url, "status": status, "content_type": content_type,
-             "sha256": hashlib.sha256(body).hexdigest(),
-             "retrieved_at": retrieved_at}
-    for path, data in ((body_path, body), (about_path, json.dumps(about, indent=1).encode("utf-8"))):
-        handle, temp = tempfile.mkstemp(dir=RECORD_DIR, suffix=".tmp")
+_BODY_NAME = re.compile(r"[0-9a-f]{64}\.[0-9a-f]{64}\.body")
+
+
+def _publish(path, data, kind):
+    """Publish `data` at `path`, whole, by hard-linking a complete temp file:
+    False when the name already exists, which is never replaced. `kind`
+    ("body" or "desc") names the test hook points."""
+    folder = os.path.dirname(path)
+    handle, temp = tempfile.mkstemp(dir=folder, prefix=".tmp-", suffix=".part")
+    try:
         with os.fdopen(handle, "wb") as f:
             f.write(data)
-        os.replace(temp, path)
+            f.flush()
+            os.fsync(f.fileno())
+        _testhooks.pause(f"after_{kind}_temp")
+        _testhooks.pause(f"before_{kind}_link")
+        try:
+            os.link(temp, path)
+        except FileExistsError:
+            return False
+        except OSError as e:
+            raise SecError(f"the record directory {folder} cannot publish atomically (no hard link: {e})") from None
+        _testhooks.pause(f"after_{kind}_link")
+        return True
+    finally:
+        try:
+            os.remove(temp)
+        except OSError as e:  # e.g. held by antivirus; a leftover temp is harmless
+            logger.warning(f"could not remove the temp file {temp}: {e}")
+
+
+def _record(url, status, body, content_type, retrieved_at):
+    """Publish a live response in RECORD_DIR, once: the body under its hash,
+    then the description naming it. Nothing published is ever replaced. If
+    another capture published this address first, returns its Response (its
+    metadata) when it holds the same status and bytes, and raises SecError
+    when it differs; returns None when this capture is the one published."""
+    os.makedirs(RECORD_DIR, exist_ok=True)
+    digest = hashlib.sha256(body).hexdigest()
+    body_path = os.path.join(RECORD_DIR, _body_name(url, body))
+    if not _publish(body_path, body, "body"):
+        # The same address and bytes were published before: check, never touch.
+        with open(body_path, "rb") as f:
+            if hashlib.sha256(f.read()).hexdigest() != digest:
+                raise SecError(f"the recording of {url} is corrupt: {body_path} does not match its name")
+    about = {"url": url, "status": status, "content_type": content_type, "sha256": digest,
+             "retrieved_at": retrieved_at, "body": os.path.basename(body_path)}
+    about_path = _copy_paths(RECORD_DIR, url)[1]
+    if _publish(about_path, json.dumps(about, indent=1).encode("utf-8"), "desc"):
+        return None
+    with open(about_path, encoding="utf-8") as f:
+        winner = json.load(f)
+    if winner.get("status") != status or winner.get("sha256") != digest:
+        raise SecError(f"two captures of {url} differ; the first one recorded is kept")
+    return Response(body, winner["content_type"], winner["retrieved_at"], frozen=True)
 
 
 # Redirects are not followed: every address is checked by the caller first.
-_client = httpx.Client(headers=HTTP_HEADERS, timeout=API_REQUEST_TIMEOUT, follow_redirects=False)
-# The limiter and the back-off time below are shared by every thread of this
-# process only. Two processes on one machine (two MCP servers, a server and a
-# batch run) each keep their own, and the SEC counts them together.
-_rate_lock = threading.Lock()
-_last_request = 0.0
-_blocked_until = 0.0  # time.monotonic() before which no request may be sent
-
-
-def _back_off(seconds):
-    """Hold every thread's requests for `seconds`, as the SEC asked."""
-    global _blocked_until
-    with _rate_lock:
-        _blocked_until = max(_blocked_until, time.monotonic() + seconds)
-
-
-def _wait_for_turn(url):
-    """Space requests out; the SEC allows 10 a second per user.
-
-    While the SEC has asked for a pause, waits it out if it is short and
-    otherwise raises SecRateLimited saying how long is left, so no thread
-    sends a request the SEC has already said it will refuse.
-    """
-    global _last_request
-    with _rate_lock:
-        blocked = _blocked_until - time.monotonic()
-        if blocked > MAX_RETRY_WAIT:
-            raise SecRateLimited(
-                f"the SEC asked for a pause; no request may be sent for another {blocked:.0f} seconds ({url})")
-        pause = max(blocked, (1.0 / RATE_LIMIT_REQUESTS_PER_SECOND) - (time.monotonic() - _last_request))
-        if pause > 0:
-            time.sleep(pause)
-        _last_request = time.monotonic()
+# Every request waits for the limiter shared by every process on the machine.
+_client = ratelimit.limited_client(headers=HTTP_HEADERS, timeout=API_REQUEST_TIMEOUT, follow_redirects=False)
 
 
 def _retry_after(response, default):
@@ -183,41 +189,51 @@ def fetch_response(url, max_bytes=MAX_JSON_BYTES):
     """GET `url`. Returns a Response; its retrieved_at is the UTC time the
     body left the SEC (the recorded time, for a frozen copy).
 
-    Retries timeouts, HTTP 429 and HTTP 5xx. A Retry-After from the SEC is
-    honoured in full by every thread: a short one is waited out, a long one
-    raises at once with the pause left in force. Raises SecNotFound for 404,
-    SecRateLimited for 403/429, SecUnsupported when the body exceeds
-    `max_bytes`, SecNoUserAgent when EDGAR_USER_AGENT is not set, and
+    Retries timeouts, HTTP 429 and HTTP 5xx. A pause the SEC asks for (a
+    429, a 403, a Retry-After on a 5xx) is published to every process on the
+    machine through the shared limiter: a short one is waited out, a long
+    one raises at once with the pause left in force. A 5xx without
+    Retry-After and a timeout wait in this call only. Raises SecNotFound for
+    404, SecRateLimited for 403/429, SecUnsupported when the body exceeds
+    `max_bytes`, SecNoUserAgent when EDGAR_USER_AGENT is not set,
+    SecLimiterUnavailable when the shared limiter cannot be used, and
     SecError for anything else; a 5xx whose Retry-After is too long to wait
     raises SecRateLimited, since the SEC has set a pause. With EDGAR_FROZEN_DIR set,
     answers from the frozen copies only (SecNoFrozenCopy when there is none);
-    with EDGAR_RECORD_DIR set, saves each live answer, a 404 included.
+    with EDGAR_RECORD_DIR set, publishes each live 200 or 404 once and
+    replays it from then on (frozen), never capturing that address again.
     """
     if FROZEN_DIR:
         return _read_frozen(url, max_bytes)
+    if RECORD_DIR and os.path.exists(_copy_paths(RECORD_DIR, url)[1]):
+        # Snapshot: an address recorded once is replayed, never captured again.
+        return _read_frozen(url, max_bytes, RECORD_DIR)
     if not USER_AGENT:
         raise SecNoUserAgent('set EDGAR_USER_AGENT to your name and email, e.g. "Jane Doe jane@example.com"; '
                              f"the SEC asks every client to identify itself ({url})")
     failure = SecError(f"no response from {url}")
     for attempt in range(API_RETRY_COUNT + 1):
-        wait, asked = API_RETRY_DELAY * (2 ** attempt), False
-        _wait_for_turn(url)
+        wait, shared = API_RETRY_DELAY * (2 ** attempt), False
         try:
             with _client.stream("GET", url) as response:
                 status = response.status_code
                 if status == 404:
                     if RECORD_DIR:
-                        _record(url, 404, b"", "", _now())
+                        _record(url, 404, b"", "", _now())  # another capture's 404 is the same answer
                     raise SecNotFound(f"nothing at {url}")
                 if status == 403:
-                    # The SEC answers 403 when it has blocked a client for its request rate.
-                    raise SecRateLimited(f"SEC refused the request (HTTP 403) for {url}")
+                    # The SEC answers 403 when it has blocked a client for its request rate:
+                    # every process holds off, for the Retry-After or FORBIDDEN_PAUSE.
+                    pause = _retry_after(response, FORBIDDEN_PAUSE)
+                    ratelimit.get_default().pause(pause)
+                    raise SecRateLimited(f"SEC refused the request (HTTP 403) for {url}; "
+                                         f"no request is sent for {pause:.0f} seconds")
                 if status == 429:
                     failure = SecRateLimited(f"SEC rate limit reached (HTTP 429) for {url}")
-                    wait = _retry_after(response, wait)
+                    wait, shared = _retry_after(response, wait), True
                 elif status >= 500:
                     failure = SecError(f"SEC server error (HTTP {status}) for {url}")
-                    asked = "Retry-After" in response.headers
+                    shared = "Retry-After" in response.headers
                     wait = _retry_after(response, wait)
                 elif status != 200:
                     raise SecError(f"unexpected HTTP {status} for {url}")
@@ -230,19 +246,23 @@ def fetch_response(url, max_bytes=MAX_JSON_BYTES):
                         chunks.append(chunk)
                     body, content_type = b"".join(chunks), response.headers.get("Content-Type", "")
                     retrieved_at = _now()  # once, so a recording and the answer agree
-                    if RECORD_DIR:
-                        _record(url, 200, body, content_type, retrieved_at)
-                    return Response(body, content_type, retrieved_at)
+                    recorded = _record(url, 200, body, content_type, retrieved_at) if RECORD_DIR else None
+                    return recorded or Response(body, content_type, retrieved_at)
         except httpx.HTTPError as e:
             failure = SecError(f"request to {url} failed: {e}")
-        _back_off(wait)
+        if shared:
+            # A pause the SEC asked for holds every process; the next
+            # admission waits it out.
+            ratelimit.get_default().pause(wait)
         if wait > MAX_RETRY_WAIT:
             # Too long to hold a tool call open; the pause stays in force. A
             # server error with a long Retry-After is a pause the SEC has set.
-            kind = SecRateLimited if asked else type(failure)
+            kind = SecRateLimited if shared else type(failure)
             raise kind(f"{failure}; the SEC asked for a pause of {wait:.0f} seconds")
         if attempt < API_RETRY_COUNT:
             logger.warning(f"{failure}; retrying in {wait:.0f}s")
+            if not shared:
+                time.sleep(wait)  # this call only: other processes are not held
     raise failure
 
 

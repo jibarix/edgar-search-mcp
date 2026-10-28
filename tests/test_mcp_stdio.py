@@ -36,6 +36,7 @@ def payload(result):
 def environment(**extra):
     env = {k: v for k, v in os.environ.items() if not k.startswith("EDGAR_")}
     env["EDGAR_CACHE_DIR"] = tempfile.mkdtemp(prefix="edgar_cache_test_")
+    env["EDGAR_RATE_FILE"] = os.path.join(tempfile.mkdtemp(prefix="edgar_rate_test_"), "state")
     return {**env, **extra}
 
 

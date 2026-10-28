@@ -15,7 +15,10 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ["EDGAR_CACHE_DIR"] = tempfile.mkdtemp(prefix="edgar_cache_test_")
+# Never the user's own limiter state.
+os.environ["EDGAR_RATE_FILE"] = os.path.join(tempfile.mkdtemp(prefix="edgar_rate_test_"), "state")
 
+from edgar_mcp import ratelimit  # noqa: E402
 from edgar_mcp.edgar import company_lookup  # noqa: E402
 from edgar_mcp.edgar.filing_retrieval import FilingRetrieval  # noqa: E402
 from edgar_mcp.server import _document_url, _resolve  # noqa: E402
@@ -93,14 +96,17 @@ def client_cases():
     # The SEC asked for a two-minute pause: nothing more may be sent, by any thread.
     # A stand-in User-Agent gets past the first check; the pause must stop the request.
     real_agent, sec_client.USER_AGENT = sec_client.USER_AGENT, "test test@example.com"
-    sec_client._back_off(120)
+    limiter = ratelimit.Limiter(os.path.join(tempfile.mkdtemp(prefix="edgar_rate_test_"), "state"), 10)
+    ratelimit.set_default(limiter)
+    limiter.pause(120)
     try:
         sec_client.fetch("https://data.sec.gov/submissions/CIK0000000001.json")
         check("no request is sent while the SEC's pause is in force", False)
     except sec_client.SecRateLimited as e:
         check("no request is sent while the SEC's pause is in force", "seconds" in str(e), str(e)[:90])
     finally:
-        sec_client._blocked_until = 0.0
+        limiter.close()
+        ratelimit.set_default(None)
         sec_client.USER_AGENT = real_agent
 
     # Without EDGAR_USER_AGENT nothing is sent at all.

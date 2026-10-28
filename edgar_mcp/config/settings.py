@@ -34,11 +34,13 @@ API_RETRY_DELAY = 2  # seconds
 
 # Rate limiting to comply with SEC guidelines
 # https://www.sec.gov/os/accessing-edgar-data
-# The SEC ceiling is 10 a second per user across all machines; stay under it.
-RATE_LIMIT_REQUESTS_PER_SECOND = 8
+# The SEC ceiling is 10 a second per user across all machines. The limit is
+# shared by every process on this machine: see edgar_mcp/ratelimit.py
+# (EDGAR_RATE_LIMIT, default 8; EDGAR_RATE_FILE).
 
 # Frozen copies, for tests. EDGAR_FROZEN_DIR serves saved responses only and
-# blocks the network; EDGAR_RECORD_DIR saves every live response there.
+# blocks the network; EDGAR_RECORD_DIR saves each live response there once
+# and replays it from then on.
 FROZEN_DIR = os.environ.get("EDGAR_FROZEN_DIR") or None
 RECORD_DIR = os.environ.get("EDGAR_RECORD_DIR") or None
 

@@ -3,7 +3,12 @@
 Run from the repository root (no network):
     python -X utf8 tests/test_contract.py
 
-docs/response_contract.schema.json lists the 1.0 tools and their answers.
+With EDGAR_TEST_INSTALLED=1 the package is the one installed (or put on
+PYTHONPATH), not the source tree, which is kept off the path; the contract and
+the frozen answers still come from this repository. That is the consumer kit:
+it checks a built package against the contract it claims.
+
+edgar_mcp/response_contract.schema.json lists the 1.0 tools and their answers.
 Each tool is called through its real wrapper with the network blocked, its
 answer is validated against the schema, and no key the contract forbids
 (an inferred classification) may appear anywhere in it. Where a tool returns
@@ -23,17 +28,25 @@ import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEC = os.path.join(ROOT, "tests", "fixtures", "sec")
-sys.path.insert(0, ROOT)
+INSTALLED = os.environ.get("EDGAR_TEST_INSTALLED") == "1"
+if not INSTALLED:
+    sys.path.insert(0, ROOT)
 os.environ["EDGAR_FROZEN_DIR"] = SEC
 os.environ["EDGAR_CACHE_DIR"] = tempfile.mkdtemp(prefix="edgar_cache_test_")
+# Never the user's own limiter state.
+os.environ["EDGAR_RATE_FILE"] = os.path.join(tempfile.mkdtemp(prefix="edgar_rate_test_"), "state")
 os.environ.pop("EDGAR_RECORD_DIR", None)
 
 from jsonschema import Draft202012Validator  # noqa: E402
 
-from edgar_mcp import server  # noqa: E402
+import edgar_mcp  # noqa: E402
+from edgar_mcp import contract, server  # noqa: E402
 from edgar_mcp.utils import sec_client  # noqa: E402
 
-with open(os.path.join(ROOT, "docs", "response_contract.schema.json"), encoding="utf-8") as f:
+# The folder the package was imported from: the source tree, or an installed copy.
+PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(edgar_mcp.__file__)))
+print(f"imported from {PACKAGE_ROOT}")
+with open(os.path.join(ROOT, "edgar_mcp", "response_contract.schema.json"), encoding="utf-8") as f:
     SCHEMA = json.load(f)
 with open(os.path.join(ROOT, "docs", "RESPONSE_CONTRACT.md"), encoding="utf-8") as f:
     DOC = f.read()
@@ -112,6 +125,10 @@ def validate(tool, result, label):
 
 
 def schema_cases():
+    if INSTALLED:
+        check("the package under test is not the source tree",
+              os.path.normcase(PACKAGE_ROOT) != os.path.normcase(ROOT), PACKAGE_ROOT)
+    check("the package carries the contract of this repository", contract.SCHEMA == SCHEMA)
     Draft202012Validator.check_schema(SCHEMA)
     check("the schema is valid JSON Schema 2020-12", True)
     for tool in SCHEMA["x-tools"]:
@@ -660,13 +677,13 @@ def error_cases():
 def removal_cases():
     import subprocess
     for path in REMOVED_FILES:
-        check(f"removed from the package: {path}", not os.path.exists(os.path.join(ROOT, path)))
+        check(f"removed from the package: {path}", not os.path.exists(os.path.join(PACKAGE_ROOT, path)))
     with open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8") as f:
         pyproject = f.read()
     check("pyproject ships no data files for the removed classifier", '"edgar_mcp.edgar"' not in pyproject)
     check("pyproject ships no company index", "package-data" not in pyproject and "data/*.json" not in pyproject)
     left = []
-    for folder, _, files in os.walk(os.path.join(ROOT, "edgar_mcp")):
+    for folder, _, files in os.walk(os.path.join(PACKAGE_ROOT, "edgar_mcp")):
         for name in files:
             if name.endswith(".py"):
                 with open(os.path.join(folder, name), encoding="utf-8") as f:
@@ -678,7 +695,7 @@ def removal_cases():
     started = subprocess.run(
         [sys.executable, "-X", "utf8", "-c",
          "import asyncio, edgar_mcp.server as s; print(len(asyncio.run(s.mcp.list_tools())))"],
-        cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
+        cwd=PACKAGE_ROOT, env=env, capture_output=True, text=True, timeout=120)
     check("the server starts without the removed files", started.returncode == 0 and started.stdout.strip().isdigit(),
           started.stderr[-300:])
 

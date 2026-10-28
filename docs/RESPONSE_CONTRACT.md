@@ -1,7 +1,7 @@
 # Response contract, version 1.0
 
 This is the contract every tool of edgar-search-mcp 1.x keeps. The JSON Schema
-in [`response_contract.schema.json`](response_contract.schema.json) states the
+in [`response_contract.schema.json`](../edgar_mcp/response_contract.schema.json) states the
 same rules in machine-checkable form, and `tests/test_contract.py` checks each
 tool's answer against it, offline, from the frozen SEC answers in
 `tests/fixtures/sec`.
@@ -109,7 +109,7 @@ A tool that cannot do its work raises an error whose message starts with a
 code (over MCP the SDK puts `Error executing tool <name>: ` before it, so
 the code follows that prefix in the result's text): `INVALID_INPUT`, `AMBIGUOUS_COMPANY`, `NOT_FOUND`, `RATE_LIMITED`,
 `UPSTREAM_UNAVAILABLE`, `UNSUPPORTED_DOCUMENT`, `NO_USER_AGENT`,
-`NO_FROZEN_COPY`. A normal answer with nothing in it always means the SEC had
+`NO_FROZEN_COPY`, `RATE_LIMITER_UNAVAILABLE`. A normal answer with nothing in it always means the SEC had
 nothing, never that a request failed.
 
 ## Identifying a company
@@ -183,6 +183,13 @@ bytes. `data_base64` holds `length` bytes from `offset`; `text` holds the same
 bytes decoded as UTF-8 when they decode strictly, else null (a page boundary
 can split a character). `sha256` and `total_bytes` describe the whole file and
 `content_type` is the SEC's. `next_offset` is null on the last page.
+
+The SEC files the company tools read are also returned, each address matched
+exactly as written before it is parsed: `https://www.sec.gov/files/company_tickers_exchange.json`,
+`https://data.sec.gov/submissions/CIK<10 digits>.json` and
+`https://data.sec.gov/submissions/CIK<10 digits>-submissions-<3 digits>.json`.
+Any other address is `INVALID_INPUT`. Redirects are not followed: a redirect
+is `UPSTREAM_UNAVAILABLE`.
 
 ### `get_filing_text(url, find=None, start=0, max_chars=12000)` — `transformed`
 
@@ -424,3 +431,139 @@ name suffixes, chosen columns, balances moved between periods, values promoted
 from members, roll-forward or calculation checks, a preferred label or
 language, a merged or "best" duplicate, cover-page interpretations, segment
 selections or shares, industry groups, or companies ranked by similarity.
+
+## The public API of 1.x
+
+From 1.0.0 the following is public, and kept by every 1.x release:
+
+- the eleven tools above, their input schemas and their answers;
+- the envelope, its fields, the representations and `sources`;
+- the error codes listed under Errors;
+- the environment variables below;
+- the layout of recordings and frozen copies;
+- the limiter's state file, how processes share it, and the reset command.
+
+Internals are not public: module and function names other than those the
+README lists under "Using it from Python", `__wrapped__`, the test hooks, and
+the format of the cache.
+
+### Answer schemas
+
+Each tool's `outputSchema` (in `list_tools`) is its answer schema from
+[`response_contract.schema.json`](../edgar_mcp/response_contract.schema.json),
+self-contained: its `$id` is `edgar://contract/1.0/<tool>` and every
+definition it refers to is bundled in its own `$defs`, so a client resolves
+no outside reference. Each successful result carries the answer twice: as
+`structuredContent`, which validates against that schema, and as a text block
+holding the same JSON. An error carries no `structuredContent`.
+
+### Versioning
+
+`contract_version` is `"1.0"`. The release candidates 1.0.0rc1 to rc4 also
+said `"1.0"` while their answers changed; 1.0.0 is the first release in which
+the value names a frozen contract. From 1.0.0:
+
+- a breaking change raises the major version and `contract_version`. Removing
+  or renaming a field, changing its meaning or type, and adding an error code
+  or a representation value are all breaking;
+- a minor release only adds: a new optional field, a new tool, a new optional
+  argument. Consumers ignore fields they do not know;
+- something to be removed is marked deprecated in a minor release and removed
+  only in the next major one.
+
+### Configuration
+
+| Variable | Meaning |
+|---|---|
+| `EDGAR_USER_AGENT` | Name and email sent to the SEC with every request; without it nothing is sent (`NO_USER_AGENT`). |
+| `EDGAR_CACHE_DIR` | Folder of the disk cache. |
+| `EDGAR_FROZEN_DIR` | Answer from frozen copies only; the network is never used (`NO_FROZEN_COPY` for an address without one). |
+| `EDGAR_RECORD_DIR` | Record each live answer there once, and replay it from then on. |
+| `EDGAR_RATE_LIMIT` | Requests a second for this process, more than 0 and at most 10 (default 8). |
+| `EDGAR_RATE_FILE` | The limiter's state file; processes share a limit when they use the same file. Its folder must support hard links. |
+
+### Recordings and frozen copies
+
+For an address `url`, with `h = sha256(url)` in lowercase hex:
+
+- `<h>.json` is the description: `url`, `status` (200 or 404),
+  `content_type`, `sha256` of the body, `retrieved_at` (UTC, when the body
+  left the SEC) and `body`, the name of the body file.
+- `<h>.<sha256 of the body>.body` holds the bytes exactly as received.
+- A description without `body` is the layout before 1.0.0: its body is
+  `<h>.body`. Both layouts are read.
+- Files named `.tmp-*.part` are temp files and may be deleted.
+
+A recorder writes each file to a temp file, then publishes it under its final
+name with a hard link, which never replaces an existing file: the body first,
+then the description. A name that exists holds a complete file. Once an
+address's description exists it is replayed (`frozen: true`, the recorded
+`retrieved_at`) and never captured again. When two processes capture one
+address, the first description published wins: the other answers with the
+winner's metadata if its bytes are the same, and with `UPSTREAM_UNAVAILABLE`
+if they differ. A folder that cannot hold hard links is refused with
+`UPSTREAM_UNAVAILABLE`. Only 200 and 404 answers are recorded. This holds for
+a process that is killed part way; it is not claimed across a power loss.
+
+### The shared request limiter
+
+Every process that uses one `EDGAR_RATE_FILE` shares one limit. Each request
+is admitted under a lock on one byte of the file and then passes a last check
+just before it is handed to the network: it goes only if that check falls
+within 25 ms of its admission, and is otherwise admitted again. The guarantee
+is on the times of those last checks: across all processes sharing the file,
+at most 10 in any one second. How soon after its last check a request leaves
+the machine is best effort, not guaranteed. `EDGAR_RATE_LIMIT` sets how far
+apart one process's admissions are spaced; it is not a separate strict bound
+on that process's requests in a rolling second.
+
+A pause the SEC asks for (HTTP 429, 403, or a 5xx with `Retry-After`) holds
+every process. While more than 60 seconds of it remain, a call fails with
+`RATE_LIMITED` and sends nothing; with 60 seconds or less left, the call waits
+for its end. A 403 without `Retry-After` is not retried and pauses every
+process for 600 seconds. That length is this server's policy: the SEC says
+access may resume once a client's request rate has stayed below its threshold
+for ten minutes, but it does not say every 403 is a rate block.
+
+`RATE_LIMITER_UNAVAILABLE` means nothing was sent, for one of three reasons:
+
+- The lock was not obtained within 5 seconds. Only that call fails; the next
+  call tries again, so this clears by itself once the lock is free.
+- The file cannot be opened or read (for example, a folder at that path).
+  Every call fails until the path is fixed.
+- The file does not hold a whole, valid state: a write cut short, an empty
+  file, or a checksum that does not match. Every call fails until a person
+  runs
+
+  ```
+  python -m edgar_mcp.ratelimit --reset --reason "<why>"
+  ```
+
+  which keeps the previous contents in `reset.log` beside the file and holds
+  requests for 60 seconds. A reset writes the new state over the old bytes;
+  if it is stopped part way, the file is left invalid, never empty.
+
+A missing file is created whole: a fresh state is published with a hard link,
+so no process ever reads a new file empty. Creating it therefore needs a
+folder on a file system that supports hard links (NTFS or a usual Linux or
+macOS file system; not FAT or exFAT, and not every network share). Where the
+link fails, every call is refused as a file that cannot be opened, and no
+state file is left; point `EDGAR_RATE_FILE` at a folder that supports hard
+links. The default folders are usually on such a file system, but that is not
+checked. When the wall clock and the
+monotonic clock disagree about the time since the last write, the stored
+times are dropped: requests wait 1.025 seconds and a pause in force starts
+again in full. The event is logged as a warning with both clocks' readings,
+stored and current, and as one line in `clock.log` beside the file.
+
+### In-memory caches
+
+The disk cache (`EDGAR_CACHE_DIR`) is off while recording or replaying. Two
+caches in memory stay on in every mode: the last 32 files, up to 100 MB,
+read through `get_filing_document`, and the text of the last eight documents.
+A repeat read of an address from one server process comes from memory, with
+`cache_hit: true` and the first read's `retrieved_at`. These entries have no
+expiry. A filing folder's files never change, but the SEC's company files read
+through `get_filing_document` (the exchange list, submissions files) do, so in
+a server that runs for days such an answer can be days old. Check
+`retrieved_at`, or start a new server.

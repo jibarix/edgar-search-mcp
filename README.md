@@ -21,12 +21,14 @@ time it left the SEC, whether it came from the cache or a frozen copy) and says
 what kind of data it is (`representation`). An empty result always means the
 SEC had nothing. A failed request is a coded error, never an empty answer. The
 full contract is in [docs/RESPONSE_CONTRACT.md](docs/RESPONSE_CONTRACT.md), with
-a JSON Schema beside it.
+a JSON Schema in the package, and each tool serves its answer schema as its
+`outputSchema`.
 
-This is a release candidate, `1.0.0rc4`. The tools of 0.8 that classified,
-mapped or chose figures are gone. [docs/CONSUMER_MIGRATION.md](docs/CONSUMER_MIGRATION.md)
-lists every removed or changed tool and field and how to rebuild each from the
-raw data. [CHANGELOG.md](CHANGELOG.md) has the history.
+This is `1.0.0`, the first version whose contract is frozen: what 1.x keeps
+and how it changes is under "The public API of 1.x" in the contract. The tools
+of 0.8 that classified, mapped or chose figures are gone.
+[docs/CONSUMER_MIGRATION.md](docs/CONSUMER_MIGRATION.md) lists every removed or
+changed tool and field and how to rebuild each from the raw data. [CHANGELOG.md](CHANGELOG.md) has the history.
 
 ## Contents
 
@@ -52,7 +54,7 @@ raw data. [CHANGELOG.md](CHANGELOG.md) has the history.
 | `get_submissions` | `source` | The SEC submissions document of a company, unchanged; older files on request |
 | `list_filings` | `source_records` | Rows of the submissions filing tables in the SEC's order, every column under the SEC's key, literal filters |
 | `list_filing_documents` | `transformed` | The rows of one filing's index page, with the page's hash |
-| `get_filing_document` | `source` | Any file of one filing folder, byte for byte, in pages |
+| `get_filing_document` | `source` | Any file of one filing folder, or an SEC company list, byte for byte, in pages |
 | `get_filing_text` | `transformed` | Plain text extracted from a filing document by named rules, in pages or where a phrase occurs |
 | `search_filings` | `source_records` | Hits of the SEC full-text search, each record as the index returns it |
 | `get_companyfacts` | `source` | The SEC companyfacts document, unchanged (literal taxonomy and concept filters) |
@@ -98,7 +100,9 @@ The package ships no data files and writes nothing next to its code. Use
 | `EDGAR_USER_AGENT` | **yes** | Your name and email, e.g. `Jane Doe jane@example.com`. The SEC asks every client to identify itself this way. Without it no request is sent, and tools that need the SEC answer `NO_USER_AGENT`. |
 | `EDGAR_CACHE_DIR` | no | Where responses are cached. Default: your user cache folder (below). |
 | `EDGAR_FROZEN_DIR` | no | Serve saved responses only; the network is never used. See [Frozen copies](#frozen-copies-for-reproducible-runs). |
-| `EDGAR_RECORD_DIR` | no | Save every live response there as a frozen copy. |
+| `EDGAR_RECORD_DIR` | no | Save each live response there once as a frozen copy, and replay it from then on. |
+| `EDGAR_RATE_LIMIT` | no | Requests a second for this process, more than 0 and at most 10. Default 8. The server does not start with an invalid value. |
+| `EDGAR_RATE_FILE` | no | The state file of the limiter shared by every process on this machine. Default: `%LOCALAPPDATA%\sec-edgar-rate\state` on Windows, `$XDG_STATE_HOME/sec-edgar-rate/state` (or `~/.local/state/...`) elsewhere. Processes share a limit only when they use the same file. Its folder must support hard links (not FAT, exFAT or every network share). |
 
 The cache lives outside the installed package and is safe to delete:
 
@@ -202,8 +206,12 @@ nothing more.
 Any file inside one filing folder, byte for byte, in pages of up to 5,000,000
 bytes (`data_base64`), with `text` when those bytes decode strictly as UTF-8.
 `sha256` and `total_bytes` describe the whole file; `next_offset` is null on
-the last page. Only `https://www.sec.gov/Archives/edgar/data/<cik>/<accession>/<file>`
-is accepted.
+the last page. Accepted addresses, matched exactly as written:
+`https://www.sec.gov/Archives/edgar/data/<cik>/<accession>/<file>`,
+`https://www.sec.gov/files/company_tickers_exchange.json`,
+`https://data.sec.gov/submissions/CIK<10 digits>.json` and
+`https://data.sec.gov/submissions/CIK<10 digits>-submissions-<3 digits>.json`.
+Redirects are not followed.
 
 ### `get_filing_text(url, find=None, start=0, max_chars=12000)`
 
@@ -288,43 +296,105 @@ MCP SDK's prefix `Error executing tool <name>: `, starts with a code:
 | `UNSUPPORTED_DOCUMENT` | The document is too large, not a type the tool reads, or a filing has no XBRL the tool can read |
 | `NO_USER_AGENT` | `EDGAR_USER_AGENT` is not set |
 | `NO_FROZEN_COPY` | Frozen copies only, and this address has none |
+| `RATE_LIMITER_UNAVAILABLE` | The request limiter shared by every process on this machine cannot be used (its state file cannot be opened, locked within 5 seconds or read, or `EDGAR_RATE_LIMIT` is invalid); nothing was sent |
 
 ## SEC access: rate limit, retries, cache
 
-- Every request goes through `edgar_mcp/utils/sec_client.py`, which allows at
-  most 8 requests a second per process. The SEC's limit is 10 a second per
-  user, across all your processes and machines.
+- Every request goes through `edgar_mcp/utils/sec_client.py` and waits for
+  one limiter shared by every edgar-search-mcp process on the machine
+  (`edgar_mcp/ratelimit.py`): a small state file, `EDGAR_RATE_FILE`, else
+  `%LOCALAPPDATA%\sec-edgar-rate\state` on Windows and
+  `$XDG_STATE_HOME/sec-edgar-rate/state` elsewhere, read and written under a
+  file lock. A request is handed to the network only if its last check falls
+  within 25 ms of its admission; across all processes sharing the file, at
+  most 10 of those last checks fall in any one second. What happens after the
+  check is best effort. `EDGAR_RATE_LIMIT` (default 8, at most 10) spaces one
+  process's admissions; it is not a strict per-process bound. The SEC's limit
+  is 10 a second per user, across all your processes and machines; other
+  machines are not counted.
 - Timeouts, HTTP 429 and HTTP 5xx are retried up to three times with
-  exponential back-off, and a `Retry-After` from the SEC is honoured. A pause
-  longer than 60 seconds is reported as `RATE_LIMITED` instead of holding the
-  call open; until the pause ends, other calls get the same answer without
-  sending a request. HTTP 403 is treated as a rate-limit block and not retried.
+  exponential back-off. A pause the SEC asks for (HTTP 429, HTTP 403, or a
+  `Retry-After` on a 5xx) holds every process on the machine. A pause longer
+  than 60 seconds is reported as `RATE_LIMITED` instead of holding the call
+  open; while more than 60 seconds of it remain, other calls get the same
+  answer without sending a request, and with 60 seconds or less left they
+  wait. HTTP 403 is treated as a rate-limit block and not retried; without a
+  `Retry-After` it pauses every process for 600 seconds. That is this
+  server's policy: the SEC says access may resume after the request rate has
+  stayed below its threshold for ten minutes, not that every 403 is a rate
+  block. A 5xx without `Retry-After` and a timeout wait in the one call only.
+- `RATE_LIMITER_UNAVAILABLE` sends nothing. A lock not obtained within 5
+  seconds fails that call only; the next call tries again. A state file that
+  cannot be opened or read fails every call until the path is fixed. A state
+  that is not whole and valid (a write cut short, an empty file, a checksum
+  mismatch) fails every call until it is reset by hand, which keeps the old
+  bytes in `reset.log` and holds requests for 60 seconds:
+  `python -m edgar_mcp.ratelimit --reset --reason "<why>"`. A missing state
+  file is created whole, and a reset stopped part way leaves an invalid file,
+  never an empty one.
+- Creating the state file needs a folder that supports hard links: NTFS or a
+  usual Linux or macOS file system, not FAT, exFAT or every network share.
+  Where the link fails, every call is refused with `RATE_LIMITER_UNAVAILABLE`
+  ("cannot be opened") and no state file is left; set `EDGAR_RATE_FILE` to a
+  file in a folder that supports hard links. The default folders usually do,
+  but the server does not check this in advance.
+- When the wall clock and the monotonic clock disagree since the state was
+  last written, the stored times are dropped: requests wait 1.025 seconds and
+  a pause in force starts again in full. The event is logged as a warning with
+  both clocks' readings and as a line in `clock.log` beside the state file.
 - Redirects are not followed, and response sizes are capped (60 MB for a
   document).
 - Submissions, companyfacts, companyconcept and frames are cached on disk for
   one hour, and the SEC's ticker list for 24 hours. A cached answer keeps the
   `retrieved_at` and `sha256` of its download and says `cache_hit: true`. The
-  text of the last eight documents read is kept in memory. A cache read never
-  deletes anything; an entry that cannot be read is a miss.
+  text of the last eight documents read is kept in memory, and so are the last
+  32 files (up to 100 MB) read through `get_filing_document`. The memory
+  entries have no expiry: a filing folder's files never change, but the SEC's
+  company files read through `get_filing_document` (the exchange list,
+  submissions files) do, so in a server that runs for days they can be days
+  old. Their `retrieved_at` says when; start a new server for a fresh copy. A
+  cache read never deletes anything; an entry that cannot be read is a miss.
 
 ## Frozen copies for reproducible runs
 
 To make a run repeatable, record what the SEC returned and replay it later:
 
 ```bash
-EDGAR_RECORD_DIR=./frozen python -m edgar_mcp   # live; every response saved, 404s included
+EDGAR_RECORD_DIR=./frozen python -m edgar_mcp   # live once per address; 200s and 404s saved
 EDGAR_FROZEN_DIR=./frozen python -m edgar_mcp   # replay; the network is never used
 ```
 
-Each response is saved as a `.body` file plus a `.json` description (URL,
-status, content type, SHA-256, retrieval time). A replay reports the recorded
-retrieval time, with `frozen: true`. During replay:
+Each response is saved as a body file named by the hashes of its address and
+its bytes, plus a `.json` description named by the hash of its address (URL,
+status, content type, SHA-256, retrieval time, body file name). A replay reports
+the recorded retrieval time, with `frozen: true`.
+
+While recording:
+
+- an address is captured once. Once its description exists, the copy is
+  replayed (`frozen: true`) and never captured again, so later pages of a
+  paged document come from the same copy. A fresh capture needs a fresh folder.
+- each file is written to a temp file, then published under its final name by
+  a hard link, which never replaces an existing file. A process killed part
+  way leaves either a complete copy or harmless leftovers (a body without a
+  description, a `.tmp-*.part` file). Power loss is not covered.
+- if two processes capture one address at once, the first description
+  published wins. The other process returns the winner's metadata when its
+  bytes are the same, and `UPSTREAM_UNAVAILABLE` ("two captures ... differ")
+  when they are not; both bodies stay on disk.
+- only 200 and 404 answers are saved, never 403, 429 or 5xx.
+- a folder on a volume without hard links (FAT, exFAT, some network shares)
+  is refused with `UPSTREAM_UNAVAILABLE`.
+
+During replay:
 
 - an address with no copy is refused with `NO_FROZEN_COPY`;
 - a copy whose body no longer matches its SHA-256, whose description is
   malformed, or whose body is larger than the tool allows is refused.
 
-The cache is off while recording or replaying.
+The disk cache is off while recording or replaying. The in-memory caches stay
+on: a repeat read in one server process comes from memory, with
+`cache_hit: true` and the first read's `retrieved_at`.
 
 ## Using it from Python
 
@@ -343,20 +413,29 @@ package is internal.
 
 ## Tests
 
-Six plain scripts, run from the repository root, all offline: they replay the
+Ten plain scripts, run from the repository root, all offline: they replay the
 frozen SEC answers in `tests/fixtures/sec` or use made-up answers, and fail if
-anything tries to reach the network. Each prints one line per check and ends
+anything tries to reach the network. Each script gets its own limiter state
+file, never yours. Each prints one line per check and ends
 with `problems: N`.
 
 ```bash
-python -X utf8 tests/run_all.py             # all six, with a total
+python -X utf8 tests/run_all.py             # all ten, with a total
 python -X utf8 tests/test_cases.py          # exact lookup, SEC client, filing rows, URL checks, cache
 python -X utf8 tests/test_tools_offline.py  # the tools against made-up SEC answers
 python -X utf8 tests/test_frozen.py         # record and replay; the 0.8.0 outputs and what replaced them
 python -X utf8 tests/test_contract.py       # every tool's answer against the 1.0 contract and its schema
 python -X utf8 tests/test_xbrl_source.py    # the XBRL readers on made-up and real filings
 python -X utf8 tests/test_mcp_stdio.py      # starts the server over stdio and calls the tools
+python -X utf8 tests/test_urls.py           # the SEC files outside filing folders that get_filing_document reads
+python -X utf8 tests/test_ratelimit.py      # the limiter shared by processes, with real subprocesses
+python -X utf8 tests/test_recorder.py       # recordings published once, races and killed processes
+python -X utf8 tests/test_schema.py         # each tool's outputSchema; test_contract.py against a built wheel
 ```
+
+`tests/build_wheel.py <out>` builds a test wheel of the working tree from a
+clean copy, offline, with a `build_record.json` of every hash; it is not a
+release build.
 
 `tests/capture_fixtures.py` recorded the frozen answers and the 0.8.0 tool
 outputs once, with 0.8.0 checked out; it is not a test.
@@ -375,21 +454,23 @@ edgar-search-mcp/
 ├── edgar_mcp/
 │   ├── __main__.py              # python -m edgar_mcp: starts the stdio server
 │   ├── server.py                # the eleven tools
-│   ├── contract.py              # the response envelope and source records
+│   ├── contract.py              # the response envelope, source records, per-tool schemas
+│   ├── response_contract.schema.json  # the 1.0 contract as JSON Schema
+│   ├── ratelimit.py             # the request limiter shared by every process
 │   ├── edgar/
 │   │   ├── company_lookup.py    # company_tickers.json, exact matching
 │   │   ├── filing_retrieval.py  # submissions, companyfacts, companyconcept, frames
 │   │   └── xbrl_source.py       # XBRL files read as written
 │   ├── config/
 │   │   ├── constants.py         # SEC endpoints, User-Agent
-│   │   └── settings.py          # timeouts, rate limit, cache folder, frozen copies
+│   │   └── settings.py          # timeouts, cache folder, frozen copies
 │   └── utils/
-│       ├── sec_client.py        # the only code that talks to the SEC
+│       ├── sec_client.py        # the only code that talks to the SEC; recording and replay
+│       ├── errors.py            # the error of every SEC request, with its code
 │       ├── cache.py             # disk cache
 │       └── helpers.py
 ├── docs/
 │   ├── RESPONSE_CONTRACT.md     # the 1.0 contract
-│   ├── response_contract.schema.json
 │   └── CONSUMER_MIGRATION.md    # from 0.8 to 1.0, tool by tool and field by field
 ├── tests/
 ├── pyproject.toml

@@ -147,6 +147,7 @@ def replay():
 
 def run(mode, env):
     clean = {k: v for k, v in os.environ.items() if not k.startswith("EDGAR_")}
+    clean["EDGAR_RATE_FILE"] = os.path.join(tempfile.mkdtemp(prefix="edgar_rate_test_"), "state")
     clean["EDGAR_CACHE_DIR"] = tempfile.mkdtemp(prefix="edgar_cache_test_")
     result = subprocess.run([sys.executable, "-X", "utf8", __file__, mode], cwd=HERE, capture_output=True,
                             text=True, env={**clean, **env})

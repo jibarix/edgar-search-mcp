@@ -16,10 +16,13 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+# Never the user's own limiter state.
+os.environ["EDGAR_RATE_FILE"] = os.path.join(tempfile.mkdtemp(prefix="edgar_rate_test_"), "state")
 
 from edgar_mcp.edgar import xbrl_source as xs  # noqa: E402
 

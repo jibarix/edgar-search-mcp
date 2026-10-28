@@ -1,5 +1,80 @@
 # Changelog
 
+## 1.0.0
+
+The first release whose contract is frozen: "The public API of 1.x" in
+`docs/RESPONSE_CONTRACT.md` says what every 1.x release keeps and how it may
+change. Differences from 1.0.0rc4:
+
+- **More addresses for `get_filing_document`**: besides a file of one filing
+  folder, it returns `https://www.sec.gov/files/company_tickers_exchange.json`
+  and the submissions files
+  `https://data.sec.gov/submissions/CIK<10 digits>.json` and
+  `CIK<10 digits>-submissions-<3 digits>.json`, byte for byte, matched exactly
+  as written. Redirects are no longer followed.
+- **One request limiter for every process on the machine**: a state file
+  (`EDGAR_RATE_FILE`, default `%LOCALAPPDATA%\sec-edgar-rate\state` on
+  Windows, `$XDG_STATE_HOME/sec-edgar-rate/state` elsewhere) read and written
+  under a file lock. Each request passes a last check within 25 ms of its
+  admission before it is handed to the network; across processes sharing the
+  file, at most 10 of those last checks fall in any one second. Delivery after
+  the check is best effort. `EDGAR_RATE_LIMIT` (new; default 8, at most 10;
+  the server does not start with an invalid value) spaces one process's
+  admissions; it is not a strict per-process bound. rc4 paced each process
+  alone at 8 a second.
+- **New error code `RATE_LIMITER_UNAVAILABLE`**: nothing is sent. A lock not
+  obtained within 5 seconds fails that call only. A file that cannot be opened
+  or read fails every call until the path is fixed. A state that is not whole
+  and valid (a cut-short write, an empty file, a checksum mismatch) fails
+  every call until
+  `python -m edgar_mcp.ratelimit --reset --reason "<why>"`, which keeps the old
+  bytes in `reset.log` and holds requests for 60 seconds. A missing state file
+  is created whole, with a hard link, so its folder must support hard links
+  (choose it with `EDGAR_RATE_FILE`); where it does not, every call is refused
+  and no state file is left. A reset stopped part way leaves an invalid file,
+  never an empty one. A clock inconsistency is logged with both clocks' readings and
+  in `clock.log`. An invalid `EDGAR_RATE_LIMIT` also gives this code.
+- **Pauses the SEC asks for hold every process**: a 429, a 403, or a 5xx with
+  `Retry-After`. While more than 60 seconds remain, calls fail with
+  `RATE_LIMITED` without sending; with 60 seconds or less, they wait. A 403
+  without `Retry-After` now pauses every process for 600 seconds, a local
+  policy; in rc4 it held nothing. A 5xx without `Retry-After` and a timeout
+  wait in the one call only.
+- **The in-memory caches have no expiry**: the last 32 files read through
+  `get_filing_document` and the text of the last eight documents stay in
+  memory in every mode, recording and replay included (the disk cache is off
+  in those modes). A company file read that way can be days old in a
+  long-running server; its `retrieved_at` says when.
+- **Recordings are captured once and never replaced**: with
+  `EDGAR_RECORD_DIR`, an address whose description exists is replayed
+  (`frozen: true`, the recorded `retrieved_at`) instead of fetched again. The
+  body file is now named `<sha256 of url>.<sha256 of body>.body` and the
+  description names it in a new `body` field; each file is published whole by
+  a hard link. When two processes capture one address, the first description
+  wins; the other answers with its metadata, or `UPSTREAM_UNAVAILABLE` if the
+  bytes differ. A folder without hard links is refused. rc4 overwrote every
+  recording on each fetch. Frozen copies in the rc4 layout are still read.
+- **Each tool serves its answer schema as `outputSchema`**, self-contained,
+  with `$id` `edgar://contract/1.0/<tool>`; successful results carry
+  `structuredContent` that validates against it, plus the same JSON as text.
+  The tools' Python return type is now `dict[str, Any]`.
+- **The JSON Schema moved into the package**:
+  `edgar_mcp/response_contract.schema.json` (was
+  `docs/response_contract.schema.json`), shipped in the wheel through the new
+  `MANIFEST.in` and read by `edgar_mcp.contract`.
+- **Consumer kit**: `tests/test_contract.py` runs against an installed package
+  with `EDGAR_TEST_INSTALLED=1` and says which package it imported;
+  `tests/build_wheel.py` builds a test wheel from a clean copy of the working
+  tree with a record of every hash.
+- **Server start**: refuses to start when the test-only `EDGAR_TEST_HOOKS` is
+  set.
+- **Docs**: the public API, versioning rules, configuration, recording layout
+  and limiter are stated in `docs/RESPONSE_CONTRACT.md`;
+  `docs/CONSUMER_MIGRATION.md` names version `1.0.0` and the new error code.
+
+`contract_version` stays `"1.0"`; rc1 to rc4 carried it across breaking
+changes, and from 1.0.0 a breaking change raises it.
+
 ## 1.0.0rc4
 
 A review of 1.0.0rc3 found unread references missing from linkbase answers.

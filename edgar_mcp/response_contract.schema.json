@@ -109,6 +109,7 @@
    "allOf": [{"$ref": "#/$defs/envelope"}, {
     "required": ["url", "content_type", "sha256", "total_bytes", "offset", "length", "next_offset", "data_base64", "text"],
     "properties": {"representation": {"const": "source"}, "data_base64": {"type": "string"},
+                   "url": {"type": "string", "description": "A file inside one filing folder, https://www.sec.gov/Archives/edgar/data/<cik>/<accession>/<file>, or exactly one of https://www.sec.gov/files/company_tickers_exchange.json, https://data.sec.gov/submissions/CIK<10 digits>.json and https://data.sec.gov/submissions/CIK<10 digits>-submissions-<3 digits>.json"},
                    "text": {"type": ["string", "null"]}}
    }]
   },

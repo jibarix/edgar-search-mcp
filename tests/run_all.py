@@ -6,17 +6,20 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = ["test_cases.py", "test_tools_offline.py", "test_frozen.py", "test_contract.py", "test_xbrl_source.py",
-           "test_mcp_stdio.py"]
+           "test_mcp_stdio.py", "test_urls.py", "test_ratelimit.py", "test_recorder.py", "test_schema.py"]
 
 
 def main():
     failed, total_ok = [], 0
     for script in SCRIPTS:
+        # A fresh limiter state file per script: no test touches the user's own.
+        env = {**os.environ, "EDGAR_RATE_FILE": os.path.join(tempfile.mkdtemp(prefix="edgar_rate_test_"), "state")}
         result = subprocess.run([sys.executable, "-X", "utf8", os.path.join(HERE, script)], cwd=os.path.dirname(HERE),
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, env=env)
         out = result.stdout
         ok = len(re.findall(r"(?m)^OK ", out))
         fails = re.findall(r"(?m)^FAIL .*$", out)

@@ -1,0 +1,3 @@
+# The response contract ships in the package: the server builds each
+# tool's outputSchema from it.
+include edgar_mcp/response_contract.schema.json

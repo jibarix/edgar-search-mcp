@@ -19,6 +19,8 @@ import types
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ["EDGAR_CACHE_DIR"] = tempfile.mkdtemp(prefix="edgar_cache_test_")
+# Never the user's own limiter state.
+os.environ["EDGAR_RATE_FILE"] = os.path.join(tempfile.mkdtemp(prefix="edgar_rate_test_"), "state")
 os.environ.pop("EDGAR_FROZEN_DIR", None)
 os.environ.pop("EDGAR_RECORD_DIR", None)
 
@@ -26,7 +28,7 @@ from urllib.parse import quote  # noqa: E402
 
 import httpx  # noqa: E402
 
-from edgar_mcp import server  # noqa: E402
+from edgar_mcp import ratelimit, server  # noqa: E402
 from edgar_mcp.config import settings  # noqa: E402
 from edgar_mcp.edgar import company_lookup, filing_retrieval  # noqa: E402
 from edgar_mcp.utils import sec_client  # noqa: E402
@@ -49,7 +51,6 @@ def unexpected(request):
 sec_client._client = httpx.Client(transport=httpx.MockTransport(unexpected))
 sec_client.USER_AGENT = "test test@example.com"
 sec_client.API_RETRY_DELAY = 0.001
-sec_client.RATE_LIMIT_REQUESTS_PER_SECOND = 10_000
 
 
 def transport(handler):
@@ -220,27 +221,33 @@ def client_cases():
           second["cache_hit"] and second["retrieved_at"] == first["retrieved_at"])
 
     # A 503 with a long Retry-After is a pause: RATE_LIMITED, and later requests are held too.
+    # The shared limiter runs on its own state file and a clock that moves only when told.
     clock = {"now": 1000.0}
-    real_monotonic = sec_client.time.monotonic
-    sec_client.time = types.SimpleNamespace(monotonic=lambda: clock["now"], sleep=lambda s: None)
+    fake = types.SimpleNamespace(monotonic=lambda: clock["now"], time=lambda: 1.7e9 + clock["now"],
+                                 sleep=lambda s: clock.update(now=clock["now"] + max(0.0, s)))
+    limiter = ratelimit.Limiter(os.path.join(tempfile.mkdtemp(prefix="edgar_rate_test_"), "state"), 10, clock=fake)
+    ratelimit.set_default(limiter)
+
+    def limited(handler):
+        sec_client._client = httpx.Client(transport=ratelimit.RateLimitedTransport(httpx.MockTransport(handler)))
     try:
-        transport(lambda r: httpx.Response(503, headers={"Retry-After": "120"}))
+        limited(lambda r: httpx.Response(503, headers={"Retry-After": "120"}))
         try:
             sec_client.fetch_response(url)
             check("a 503 asking for two minutes is RATE_LIMITED", False)
         except sec_client.SecError as e:
             check("a 503 asking for two minutes is RATE_LIMITED",
                   e.code == "RATE_LIMITED" and "503" in str(e), str(e)[:80])
-        sec_client._client = httpx.Client(transport=httpx.MockTransport(unexpected))
+        limited(unexpected)
         try:
             sec_client.fetch_response(url)
             check("no request is sent while that pause lasts", False)
         except sec_client.SecRateLimited:
             check("no request is sent while that pause lasts", True)
         clock["now"] += 121
-        transport(lambda r: httpx.Response(200, content=b"{}"))
+        limited(lambda r: httpx.Response(200, content=b"{}"))
         check("requests go out again once the pause is over", sec_client.fetch(url)[0] == b"{}")
-        transport(lambda r: httpx.Response(503))
+        limited(lambda r: httpx.Response(503))
         try:
             sec_client.fetch_response(url)
             check("a 503 without Retry-After, retried to the end, is UPSTREAM_UNAVAILABLE", False)
@@ -248,9 +255,8 @@ def client_cases():
             check("a 503 without Retry-After, retried to the end, is UPSTREAM_UNAVAILABLE",
                   e.code == "UPSTREAM_UNAVAILABLE", e.code)
     finally:
-        sec_client.time = __import__("time")
-        sec_client._blocked_until = 0.0
-        del real_monotonic
+        limiter.close()
+        ratelimit.set_default(None)
         sec_client._client = httpx.Client(transport=httpx.MockTransport(unexpected))
 
 
